@@ -227,7 +227,7 @@ tr.row-done td{transition:background .3s}
       <img class="hdr-logo-svg" src="{{ url_for('static', filename='images/mirae_asset_logo.png') }}" alt="MIRAE ASSET 미래에셋증권">
       신용등급 관리 시스템
     </div>
-    <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFS) &nbsp;|&nbsp; 미공시 시 회사채 선순위 자동 적용</div>
+    <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFSR) &nbsp;|&nbsp; 1순위 기업신용등급 2순위 회사채 선순위 적용</div>
   </div>
   <div class="hdr-right">
     <div class="upd-lbl">마지막 업데이트<br><strong id="hdr-upd">{{ last_updated }}</strong></div>
@@ -283,7 +283,7 @@ tr.row-done td{transition:background .3s}
       <div class="card-head">
         <span class="card-title">{{ category }}</span>
         <span class="card-note">
-          {% if category in ['손해보험','생명보험'] %}보험지급능력등급(IFS) 기준{% else %}기업신용등급(ICR) 우선 · 미공시 시 회사채 선순위 자동 적용{% endif %}
+          {% if category in ['손해보험','생명보험'] %}보험지급능력등급(IFSR) 기준{% else %}기업신용등급(ICR) 우선 · 1순위 기업신용등급 2순위 회사채 선순위 적용{% endif %}
           &nbsp;|&nbsp; 최종적용 = 3사 중 최저등급
         </span>
       </div>
