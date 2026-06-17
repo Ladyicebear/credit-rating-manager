@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>신용등급 관리 시스템</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
+     background:#f4f5f7;color:#222;min-height:100vh;font-size:13px}
+
+/* ── Header ── */
+.hdr{background:#F68121;
+     color:#fff;padding:14px 28px;display:flex;align-items:center;
+     justify-content:space-between;position:sticky;top:0;z-index:100;
+     box-shadow:0 3px 14px rgba(0,0,0,.2)}
+.hdr-title{font-size:1.2rem;font-weight:800;letter-spacing:-.4px;display:flex;align-items:center;gap:14px}
+.hdr-logo-svg{height:48px;width:auto;display:block}
+.hdr-sub{font-size:.7rem;color:#ffe2cc;margin-top:3px}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.upd-lbl{font-size:.7rem;color:#ffe2cc;text-align:right;line-height:1.5}
+.upd-lbl strong{color:#fff}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;
+     border:none;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;
+     transition:all .15s;white-space:nowrap}
+.btn-primary{background:#F68121;color:#fff}
+.btn-primary:hover{background:#d65f0f;transform:translateY(-1px)}
+.btn-navy{background:#16335B;color:#fff}
+.btn-navy:hover{background:#0f2440;transform:translateY(-1px)}
+.btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.32)}
+.btn-ghost:hover{background:rgba(255,255,255,.24)}
+.btn-sm{padding:4px 9px;font-size:.71rem}
+.btn-warn{background:#fff3cd;color:#856404;border:1px solid #ffc107}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
+
+/* ── Layout ── */
+.main{max-width:1700px;margin:0 auto;padding:18px 18px 60px}
+
+/* ── Alert / Info bars ── */
+.alert-bar{display:flex;align-items:center;gap:10px;background:#fff8e1;
+           border:1px solid #ffc107;border-radius:9px;padding:10px 16px;
+           margin-bottom:14px;font-size:.8rem;color:#6d4c00}
+.alert-bar.hidden{display:none}
+.alert-bar .ack-all{margin-left:auto}
+.info-bar{background:#fff;border-radius:9px;padding:9px 16px;margin-bottom:14px;
+          display:flex;align-items:center;gap:8px;font-size:.76rem;color:#666;
+          box-shadow:0 1px 4px rgba(0,0,0,.07)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap}
+.tab-btn{padding:7px 16px;border:2px solid transparent;border-radius:7px;
+         background:#fff;color:#555;font-size:.8rem;font-weight:700;cursor:pointer;
+         transition:all .14s;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.tab-btn:hover{border-color:#F68121;color:#F68121}
+.tab-btn.active{background:#16335B;color:#fff;border-color:#16335B}
+.tab-badge{display:inline-block;padding:1px 6px;border-radius:9px;font-size:.67rem;margin-left:3px}
+.tab-btn.active .tab-badge{background:#F68121;color:#fff}
+.tab-btn:not(.active) .tab-badge{background:#eef1f7;color:#777}
+.tab-chg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;
+             background:#F68121;margin-left:4px;vertical-align:middle}
+
+/* ── Panel / Card ── */
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden}
+.card-head{padding:11px 16px;display:flex;align-items:center;justify-content:space-between;
+           border-bottom:2px solid #f0f2f7}
+.card-title{font-size:.9rem;font-weight:800;color:#12122a}
+.card-note{font-size:.7rem;color:#888}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:75vh}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+thead th{position:sticky;top:0;z-index:2;background:#fff}
+
+/* 헤더 그룹 색상 */
+.th-grp-nice {background:#eef1f6!important}
+.th-grp-kr   {background:#eef1f6!important}
+.th-grp-kis  {background:#eef1f6!important}
+.th-grp-final{background:#fdeee2!important}
+.th-grp-chg  {background:#f4f5f7!important}
+
+thead th{color:#16335B;font-weight:800;padding:8px 10px;
+         text-align:center;border-bottom:2px solid #dde3ec;
+         white-space:nowrap;vertical-align:middle;font-size:.75rem}
+th.th-name{text-align:left;min-width:120px;background:#eef1f6}
+th.th-agency{min-width:145px}
+th.th-final-r{min-width:100px}
+th.th-basis {min-width:160px}
+th.th-chg   {min-width:190px}
+th.th-act   {min-width:80px;background:#eef1f6}
+
+tbody tr{border-bottom:1px solid #f0f2f7;transition:background .1s}
+tbody tr:hover{background:#f7f9fc}
+tbody tr.row-changed{background:#fdf2e9}
+tbody tr.row-changed:hover{background:#fbe7d6}
+
+td{padding:8px 10px;text-align:center;vertical-align:middle}
+td.td-name{text-align:left;font-weight:700;color:#16335B;min-width:120px}
+td.td-agency{vertical-align:middle}
+td.td-final-r{background:#fdf6ef;font-weight:800}
+td.td-basis {background:#fdf6ef;text-align:left;font-size:.72rem;color:#555;padding:7px 10px}
+td.td-chg   {text-align:left;padding:7px 10px}
+td.td-act   {padding:6px 7px}
+
+/* ── Agency Cell ── */
+.ag-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.ag-type-badge{display:inline-block;padding:1px 7px;border-radius:10px;
+               font-size:.63rem;font-weight:700;white-space:nowrap;margin-bottom:1px}
+.type-ICR  {background:#dde6f2;color:#16335B}
+.type-SB   {background:#dde6f2;color:#16335B}
+.type-IFS  {background:#fde4d0;color:#b8500f}
+.type-none {background:#eee;color:#999}
+.ag-date{font-size:.67rem;color:#aaa;margin-top:1px}
+
+/* ── Rating Badge ── */
+.rbadge{display:inline-block;padding:3px 10px;border-radius:18px;
+        font-size:.77rem;font-weight:800;min-width:46px;text-align:center;letter-spacing:.3px}
+.rating-AAA{background:#b8e0c2;color:#0a4020}
+.rating-AA {background:#c8e8d0;color:#155724}
+.rating-A  {background:#dff0d8;color:#276221}
+.rating-BBB{background:#fff3cd;color:#856404}
+.rating-BB {background:#fde8d0;color:#874d00}
+.rating-B  {background:#fddcdc;color:#721c24}
+.rating-CCC{background:#f5c6cb;color:#491217}
+.rating-low{background:#dc3545;color:#fff}
+.no-rating {color:#ccc;font-size:.77rem}
+.rbadge-final{font-size:.83rem;padding:4px 13px}
+
+/* ── Change tag ── */
+.chg-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
+         border-radius:11px;font-size:.73rem;font-weight:700;white-space:nowrap}
+.chg-down{background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb}
+.chg-up  {background:#f0fff4;color:#1e7e34;border:1px solid #c3e6cb}
+.chg-same{background:#f5f5f5;color:#666;border:1px solid #ddd}
+
+/* 변경사항 행 */
+.chg-row{display:flex;align-items:baseline;gap:5px;margin:2px 0;flex-wrap:nowrap}
+.chg-agency-lbl{font-size:.68rem;font-weight:700;color:#666;min-width:46px;flex-shrink:0}
+
+/* ── Basis cell ── */
+.basis-line{display:flex;align-items:center;gap:5px;margin:2px 0}
+.basis-ico{font-size:.9rem}
+.basis-agency{font-weight:700;color:#16335B}
+.basis-type{font-size:.68rem;padding:1px 6px;border-radius:8px}
+
+/* ── Status pill ── */
+.spill{display:inline-block;padding:1px 6px;border-radius:7px;
+       font-size:.63rem;font-weight:700;margin-left:4px;vertical-align:middle}
+.spill-ok    {background:#e2f0d9;color:#276221}
+.spill-manual{background:#fff3cd;color:#856404}
+.spill-fail  {background:#f5f5f5;color:#aaa}
+.spill-ifs   {background:#f0d8ff;color:#7a1a8f}
+.spill-sb    {background:#e0d8ff;color:#4a1a8f}
+
+/* ── Bell / alert ── */
+.bell{font-size:.85rem;margin-left:4px;cursor:pointer;opacity:.85}
+.bell:hover{opacity:1}
+
+/* ── Modal ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);
+         z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:#fff;border-radius:13px;padding:24px 28px;width:540px;
+       max-width:96vw;box-shadow:0 10px 50px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:.95rem;font-weight:800;margin-bottom:14px;color:#12122a}
+.ag-section{border:1px solid #e8ecf5;border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.ag-section-title{font-size:.75rem;font-weight:800;margin-bottom:10px;padding-bottom:6px;
+                   border-bottom:1px solid #eee}
+.ag-sec-nice{color:#1a3a8f}.ag-sec-kr{color:#4a1a8f}.ag-sec-kis{color:#1a6a3a}
+.form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:.7rem;font-weight:700;color:#555}
+.fg select,.fg input{padding:5px 7px;border:1px solid #ddd;border-radius:5px;font-size:.76rem}
+.mfoot{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:22px;right:22px;background:#12122a;color:#fff;
+       padding:10px 16px;border-radius:8px;font-size:.8rem;z-index:999;
+       opacity:0;transform:translateY(10px);transition:all .22s;pointer-events:none;max-width:320px}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok  {border-left:4px solid #28a745}
+#toast.err {border-left:4px solid #dc3545}
+#toast.info{border-left:4px solid #17a2b8}
+
+/* ── Spinner ── */
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);
+      border-top-color:#fff;border-radius:50%;animation:sp .65s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ── Progress bar ── */
+#prog-wrap{background:#fff;border-radius:9px;padding:10px 16px;margin-bottom:14px;
+           box-shadow:0 1px 4px rgba(0,0,0,.07);display:none}
+#prog-wrap.visible{display:block}
+.prog-label{font-size:.76rem;color:#444;margin-bottom:6px;display:flex;justify-content:space-between}
+.prog-track{background:#eef0f5;border-radius:4px;height:7px;overflow:hidden}
+.prog-fill{background:linear-gradient(90deg,#16335B,#F68121);height:100%;
+           border-radius:4px;width:0%;transition:width .4s ease}
+
+/* ── Row loading shimmer ── */
+@keyframes shimmer{0%{opacity:.4}50%{opacity:.9}100%{opacity:.4}}
+tr.row-loading td.td-agency .ag-wrap{animation:shimmer 1.2s ease-in-out infinite}
+tr.row-loading td.td-agency .ag-wrap>*{color:#bbb!important;background:#eee!important;border-color:#eee!important}
+tr.row-loading td.td-final-r .rbadge,
+tr.row-loading td.td-final-r .no-rating{opacity:.3}
+tr.row-done td{transition:background .3s}
+
+/* ── Legend ── */
+.legend{display:flex;gap:10px;flex-wrap:wrap;padding:9px 14px;
+        border-top:1px solid #f0f2f7;font-size:.7rem;color:#666;align-items:center}
+.ldot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:3px}
+
+@media(max-width:700px){
+  .hdr{flex-direction:column;align-items:flex-start;gap:8px}
+  .main{padding:10px}
+  .form-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div>
+    <div class="hdr-title">
+      <img class="hdr-logo-svg" src="{{ url_for('static', filename='images/mirae_asset_logo.png') }}" alt="MIRAE ASSET 미래에셋증권">
+      신용등급 관리 시스템
+    </div>
+    <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFS) &nbsp;|&nbsp; 미공시 시 회사채 선순위 자동 적용</div>
+  </div>
+  <div class="hdr-right">
+    <div class="upd-lbl">마지막 업데이트<br><strong id="hdr-upd">{{ last_updated }}</strong></div>
+    <button class="btn btn-ghost btn-sm" onclick="openAdd()">＋ 기관 추가</button>
+    {% if total_changed > 0 %}
+    <button class="btn btn-warn btn-sm" onclick="acknowledgeAll()">🔔 변경 전체 확인 ({{ total_changed }})</button>
+    {% endif %}
+    <button class="btn btn-navy" id="ref-btn" onclick="doRefresh()">🔄 지금 조회</button>
+  </div>
+</header>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+
+  <!-- Alert -->
+  <div class="alert-bar {% if total_changed == 0 %}hidden{% endif %}" id="alert-bar">
+    <span style="font-size:1.1rem">🔔</span>
+    <span><strong>{{ total_changed }}개 기관</strong>의 신용등급 변경이 감지되었습니다. 아래 <span style="color:#c0392b;font-weight:700">주황색 행</span>을 확인하세요.</span>
+    <button class="btn btn-sm btn-warn ack-all" onclick="acknowledgeAll()">모두 확인</button>
+  </div>
+
+  <!-- Info -->
+  <div class="info-bar">
+    <span>ℹ️</span>
+    <span id="info-text">{% if scrape_summary %}{{ scrape_summary }}{% else %}조회 버튼을 눌러 신용평가 3사 최신 등급을 가져오세요. 매일 오전 8시 자동 조회됩니다.{% endif %}</span>
+  </div>
+
+  <!-- Progress bar (조회 중일 때만 표시) -->
+  <div id="prog-wrap">
+    <div class="prog-label">
+      <span>🔄 신용평가 3사 조회 중…</span>
+      <span><span id="prog-done">0</span> / <span id="prog-total">0</span> 완료</span>
+    </div>
+    <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    {% for category, rows in data.items() %}
+    {% set n_chg = rows | selectattr('any_changed') | list | length %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}"
+            data-tab="{{ category }}" onclick="switchTab('{{ category }}')">
+      {{ category }}<span class="tab-badge">{{ rows|length }}</span>
+      {% if n_chg > 0 %}<span class="tab-chg-dot" title="{{ n_chg }}건 변경"></span>{% endif %}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- Panels -->
+  {% for category, rows in data.items() %}
+  <div class="panel {% if loop.first %}active{% endif %}" id="panel-{{ category }}">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">{{ category }}</span>
+        <span class="card-note">
+          {% if category in ['손해보험','생명보험'] %}보험지급능력등급(IFS) 기준{% else %}기업신용등급(ICR) 우선 · 미공시 시 회사채 선순위 자동 적용{% endif %}
+          &nbsp;|&nbsp; 최종적용 = 3사 중 최저등급
+        </span>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <colgroup>
+            <col style="min-width:120px"><!-- 기관명 -->
+            <col style="min-width:148px"><!-- 나이스 -->
+            <col style="min-width:148px"><!-- 기업평 -->
+            <col style="min-width:148px"><!-- 신용평 -->
+            <col style="min-width:95px"> <!-- 최종등급 -->
+            <col style="min-width:170px"><!-- 최종등급 근거 -->
+            <col style="min-width:195px"><!-- 변경사항 -->
+            <col style="min-width:80px"> <!-- 관리 -->
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="th-name" rowspan="2">기관명</th>
+              <th class="th-agency th-grp-nice">나이스신용평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
+              <th class="th-agency th-grp-kr">한국기업평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
+              <th class="th-agency th-grp-kis">한국신용평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
+              <th class="th-final-r th-grp-final" rowspan="2">최종적용<br>신용등급</th>
+              <th class="th-basis th-grp-final" rowspan="2">최종등급 근거<br><span style="font-weight:400;font-size:.67rem">적용 평가사 · 등급 유형</span></th>
+              <th class="th-chg th-grp-chg" rowspan="2">변경사항<br><span style="font-weight:400;font-size:.67rem">이전등급 → 현재등급</span></th>
+              <th class="th-act" rowspan="2">관리</th>
+            </tr>
+            <tr><!-- sub-header는 colgroup으로 처리, rowspan=2인 열들이 공간 차지 --></tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr class="{% if row.any_changed %}row-changed{% endif %}" data-name="{{ row.name }}">
+
+              <!-- 기관명 -->
+              <td class="td-name">
+                {{ row.name }}
+                {% if row.any_changed %}<span class="bell" title="확인" onclick="acknowledge('{{ row.name }}')">🔔</span>{% endif %}
+                {% if row.scrape_status %}
+                  {% set sc = row.scrape_status %}
+                  <span class="spill {% if '성공' in sc %}spill-ok{% elif '수동' in sc %}spill-manual{% else %}spill-fail{% endif %}">
+                    {{ sc if '실패' not in sc else '재조회필요' }}
+                  </span>
+                {% endif %}
+              </td>
+
+              <!-- 나이스 -->
+              {% set n = row.agencies['nice'] %}
+              <td class="td-agency th-grp-nice" style="background:#f5f8ff">
+                <div class="ag-wrap">
+                  <span class="ag-type-badge {% if n.type=='ICR' %}type-ICR{% elif n.type=='회사채선순위' %}type-SB{% elif n.type=='IFS' %}type-IFS{% else %}type-none{% endif %}">
+                    {% if n.type=='ICR' %}기업신용등급{% elif n.type=='회사채선순위' %}회사채 선순위{% elif n.type=='IFS' %}보험지급능력{% elif n.rating %}기타{% else %}미공시{% endif %}
+                  </span>
+                  {{ rating_badge(n.rating) }}
+                  <span class="ag-date">{{ n.eval_date or '평가일 미확인' }}</span>
+                </div>
+              </td>
+
+              <!-- 한국기업 -->
+              {% set k = row.agencies['kr'] %}
+              <td class="td-agency th-grp-kr" style="background:#f8f5ff">
+                <div class="ag-wrap">
+                  <span class="ag-type-badge {% if k.type=='ICR' %}type-ICR{% elif k.type=='회사채선순위' %}type-SB{% elif k.type=='IFS' %}type-IFS{% else %}type-none{% endif %}">
+                    {% if k.type=='ICR' %}기업신용등급{% elif k.type=='회사채선순위' %}회사채 선순위{% elif k.type=='IFS' %}보험지급능력{% elif k.rating %}기타{% else %}미공시{% endif %}
+                  </span>
+                  {{ rating_badge(k.rating) }}
+                  <span class="ag-date">{{ k.eval_date or '평가일 미확인' }}</span>
+                </div>
+              </td>
+
+              <!-- 한국신용 -->
+              {% set s = row.agencies['kis'] %}
+              <td class="td-agency th-grp-kis" style="background:#f5fff8">
+                <div class="ag-wrap">
+                  <span class="ag-type-badge {% if s.type=='ICR' %}type-ICR{% elif s.type=='회사채선순위' %}type-SB{% elif s.type=='IFS' %}type-IFS{% else %}type-none{% endif %}">
+                    {% if s.type=='ICR' %}기업신용등급{% elif s.type=='회사채선순위' %}회사채 선순위{% elif s.type=='IFS' %}보험지급능력{% elif s.rating %}기타{% else %}미공시{% endif %}
+                  </span>
+                  {{ rating_badge(s.rating) }}
+                  <span class="ag-date">{{ s.eval_date or '평가일 미확인' }}</span>
+                </div>
+              </td>
+
+              <!-- 최종적용등급 -->
+              <td class="td-final-r">
+                {{ rating_badge(row.final, 'rbadge-final') }}
+                {% if row.final_changed and row.final_prev %}
+                  <br><span style="font-size:.67rem;color:#888">전: {{ row.final_prev }}</span>
+                {% endif %}
+              </td>
+
+              <!-- 최종등급 근거 -->
+              <td class="td-basis">
+                {% if row.basis_agency %}
+                  <div class="basis-line">
+                    <span class="basis-ico">🏢</span>
+                    <span class="basis-agency">{{ row.basis_agency }}</span>
+                  </div>
+                  {% if row.basis_type %}
+                  <div class="basis-line" style="margin-top:3px">
+                    <span class="basis-ico">📋</span>
+                    <span class="ag-type-badge
+                      {% if '기업신용' in row.basis_type %}type-ICR
+                      {% elif '회사채' in row.basis_type %}type-SB
+                      {% elif '보험' in row.basis_type %}type-IFS
+                      {% else %}type-none{% endif %}
+                    ">{{ row.basis_type }}</span>
+                  </div>
+                  {% endif %}
+                {% else %}
+                  <span class="no-rating">—</span>
+                {% endif %}
+              </td>
+
+              <!-- 변경사항 -->
+              <td class="td-chg">
+                {% if row.changes %}
+                  {% for chg in row.changes %}
+                  <div class="chg-row">
+                    <span class="chg-agency-lbl">{{ chg.agency_label[:3] }}:</span>
+                    <span class="chg-tag {% if chg.direction=='down' %}chg-down{% elif chg.direction=='up' %}chg-up{% else %}chg-same{% endif %}">
+                      {{ chg.prev }}&nbsp;
+                      {% if chg.direction=='down' %}▼{% elif chg.direction=='up' %}▲{% else %}→{% endif %}
+                      &nbsp;{{ chg.current }}
+                    </span>
+                    {% if chg.eval_date %}<span style="font-size:.65rem;color:#aaa">{{ chg.eval_date }}</span>{% endif %}
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <span class="no-rating" style="font-size:.75rem">변경없음</span>
+                {% endif %}
+              </td>
+
+              <!-- 관리 -->
+              <td class="td-act">
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <button class="btn btn-ghost btn-sm"
+                    style="background:#eef2ff;color:#1a2a5e;border:none;font-size:.7rem"
+                    onclick="openEdit(
+                      '{{ row.name }}',
+                      '{{ row.agencies.nice.rating }}','{{ row.agencies.nice.eval_date }}','{{ row.agencies.nice.type }}',
+                      '{{ row.agencies.kr.rating }}',  '{{ row.agencies.kr.eval_date }}',  '{{ row.agencies.kr.type }}',
+                      '{{ row.agencies.kis.rating }}', '{{ row.agencies.kis.eval_date }}', '{{ row.agencies.kis.type }}'
+                    )">✏️ 수정</button>
+                  <button class="btn btn-sm"
+                    style="background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb;font-size:.7rem"
+                    onclick="deleteInst('{{ row.name }}')">🗑 삭제</button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div><!-- tbl-wrap -->
+
+      <!-- Legend -->
+      <div class="legend">
+        <strong>등급:</strong>
+        <span><span class="ldot" style="background:#28a745"></span>AAA~AA</span>
+        <span><span class="ldot" style="background:#5cb85c"></span>A</span>
+        <span><span class="ldot" style="background:#f0ad4e"></span>BBB</span>
+        <span><span class="ldot" style="background:#e67e22"></span>BB</span>
+        <span><span class="ldot" style="background:#e74c3c"></span>B 이하</span>
+        <span style="margin-left:8px"><strong>등급유형:</strong></span>
+        <span><span class="ag-type-badge type-ICR">기업신용등급</span></span>
+        <span><span class="ag-type-badge type-SB">회사채 선순위</span></span>
+        <span><span class="ag-type-badge type-IFS">보험지급능력</span></span>
+        <span style="margin-left:8px"><strong>변경:</strong></span>
+        <span><span class="chg-tag chg-down">AA ▼ AA-</span> 하향</span>
+        <span><span class="chg-tag chg-up">AA- ▲ AA</span> 상향</span>
+      </div>
+    </div><!-- card -->
+  </div><!-- panel -->
+  {% endfor %}
+</div><!-- main -->
+
+<!-- ═══ EDIT MODAL ═══ -->
+<div class="overlay" id="edit-ov">
+  <div class="modal">
+    <h3>✏️ 신용등급 수정 &nbsp;<span id="edit-lbl" style="color:#555;font-weight:500;font-size:.88rem"></span></h3>
+    <input type="hidden" id="edit-name"/>
+
+    {% for ag_key, ag_label, ag_cls in [('nice','나이스신용평가','ag-sec-nice'),('kr','한국기업평가','ag-sec-kr'),('kis','한국신용평가','ag-sec-kis')] %}
+    <div class="ag-section">
+      <div class="ag-section-title {{ ag_cls }}">{{ ag_label }}</div>
+      <div class="form-row">
+        <div class="fg">
+          <label>등급</label>
+          <select id="e-{{ ag_key }}">{{ rating_select_options() }}</select>
+        </div>
+        <div class="fg">
+          <label>평가일</label>
+          <input type="date" id="e-{{ ag_key }}-date"/>
+        </div>
+        <div class="fg">
+          <label>등급 유형</label>
+          <select id="e-{{ ag_key }}-type">
+            <option value="ICR">기업신용등급</option>
+            <option value="회사채선순위">회사채 선순위</option>
+            <option value="IFS">보험지급능력</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="mfoot">
+      <button class="btn btn-sm" style="background:#eee;color:#444" onclick="closeModal('edit-ov')">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD MODAL ═══ -->
+<div class="overlay" id="add-ov">
+  <div class="modal" style="width:320px">
+    <h3>＋ 기관 추가</h3>
+    <div class="fg" style="margin-bottom:12px">
+      <label>분류</label>
+      <select id="add-cat">
+        <option>증권사</option><option>시중은행</option><option>지방은행</option>
+        <option>저축은행</option><option>손해보험</option><option>생명보험</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>기관명</label>
+      <input type="text" id="add-name" placeholder="예: 우리금융저축은행"/>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-sm" style="background:#eee;color:#444" onclick="closeModal('add-ov')">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="addInst()">추가</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ── Tabs ── */
+function switchTab(cat){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-tab="${cat}"]`).classList.add('active');
+  document.getElementById(`panel-${cat}`).classList.add('active');
+}
+
+/* ── Rating helpers (JS) ── */
+const RATING_SCALE=['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-','BB+','BB','BB-','B+','B','B-','CCC+','CCC','CCC-','CC','C','D'];
+function ratingCss(r){
+  if(!r)return'';
+  if(r==='AAA')return'rating-AAA';
+  if(r.startsWith('AA'))return'rating-AA';
+  if(r.startsWith('A'))return'rating-A';
+  if(r.startsWith('BBB'))return'rating-BBB';
+  if(r.startsWith('BB'))return'rating-BB';
+  if(r.startsWith('B'))return'rating-B';
+  if(r.startsWith('CCC'))return'rating-CCC';
+  if(['CC','C','D'].includes(r))return'rating-low';
+  return'';
+}
+function ratingBadge(r,extra=''){
+  if(!r)return'<span class="no-rating">—</span>';
+  return`<span class="rbadge ${ratingCss(r)} ${extra}">${r}</span>`;
+}
+function typeBadge(t){
+  const cls=t==='ICR'?'type-ICR':t==='회사채선순위'?'type-SB':t==='IFS'?'type-IFS':'type-none';
+  const lbl=t==='ICR'?'기업신용등급':t==='회사채선순위'?'회사채 선순위':t==='IFS'?'보험지급능력':t?'기타':'미공시';
+  return`<span class="ag-type-badge ${cls}">${lbl}</span>`;
+}
+function agCellHtml(r,d,t){
+  return`<div class="ag-wrap">${typeBadge(t)}${ratingBadge(r)}<span class="ag-date">${d||'평가일 미확인'}</span></div>`;
+}
+function lowestRating(arr){
+  let best=null,bestIdx=Infinity;
+  for(const r of arr){if(!r)continue;const i=RATING_SCALE.indexOf(r);if(i!==-1&&i>bestIdx){best=r;bestIdx=i;}}
+  // pick worst (highest index)
+  for(const r of arr){if(!r)continue;const i=RATING_SCALE.indexOf(r);if(i!==-1&&(best===null||i>RATING_SCALE.indexOf(best))){best=r;}}
+  return best||'';
+}
+
+/* ── Refresh (비동기 + 건바이건 로딩) ── */
+let _pollTimer=null;
+const _done=new Set();
+
+function doRefresh(){
+  const btn=document.getElementById('ref-btn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin"></span> 조회 시작…';
+
+  // 모든 행 로딩 상태로
+  document.querySelectorAll('tr[data-name]').forEach(tr=>{
+    tr.classList.add('row-loading');
+    tr.classList.remove('row-done');
+  });
+  _done.clear();
+
+  fetch('/api/refresh',{method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.success){
+        _resetRefresh();
+        showToast('오류: '+d.message,'err');
+        return;
+      }
+      const total=d.total;
+      document.getElementById('prog-wrap').classList.add('visible');
+      document.getElementById('prog-total').textContent=total;
+      document.getElementById('prog-done').textContent='0';
+      document.getElementById('prog-fill').style.width='0%';
+      btn.innerHTML='<span class="spin"></span> 조회 중…';
+      _pollTimer=setInterval(()=>_pollStatus(total),1500);
+    })
+    .catch(()=>{_resetRefresh();showToast('네트워크 오류','err')});
+}
+
+function _pollStatus(total){
+  fetch('/api/refresh_status')
+    .then(r=>r.json())
+    .then(state=>{
+      const completed=state.completed||0;
+      const pct=total>0?Math.round(completed/total*100):0;
+      document.getElementById('prog-done').textContent=completed;
+      document.getElementById('prog-fill').style.width=pct+'%';
+
+      // 완료된 건 행 업데이트
+      const results=state.results||{};
+      for(const [name,data] of Object.entries(results)){
+        if(_done.has(name))continue;
+        _done.add(name);
+        _updateRow(name,data);
+      }
+
+      if(!state.running){
+        clearInterval(_pollTimer);_pollTimer=null;
+        _resetRefresh();
+        document.getElementById('prog-wrap').classList.remove('visible');
+        if(state.error){
+          showToast('오류: '+state.error,'err');
+        } else {
+          document.getElementById('info-text').textContent=state.summary||'조회 완료';
+          document.getElementById('hdr-upd').textContent=state.updated_at||'-';
+          showToast('조회 완료! '+state.summary,'ok');
+        }
+      }
+    })
+    .catch(()=>{});
+}
+
+function _updateRow(name,data){
+  const tr=document.querySelector(`tr[data-name="${CSS.escape(name)}"]`);
+  if(!tr)return;
+  tr.classList.remove('row-loading');
+  tr.classList.add('row-done');
+
+  const cells=tr.querySelectorAll('td.td-agency');
+  const ags=['nice','kr','kis'];
+  ags.forEach((ag,i)=>{
+    if(cells[i]){
+      cells[i].innerHTML=agCellHtml(data[ag]||'',data[ag+'_eval_date']||'',data[ag+'_type']||'');
+    }
+  });
+
+  // 최종등급
+  const final=lowestRating([data.nice,data.kr,data.kis]);
+  const finalCell=tr.querySelector('td.td-final-r');
+  if(finalCell) finalCell.innerHTML=ratingBadge(final,'rbadge-final');
+
+  // 상태 pill
+  const nameCell=tr.querySelector('td.td-name');
+  if(nameCell){
+    const oldPill=nameCell.querySelector('.spill');
+    if(oldPill)oldPill.remove();
+    const status=data.scrape_status||'';
+    if(status){
+      const cls=status.includes('성공')?'spill-ok':status.includes('수동')?'spill-manual':'spill-fail';
+      const txt=status.includes('실패')?'재조회필요':status;
+      const pill=document.createElement('span');
+      pill.className='spill '+cls;
+      pill.textContent=txt;
+      nameCell.appendChild(pill);
+    }
+  }
+}
+
+function _resetRefresh(){
+  const btn=document.getElementById('ref-btn');
+  btn.disabled=false;
+  btn.innerHTML='🔄 지금 조회';
+}
+
+/* ── Acknowledge ── */
+function acknowledge(name){
+  fetch(`/api/acknowledge/${encodeURIComponent(name)}`,{method:'POST'})
+    .then(()=>{showToast('확인 처리됨','ok');setTimeout(()=>location.reload(),700)});
+}
+function acknowledgeAll(){
+  fetch('/api/acknowledge_all',{method:'POST'})
+    .then(()=>{showToast('전체 확인 처리됨','ok');setTimeout(()=>location.reload(),700)});
+}
+
+/* ── Edit ── */
+function isoDate(s){return s?s.replace(/\./g,'-'):''}
+function openEdit(name,nice,niceD,niceT,kr,krD,krT,kis,kisD,kisT){
+  document.getElementById('edit-lbl').textContent=name;
+  document.getElementById('edit-name').value=name;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||''};
+  set('e-nice',nice);set('e-nice-date',isoDate(niceD));set('e-nice-type',niceT||'ICR');
+  set('e-kr',kr);    set('e-kr-date',  isoDate(krD));  set('e-kr-type',  krT||'ICR');
+  set('e-kis',kis);  set('e-kis-date', isoDate(kisD)); set('e-kis-type', kisT||'ICR');
+  document.getElementById('edit-ov').classList.add('open');
+}
+function saveEdit(){
+  const name=document.getElementById('edit-name').value;
+  const fmt=v=>v?v.replace(/-/g,'.'):'' ;
+  const payload={
+    nice:document.getElementById('e-nice').value,
+    nice_eval_date:fmt(document.getElementById('e-nice-date').value),
+    nice_type:document.getElementById('e-nice-type').value,
+    kr:document.getElementById('e-kr').value,
+    kr_eval_date:fmt(document.getElementById('e-kr-date').value),
+    kr_type:document.getElementById('e-kr-type').value,
+    kis:document.getElementById('e-kis').value,
+    kis_eval_date:fmt(document.getElementById('e-kis-date').value),
+    kis_type:document.getElementById('e-kis-type').value,
+  };
+  fetch(`/api/ratings/${encodeURIComponent(name)}`,{
+    method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){closeModal('edit-ov');showToast('저장 완료','ok');setTimeout(()=>location.reload(),700)}
+    else showToast('저장 오류','err');
+  });
+}
+
+/* ── Add / Delete ── */
+function openAdd(){document.getElementById('add-name').value='';document.getElementById('add-ov').classList.add('open')}
+function addInst(){
+  const cat=document.getElementById('add-cat').value;
+  const name=document.getElementById('add-name').value.trim();
+  if(!name){showToast('기관명을 입력하세요','err');return}
+  fetch('/api/institutions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:cat,name})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){closeModal('add-ov');showToast(`'${name}' 추가됨`,'ok');setTimeout(()=>location.reload(),700)}
+      else showToast(d.message||'오류','err')
+    });
+}
+function deleteInst(name){
+  if(!confirm(`'${name}' 을(를) 삭제하시겠습니까?`))return;
+  fetch(`/api/institutions/${encodeURIComponent(name)}`,{method:'DELETE'})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){showToast(`'${name}' 삭제됨`,'ok');setTimeout(()=>location.reload(),700)}
+      else showToast(d.message||'오류','err')
+    });
+}
+
+/* ── Modal helpers ── */
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+document.querySelectorAll('.overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open')})
+});
+
+/* ── Toast ── */
+let _tt;
+function showToast(msg,type='info',dur=3200){
+  clearTimeout(_tt);const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`show ${type}`;
+  if(dur>0)_tt=setTimeout(hideToast,dur);
+}
+function hideToast(){document.getElementById('toast').className=''}
+</script>
+</body>
+</html>

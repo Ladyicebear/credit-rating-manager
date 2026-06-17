@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 가상환경
+venv/
+env/
+.venv/
+
+# 로그
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Playwright 브라우저 캐시
+.playwright/
+
+# 환경변수
+.env
+.env.*
+
+# 디버그 파일
+debug*.py
+debug*.txt
+test_scraper.py
+kis_*.txt
+meritz_*.txt
