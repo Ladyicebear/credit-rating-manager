@@ -1,0 +1,14 @@
+.git
+.gitignore
+.claude/
+__pycache__/
+*.pyc
+*.log
+*.zip
+data/ratings.backup_*.json
+수정내역_*.md
+debug*.py
+debug*.txt
+test_scraper.py
+_*.txt
+_*.xlsx

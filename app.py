@@ -27,6 +27,9 @@ INSTITUTIONS_FILE = os.path.join(DATA_DIR, 'institutions.json')
 EXPORT_TEMPLATE = os.path.join(BASE_DIR, 'export_template.xlsx')
 OVERRIDES_FILE = os.path.join(DATA_DIR, 'overrides.json')
 
+# 서버 포트: 클라우드(Cloud Run 등)는 환경변수 PORT를 지정함. 없으면 로컬 기본 5000.
+PORT = int(os.environ.get('PORT', 5000))
+
 RATING_SCALE = [
     'AAA', 'AA+', 'AA', 'AA-',
     'A+', 'A', 'A-',
@@ -618,7 +621,7 @@ def scheduled_job():
     with app.app_context():
         try:
             import requests as req
-            req.post('http://localhost:5000/api/refresh', timeout=300)
+            req.post(f'http://localhost:{PORT}/api/refresh', timeout=300)
         except Exception:
             logger.exception('스케줄 실행 오류')
 
@@ -638,4 +641,4 @@ if __name__ == '__main__':
         logger.warning('APScheduler 미설치')
 
     from waitress import serve
-    serve(app, host='0.0.0.0', port=5000)
+    serve(app, host='0.0.0.0', port=PORT)
