@@ -126,6 +126,28 @@ def _alt_norms(norm: str) -> list[str]:
     return alts
 
 
+def _cell_matches_name(cell_norm: str, alts: list[str]) -> bool:
+    """검색결과 행 이름(cell_norm)이 회사 별칭(alts) 중 하나와 안전하게 일치하는지.
+
+    ⚠️ 단순 양방향 부분일치(a in cell or cell in a)는 접두사 제거 별칭이
+       다른 브랜드와 오탐을 일으킴.
+       예) 'KB라이프생명보험' → 접두사 제거 별칭 '라이프생명보험'이
+           '신한라이프생명보험'에 부분 포함되어 신한라이프 AAA를 잘못 반환.
+    → 별칭이 셀 이름의 '접두부'일 때만 허용한다. 다른 브랜드 접두사(예: '신한')가
+      별칭 앞에 붙어 있으면 거부하여 오탐을 차단한다.
+    정상 매칭은 유지:
+      · 완전 일치           (cell == alt)
+      · NICE가 접두사 생략   (cell in alt, 셀이 더 짧음)
+      · 정식 긴 이름의 접두부 (cell.startswith(alt), 예: '삼성화재'→'삼성화재해상보험')
+    """
+    for a in alts:
+        if not a:
+            continue
+        if cell_norm == a or cell_norm in a or cell_norm.startswith(a):
+            return True
+    return False
+
+
 def _search_variants(name: str) -> list[str]:
     """검색어 변형 목록 생성 (NICE/KIS 검색 재시도용)"""
     variants = [name]
@@ -237,7 +259,7 @@ def _nice_pick_detail_link(page, company: str):
             if not cell0:
                 continue
             cell_norm = _norm_name(cell0)
-            if not any(a in cell_norm or cell_norm in a for a in alts if a):
+            if not _cell_matches_name(cell_norm, alts):
                 continue
             # 해당 행 내부의 '기업상세' 링크 탐색
             detail = row.locator('a:has-text("기업상세")').first

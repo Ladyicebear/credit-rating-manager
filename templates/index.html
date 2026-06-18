@@ -67,6 +67,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .card-head{padding:11px 16px;display:flex;align-items:center;justify-content:space-between;
            border-bottom:2px solid #f0f2f7}
 .card-title{font-size:.9rem;font-weight:800;color:#12122a}
+.card-head-right{display:flex;align-items:center;gap:12px}
+.admin-mark{margin-left:auto;font-size:.68rem;font-weight:700;color:#F68121;
+            letter-spacing:.3px;opacity:.85;user-select:none}
 .card-note{font-size:.7rem;color:#888}
 
 /* ── Table ── */
@@ -102,6 +105,9 @@ td.td-agency{vertical-align:middle}
 td.td-final-r{background:#fdf6ef;font-weight:800}
 td.td-basis {background:#fdf6ef;text-align:left;font-size:.72rem;color:#555;padding:7px 10px}
 td.td-chg   {text-align:left;padding:7px 10px}
+.basis-mismatch{margin-top:6px;padding-top:6px;border-top:1px dashed #e6b8b0}
+.mismatch-msg{display:inline-block;font-weight:700;color:#c0392b;font-size:.7rem}
+.mismatch-agencies{margin-top:2px;font-size:.68rem;color:#a94442;line-height:1.35}
 td.td-act   {padding:6px 7px}
 
 /* ── Agency Cell ── */
@@ -224,7 +230,6 @@ tr.row-done td{transition:background .3s}
 <header class="hdr">
   <div>
     <div class="hdr-title">
-      <img class="hdr-logo-svg" src="{{ url_for('static', filename='images/mirae_asset_logo.png') }}" alt="MIRAE ASSET 미래에셋증권">
       신용등급 관리 시스템
     </div>
     <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFSR) &nbsp;|&nbsp; 1순위 기업신용등급 2순위 회사채 선순위 적용</div>
@@ -282,10 +287,13 @@ tr.row-done td{transition:background .3s}
     <div class="card">
       <div class="card-head">
         <span class="card-title">{{ category }}</span>
-        <span class="card-note">
-          {% if category in ['손해보험','생명보험'] %}보험지급능력등급(IFSR) 기준{% else %}기업신용등급(ICR) 우선 · 1순위 기업신용등급 2순위 회사채 선순위 적용{% endif %}
-          &nbsp;|&nbsp; 최종적용 = 3사 중 최저등급
-        </span>
+        <div class="card-head-right">
+          <span class="card-note">
+            {% if category in ['손해보험','생명보험'] %}보험지급능력등급(IFSR) 기준{% else %}기업신용등급(ICR) 우선 · 1순위 기업신용등급 2순위 회사채 선순위 적용{% endif %}
+            &nbsp;|&nbsp; 최종적용 = 3사 중 최저등급
+          </span>
+          <a class="btn btn-navy btn-sm" href="/api/export.xlsx" download>⬇ 엑셀 다운로드</a>
+        </div>
       </div>
 
       <div class="tbl-wrap">
@@ -391,6 +399,14 @@ tr.row-done td{transition:background .3s}
                     ">{{ row.basis_type }}</span>
                   </div>
                   {% endif %}
+                  {% if row.rating_mismatch %}
+                  <div class="basis-mismatch">
+                    <span class="mismatch-msg">⚠ 등급상이건 있음</span>
+                    {% if row.mismatch_agencies %}
+                    <div class="mismatch-agencies">{{ row.mismatch_agencies | join(' · ') }}</div>
+                    {% endif %}
+                  </div>
+                  {% endif %}
                 {% else %}
                   <span class="no-rating">—</span>
                 {% endif %}
@@ -439,19 +455,14 @@ tr.row-done td{transition:background .3s}
 
       <!-- Legend -->
       <div class="legend">
-        <strong>등급:</strong>
-        <span><span class="ldot" style="background:#28a745"></span>AAA~AA</span>
-        <span><span class="ldot" style="background:#5cb85c"></span>A</span>
-        <span><span class="ldot" style="background:#f0ad4e"></span>BBB</span>
-        <span><span class="ldot" style="background:#e67e22"></span>BB</span>
-        <span><span class="ldot" style="background:#e74c3c"></span>B 이하</span>
-        <span style="margin-left:8px"><strong>등급유형:</strong></span>
+        <span><strong>등급유형:</strong></span>
         <span><span class="ag-type-badge type-ICR">기업신용등급</span></span>
         <span><span class="ag-type-badge type-SB">회사채 선순위</span></span>
         <span><span class="ag-type-badge type-IFS">보험지급능력</span></span>
         <span style="margin-left:8px"><strong>변경:</strong></span>
         <span><span class="chg-tag chg-down">AA ▼ AA-</span> 하향</span>
         <span><span class="chg-tag chg-up">AA- ▲ AA</span> 상향</span>
+        <span class="admin-mark">admin.Goun</span>
       </div>
     </div><!-- card -->
   </div><!-- panel -->
@@ -502,7 +513,7 @@ tr.row-done td{transition:background .3s}
     <div class="fg" style="margin-bottom:12px">
       <label>분류</label>
       <select id="add-cat">
-        <option>증권사</option><option>시중은행</option><option>지방은행</option>
+        <option>증권</option><option>시중은행</option><option>지방은행</option>
         <option>저축은행</option><option>손해보험</option><option>생명보험</option>
       </select>
     </div>
@@ -638,14 +649,23 @@ function _updateRow(name,data){
 
   const cells=tr.querySelectorAll('td.td-agency');
   const ags=['nice','kr','kis'];
+  // 조회 결과가 비면 화면의 기존 등급을 유지(백엔드와 동일 동작) → 일시적 미공시 깜빡임 방지
+  const effective=[];
   ags.forEach((ag,i)=>{
-    if(cells[i]){
-      cells[i].innerHTML=agCellHtml(data[ag]||'',data[ag+'_eval_date']||'',data[ag+'_type']||'');
+    const cell=cells[i];
+    const prevBadge=cell?cell.querySelector('.rbadge'):null;
+    const prevRating=prevBadge?prevBadge.textContent.trim():'';
+    const newRating=data[ag]||'';
+    if(newRating){
+      if(cell) cell.innerHTML=agCellHtml(newRating,data[ag+'_eval_date']||'',data[ag+'_type']||'');
+      effective.push(newRating);
+    }else{
+      effective.push(prevRating);
     }
   });
 
-  // 최종등급
-  const final=lowestRating([data.nice,data.kr,data.kis]);
+  // 최종등급 (유지된 값 포함)
+  const final=lowestRating(effective);
   const finalCell=tr.querySelector('td.td-final-r');
   if(finalCell) finalCell.innerHTML=ratingBadge(final,'rbadge-final');
 

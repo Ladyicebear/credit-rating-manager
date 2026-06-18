@@ -1,10 +1,12 @@
 import os
+import io
 import json
 import logging
 import threading
+from collections import Counter
 from datetime import datetime
 from markupsafe import Markup
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -22,6 +24,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 RATINGS_FILE = os.path.join(DATA_DIR, 'ratings.json')
 INSTITUTIONS_FILE = os.path.join(DATA_DIR, 'institutions.json')
+EXPORT_TEMPLATE = os.path.join(BASE_DIR, 'export_template.xlsx')
+OVERRIDES_FILE = os.path.join(DATA_DIR, 'overrides.json')
 
 RATING_SCALE = [
     'AAA', 'AA+', 'AA', 'AA-',
@@ -91,10 +95,44 @@ def save_ratings(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+# ── 사용자 강제 정정(override) ─────────────────────────────────────────
+# 재조회(스크래핑)가 사용자가 정정한 값을 다시 덮어쓰지 못하도록, 표시·저장 시점에 강제.
+# 형식: { "기관명": { "kr": null } }  → null이면 미공시(빈값) 강제, 문자열이면 그 등급 강제.
+
+def load_overrides() -> dict:
+    if not os.path.exists(OVERRIDES_FILE):
+        return {}
+    try:
+        with open(OVERRIDES_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _apply_overrides(name: str, d: dict, overrides: dict | None = None) -> dict:
+    """기관 데이터 dict(d)에 override를 in-place 적용. 정정값이 재조회에도 유지되게 함."""
+    ov = (overrides if overrides is not None else load_overrides()).get(name)
+    if not ov:
+        return d
+    for ag, val in ov.items():
+        if ag not in AGENCIES:
+            continue
+        d[ag] = val or ''
+        d[f'{ag}_eval_date'] = ''
+        d[f'{ag}_type'] = ''
+        d[f'{ag}_prev'] = ''
+        d[f'{ag}_changed'] = False
+    # override가 적용되면 최종등급 변경표시는 무의미 → 초기화
+    d['final_prev'] = ''
+    d['final_changed'] = False
+    return d
+
+
 # ── Build view data ───────────────────────────────────────────────────
 
-def build_row(name: str, category: str, inst_data: dict) -> dict:
+def build_row(name: str, category: str, inst_data: dict, overrides: dict | None = None) -> dict:
     is_insurance = category in INSURANCE_CATEGORIES
+    inst_data = _apply_overrides(name, dict(inst_data), overrides)
 
     agencies_out = {}
     any_changed = False
@@ -145,6 +183,20 @@ def build_row(name: str, category: str, inst_data: dict) -> dict:
         basis_agency = ''
         basis_type = ''
 
+    # 등급 상이 여부: 등급이 있는 평가사들 사이에 서로 다른 등급이 존재하는지
+    rated = [(ag, agencies_out[ag]['rating']) for ag in AGENCIES if agencies_out[ag]['rating']]
+    rating_counts = Counter(r for _, r in rated)
+    rating_mismatch = len(rating_counts) > 1
+    mismatch_agencies = []
+    if rating_mismatch:
+        if all(c == 1 for c in rating_counts.values()):
+            # 모든 평가사 등급이 제각각 → 전부 상이 처리
+            mismatch_agencies = [AGENCY_LABELS[ag] for ag, _ in rated]
+        else:
+            top_count = max(rating_counts.values())
+            majority = {r for r, c in rating_counts.items() if c == top_count}
+            mismatch_agencies = [AGENCY_LABELS[ag] for ag, r in rated if r not in majority]
+
     # 변경사항 목록
     changes = []
     for ag in AGENCIES:
@@ -183,6 +235,8 @@ def build_row(name: str, category: str, inst_data: dict) -> dict:
         'final_direction': final_direction,
         'basis_agency': basis_agency,
         'basis_type': basis_type,
+        'rating_mismatch': rating_mismatch,
+        'mismatch_agencies': mismatch_agencies,
         'changes': changes,
         'any_changed': any_changed,
         'scrape_status': inst_data.get('scrape_status', ''),
@@ -193,7 +247,8 @@ def build_row(name: str, category: str, inst_data: dict) -> dict:
 
 
 def build_response_data(institutions: dict, ratings: dict) -> dict:
-    category_order = ['증권사', '시중은행', '지방은행', '저축은행', '손해보험', '생명보험', '기타']
+    category_order = ['증권', '시중은행', '지방은행', '저축은행', '손해보험', '생명보험', '기타']
+    overrides = load_overrides()
     result = {}
     for category in category_order:
         items = institutions.get(category, [])
@@ -201,7 +256,7 @@ def build_response_data(institutions: dict, ratings: dict) -> dict:
         for inst in items:
             name = inst['name']
             inst_data = ratings.get(name, {})
-            rows.append(build_row(name, category, inst_data))
+            rows.append(build_row(name, category, inst_data, overrides))
         result[category] = rows
     return result
 
@@ -276,6 +331,58 @@ def index():
     )
 
 
+@app.route('/api/export.xlsx')
+def api_export_xlsx():
+    """조회된 전체 기관 정보를 첨부 양식(export_template.xlsx)에 채워 다운로드.
+    컬럼: 업권 | 기관명 | 나이스신용평가 | 한국기업평가 | 한국신용평가 | 최종적용신용등급 | 최종등급 근거
+    """
+    import openpyxl
+    from copy import copy
+
+    institutions = load_institutions()
+    ratings = load_ratings()
+    data = build_response_data(institutions, ratings)
+
+    wb = openpyxl.load_workbook(EXPORT_TEMPLATE)
+    ws = wb.active
+
+    # 1행(헤더)은 유지, 2행 이후를 데이터로 채움.
+    # 템플릿 2행에 들어있던 예시 스타일을 복제해 각 데이터 행에 적용.
+    sample_styles = [copy(ws.cell(row=2, column=c)._style) for c in range(1, 8)]
+    # 기존 데이터 영역(2행~) 비우기
+    if ws.max_row >= 2:
+        ws.delete_rows(2, ws.max_row - 1)
+
+    r = 2
+    for category, rows in data.items():
+        for row in rows:
+            ags = row['agencies']
+            values = [
+                category,
+                row['name'],
+                ags['nice']['rating'],
+                ags['kr']['rating'],
+                ags['kis']['rating'],
+                row['final'],
+                row['basis_agency'],
+            ]
+            for c, v in enumerate(values, start=1):
+                cell = ws.cell(row=r, column=c, value=v)
+                cell._style = copy(sample_styles[c - 1])
+            r += 1
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"신용등급_조회결과_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return send_file(
+        buf,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=fname,
+    )
+
+
 @app.route('/api/ratings')
 def api_ratings():
     institutions = load_institutions()
@@ -288,6 +395,7 @@ def api_ratings():
 def _apply_scrape_results(scrape_result: dict) -> tuple[int, int]:
     """스크래핑 결과를 ratings.json에 반영. (success_count, changed_count) 반환"""
     ratings = load_ratings()
+    overrides = load_overrides()
     success_count = 0
     changed_count = 0
     for name, new_data in scrape_result.items():
@@ -306,8 +414,13 @@ def _apply_scrape_results(scrape_result: dict) -> tuple[int, int]:
         for ag in AGENCIES:
             old_rating = prev_entry.get(ag, '')
             new_rating = new_data.get(ag, '')
+            new_date   = new_data.get(f'{ag}_eval_date', '')
             if new_rating:
-                if old_rating and old_rating != new_rating:
+                # NICE에서 평가일 없는 값은 '검색결과 테이블 폴백'(불안정 출처)에서 나온 것.
+                # 이런 값으로는 '변경'을 표시하지 않음 → 과거 오파싱값(예: KB국민은행 AA+)과
+                # 비교해 생기는 허위 변경(오탐)을 방지. KR은 항상 날짜 있음, KIS는 영향 없음.
+                unreliable_nice = (ag == 'nice' and not new_date)
+                if old_rating and old_rating != new_rating and not unreliable_nice:
                     entry[f'{ag}_prev'] = old_rating
                     entry[f'{ag}_changed'] = True
                     changed_count += 1
@@ -332,6 +445,10 @@ def _apply_scrape_results(scrape_result: dict) -> tuple[int, int]:
             import re as _re
             base = _re.sub(r'\(재조회실패\)', '', prev_entry.get('scrape_status', '')).strip()
             entry['scrape_status'] = (base or '등급없음') + '(재조회실패)'
+        # 사용자 강제 정정(override) 적용 → 재조회 결과가 정정값을 덮어쓰지 못하게 함
+        if overrides.get(name):
+            _apply_overrides(name, entry, overrides)
+            entry['final'] = get_lowest_rating([entry.get(ag, '') for ag in AGENCIES])
         ratings[name] = entry
     ratings['_meta'] = {
         'updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),

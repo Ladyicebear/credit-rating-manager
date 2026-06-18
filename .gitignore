@@ -38,3 +38,10 @@ debug*.txt
 test_scraper.py
 kis_*.txt
 meritz_*.txt
+
+# 로컬 백업/임시/도구 파일
+data/ratings.backup_*.json
+.claude/
+*.zip
+_*.txt
+_*.xlsx
