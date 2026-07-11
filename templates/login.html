@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>로그인 · 퇴직연금 상품제공기관 통합관리</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
+     background:linear-gradient(135deg,#16335B 0%,#1f4a80 100%);color:#222;
+     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.3);
+            width:360px;max-width:100%;padding:34px 30px}
+.brand{text-align:center;margin-bottom:24px}
+.brand .ico{font-size:2.2rem}
+.brand h1{font-size:1.15rem;font-weight:800;color:#16335B;margin-top:8px;letter-spacing:-.4px}
+.brand p{font-size:.72rem;color:#999;margin-top:4px}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.fg label{font-size:.74rem;font-weight:700;color:#555}
+.fg input{padding:10px 12px;border:1px solid #dde3ec;border-radius:8px;font-size:.9rem;
+          transition:border-color .15s}
+.fg input:focus{outline:none;border-color:#F68121;box-shadow:0 0 0 3px rgba(246,129,33,.15)}
+.btn-login{width:100%;padding:11px;border:none;border-radius:8px;background:#F68121;color:#fff;
+           font-size:.9rem;font-weight:800;cursor:pointer;transition:background .15s;margin-top:4px}
+.btn-login:hover{background:#d65f0f}
+.err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:8px;
+     padding:9px 12px;font-size:.76rem;margin-bottom:14px;text-align:center}
+.foot{text-align:center;margin-top:18px;font-size:.66rem;color:#bbb}
+</style>
+</head>
+<body>
+  <form class="login-card" method="POST" action="{{ url_for('login', next=request.args.get('next','')) }}">
+    <div class="brand">
+      <div class="ico">🔐</div>
+      <h1>퇴직연금 상품제공기관 통합관리</h1>
+      <p>로그인이 필요합니다</p>
+    </div>
+
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+    <div class="fg">
+      <label for="username">아이디</label>
+      <input type="text" id="username" name="username" autocomplete="username" autofocus required/>
+    </div>
+    <div class="fg">
+      <label for="password">비밀번호</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required/>
+    </div>
+    <button type="submit" class="btn-login">로그인</button>
+
+    <div class="foot">admin.Goun</div>
+  </form>
+</body>
+</html>

@@ -1,0 +1,557 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>퇴직연금 원리금보장형상품 금리현황 관리시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  /* 통합 화면(iframe)에 임베드되면 자체 상단 오렌지 바는 숨김 — 상위 헤더와 중복 방지 */
+  body.embedded .topbar{display:none}
+  body.embedded .wrap{padding-top:12px}
+  :root{
+    --orange:#FF6600; --orange-d:#E85A00; --orange-l:#FFF3EA;
+    --navy:#123E7C; --navy-d:#0D2F63; --navy-l:#EAF0F9;
+    --ink:#2A2E34; --muted:#6B7280; --line:#E5E7EB; --line-2:#EEF0F3;
+    --bg:#F4F5F7; --white:#fff; --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.06);
+    --db:#0E7C86; --dc:#2563A8; --def:#B7791F;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Malgun Gothic","맑은 고딕",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--ink);background:var(--bg);font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  /* ---------- top bar ---------- */
+  .topbar{background:var(--orange);color:#fff;height:58px;display:flex;align-items:center;padding:0 24px;gap:18px}
+  .logo{font-weight:800;font-size:19px;letter-spacing:-.5px;font-style:italic;display:flex;align-items:baseline;gap:7px}
+  .logo small{font-style:normal;font-weight:700;font-size:12px;opacity:.95;letter-spacing:0}
+  .topbar .sys-name{font-weight:600;font-size:14px;opacity:.95;padding-left:18px;border-left:1px solid rgba(255,255,255,.35)}
+  .topbar .sys-title{font-weight:800;font-size:18px;letter-spacing:-.5px;color:#fff}
+  .topbar .spacer{flex:1}
+  .topbar .env{font-size:11px;background:rgba(255,255,255,.18);padding:4px 10px;border-radius:20px;font-weight:600}
+  /* ---------- page ---------- */
+  .wrap{max-width:1580px;margin:0 auto;padding:20px}
+  .page-head{display:flex;align-items:flex-end;gap:12px;margin:6px 2px 16px}
+  .page-head h1{font-size:20px;margin:0;font-weight:800;letter-spacing:-.6px}
+  .page-head .sub{color:var(--muted);font-size:12.5px;margin-bottom:2px}
+  /* ---------- toolbar card ---------- */
+  .toolbar{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+  .tb-group{display:flex;align-items:center;gap:8px}
+  .tb-label{font-size:11px;color:var(--muted);font-weight:700}
+  .tb-sep{width:1px;height:26px;background:var(--line);margin:0 4px}
+  select,input[type=text]{border:1px solid #D5D9E0;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;color:var(--ink);height:36px}
+  select:focus,input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
+  .btn{border:1px solid transparent;border-radius:8px;padding:0 14px;height:36px;font-size:13px;font-weight:700;
+    display:inline-flex;align-items:center;gap:7px;background:#fff;color:var(--ink);border-color:#D5D9E0;transition:.12s}
+  .btn:hover{background:#F7F8FA}
+  .btn.primary{background:var(--orange);color:#fff;border-color:var(--orange)}
+  .btn.primary:hover{background:var(--orange-d)}
+  .btn.navy{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .btn.navy:hover{background:var(--navy-d)}
+  .btn.ghost{background:#fff}
+  .btn svg{width:15px;height:15px}
+  .spacer{flex:1}
+  /* ---------- stat strip ---------- */
+  .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .stat{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    padding:12px 16px;min-width:120px;flex:1}
+  .stat .k{font-size:11px;color:var(--muted);font-weight:700;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+  .stat .v{font-size:22px;font-weight:800;letter-spacing:-.5px}
+  .stat .v small{font-size:12px;font-weight:700;color:var(--muted);margin-left:2px}
+  .dot{width:8px;height:8px;border-radius:50%}
+  /* ---------- filters ---------- */
+  .filters{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{border:1px solid #D5D9E0;background:#fff;border-radius:20px;padding:5px 13px;font-size:12px;font-weight:600;color:#4B5563}
+  .chip:hover{border-color:var(--orange)}
+  .chip.on{background:var(--orange);color:#fff;border-color:var(--orange)}
+  .chip .n{opacity:.7;font-weight:700;margin-left:3px;font-size:11px}
+  .view-tabs{display:flex;border:1px solid #D5D9E0;border-radius:8px;overflow:hidden}
+  .view-tabs button{border:none;background:#fff;padding:7px 14px;font-size:12px;font-weight:700;color:#4B5563;border-right:1px solid #E5E7EB}
+  .view-tabs button:last-child{border-right:none}
+  .view-tabs button.on{background:var(--navy);color:#fff}
+  /* ---------- table ---------- */
+  .tablecard{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+  .hscroll-top{overflow-x:auto;overflow-y:hidden;height:15px;background:#F7F8FA;border-bottom:1px solid var(--line)}
+  .hscroll-top #hscrollInner{height:1px}
+  .hscroll-top::-webkit-scrollbar{height:11px}
+  .hscroll-top::-webkit-scrollbar-thumb{background:#C4CAD3;border-radius:6px;border:2px solid #F7F8FA}
+  .hscroll-top::-webkit-scrollbar-thumb:hover{background:var(--orange)}
+  .table-scroll{overflow:auto;max-height:calc(100vh - 145px)}
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;white-space:nowrap}
+  th,td{padding:7px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center}
+  #grid{border-top:1px solid var(--line);border-left:1px solid var(--line)}
+  .divL{border-left:2px solid #B9C0CA !important}
+  thead th{position:sticky;top:0;z-index:5;background:#F7F8FA;font-weight:700;color:#374151;border-bottom:1px solid var(--line)}
+  thead tr:first-child th{top:0}
+  thead tr:nth-child(2) th{top:34px}
+  th.grp-db{background:#E7F4F5;color:var(--db);border-bottom:2px solid var(--db)}
+  th.grp-dc{background:#EAF1FA;color:var(--dc);border-bottom:2px solid var(--dc)}
+  th.grp-def{background:#FBF3E3;color:var(--def);border-bottom:2px solid var(--def)}
+  td.sec-db{background:#FAFDFD}
+  td.sec-dc{background:#FAFCFF}
+  td.sec-def{background:#FFFDF7;font-weight:700}
+  /* sticky left cols */
+  .c-sec,.c-org,.c-prod{text-align:left}
+  th.c-sec,td.c-sec{position:sticky;left:0;z-index:4;background:#fff;min-width:78px}
+  th.c-org,td.c-org{position:sticky;left:78px;z-index:4;background:#fff;min-width:190px;font-weight:600}
+  th.c-prod,td.c-prod{position:sticky;left:268px;z-index:4;background:#fff;min-width:210px;border-right:2px solid var(--line);color:#111}
+  thead th.c-sec,thead th.c-org,thead th.c-prod{z-index:6;background:#F7F8FA}
+  tbody tr:hover td{background:#FFF9F3}
+  tbody tr:hover td.c-sec,tbody tr:hover td.c-org,tbody tr:hover td.c-prod{background:#FFF4E8}
+  .rate{font-variant-numeric:tabular-nums;font-weight:700;color:#1F2937}
+  .rate.hi{color:var(--orange-d)}
+  .rate.empty{color:#D1D5DB;font-weight:400}
+  .badge-sec{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700}
+  .s-은행{background:#E7F0FF;color:#1D4ED8}.s-생명보험{background:#E9F7EF;color:#059669}
+  .s-손해보험{background:#FEF0E7;color:#EA580C}.s-증권{background:#F3EAFB;color:#7C3AED}
+  .s-저축은행{background:#E7F6F8;color:#0891B2}.s-기타{background:#F0F1F3;color:#6B7280}
+  /* empty state */
+  .empty{padding:70px 20px;text-align:center;color:var(--muted)}
+  .empty svg{width:60px;height:60px;opacity:.25;margin-bottom:14px}
+  .empty h3{color:#374151;font-size:16px;margin:0 0 6px}
+  .empty p{margin:2px 0;font-size:13px}
+  .empty .btn{margin-top:16px}
+  /* toast */
+  #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:var(--navy-d);color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:600;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);transition:.25s;z-index:100;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{background:#B91C1C}
+  .muted-note{font-size:11px;color:var(--muted);margin-left:auto}
+  .hist-tag{font-size:11px;font-weight:700;color:var(--navy);background:var(--navy-l);padding:3px 9px;border-radius:6px}
+  .foot{color:var(--muted);font-size:11px;text-align:center;padding:16px}
+  .foot b{color:#4B5563}
+</style>
+
+<div class="topbar">
+  <span class="sys-title">퇴직연금 원리금보장상품 관리</span>
+  <div class="spacer"></div>
+  <span class="env">원리금보장형 상품 금리현황</span>
+</div>
+
+<div class="wrap">
+  <div class="page-head">
+    <span class="sub">상품제공기관·제도별 예정적용금리를 조회하고 매월 기록·관리합니다</span>
+  </div>
+
+  <!-- toolbar -->
+  <div class="toolbar">
+    <div class="tb-group">
+      <span class="tb-label">기준월</span>
+      <select id="monthSel" title="기준월 선택"></select>
+    </div>
+    <div class="tb-sep"></div>
+    <button class="btn primary" id="btnUpload">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+      엑셀 업로드
+    </button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    <button class="btn ghost" id="btnTemplate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      업로드 양식 다운로드
+    </button>
+    <button class="btn navy" id="btnExport">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0 5-5m-5 5-5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+      현재 화면 엑셀 다운로드
+    </button>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="btnDelete" title="현재 기준월 데이터 삭제">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6"/></svg>
+      기준월 삭제
+    </button>
+    <span id="savedInfo" class="muted-note"></span>
+  </div>
+
+  <!-- stats -->
+  <div class="stats" id="stats" style="display:none">
+    <div class="stat"><div class="k"><span class="dot" style="background:var(--orange)"></span>상품제공기관</div><div class="v" id="stOrg">0<small>개사</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:var(--navy)"></span>관리 상품구분</div><div class="v" id="stProd">0<small>건</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:var(--db)"></span>DB 최고금리</div><div class="v" id="stDb">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:var(--dc)"></span>DC/IRP 최고금리</div><div class="v" id="stDc">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:var(--def)"></span>디폴트옵션 최고금리</div><div class="v" id="stDef">-<small>%</small></div></div>
+  </div>
+
+  <!-- filters -->
+  <div class="filters" id="filters" style="display:none">
+    <span class="tb-label">업권</span>
+    <div class="chips" id="secChips"></div>
+    <input type="text" id="search" placeholder="🔍 기관·상품명 검색" style="min-width:220px">
+    <div class="spacer"></div>
+    <span class="tb-label">제도 보기</span>
+    <div class="view-tabs" id="viewTabs">
+      <button data-v="all" class="on">전체</button>
+      <button data-v="db">DB</button>
+      <button data-v="dc">DC/IRP</button>
+    </div>
+  </div>
+
+  <!-- table -->
+  <div class="tablecard">
+    <div class="hscroll-top" id="hscrollTop" title="좌우로 밀어 DB / DC·IRP 금리 보기"><div id="hscrollInner"></div></div>
+    <div class="table-scroll" id="tableScroll">
+      <div class="empty" id="emptyState">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
+        <h3>업로드된 금리 정보가 없습니다</h3>
+        <p>「금리정보_업로드」 엑셀 파일을 업로드하면 상품제공기관·제도별 금리현황이 표시됩니다.</p>
+        <p style="font-size:12px">양식이 필요하면 <b>업로드 양식 다운로드</b>를 이용하세요.</p>
+        <button class="btn primary" onclick="document.getElementById('btnUpload').click()">엑셀 업로드하기</button>
+      </div>
+      <table id="grid" style="display:none">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="foot">
+    퇴직연금 원리금보장형상품 금리현황 관리시스템 &nbsp;·&nbsp;
+    만기 매핑: <b>12개월=1년, 24=2년, 36=3년, 48=4년, 60=5년</b> (고정 컬럼: 3·6·12·18·24·30·36·48·60개월) &nbsp;·&nbsp;
+    데이터는 이 브라우저(localStorage)에 저장됩니다
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   퇴직연금 원리금보장형상품 금리관리 - 로직
+   ============================================================ */
+const MONTHS = [3,6,12,18,24,30,36,48,60];
+const MONTH_LABEL = {3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
+const SECTOR_ORDER = ['은행','저축은행','생명보험','손해보험','증권','기타'];
+const STORE_KEY = 'pension_rate_mgmt_v1';
+
+let DB = load();            // { "YYYY-MM": { rows:[...], fileName, uploadedAt } }
+let curMonth = null;
+let curRows = [];
+let filterSec = 'ALL';
+let viewMode = 'all';
+let searchTxt = '';
+
+/* ---------- storage ---------- */
+function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
+function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+function thisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+
+/* ---------- parsing helpers ---------- */
+function parseRate(v){
+  if(v===null||v===undefined) return null;
+  let s=String(v).trim();
+  if(s===''||s==='-'||s==='0'||s==='0.0'||s.toUpperCase()==='N/A') return null;
+  s=s.split('~')[0].trim();                 // range -> first
+  const f=parseFloat(s);
+  if(isNaN(f)||f===0) return null;
+  return f;
+}
+function normFamily(prod){
+  if(!prod) return '(미지정)';
+  let parts=String(prod).split('/');
+  if(parts.length>1) parts=parts.slice(1);   // drop org prefix
+  let p=parts.join('/');
+  p=p.replace(/\(디폴트옵션[^)]*\)/g,'');       // (디폴트옵션용) 등
+  p=p.replace(/디폴트옵션(전용|용)?\s*/g,'');
+  let segs=p.split('/');
+  while(segs.length>1){
+    const last=segs[segs.length-1].trim();
+    const isMat = /^\d+\s*년(\s*\d+\s*개월)?$/.test(last) ||
+                  /^\d+\s*개월$/.test(last) ||
+                  /\d+\s*(일|개월|년).*(~|미만|이상|초과)/.test(last) ||
+                  /^\d+년\s*~/.test(last);
+    if(isMat) segs.pop(); else break;
+  }
+  p=segs.join('/').replace(/\s+/g,' ').trim();
+  return p||String(prod);
+}
+function parseMaturities(mat){
+  if(mat===null||mat===undefined) return [];
+  if(typeof mat==='number') { const m=Math.round(mat); return [MONTHS.includes(m)?m:null]; }
+  return String(mat).split('/').map(t=>{
+    t=t.trim();
+    if(/^\d+$/.test(t)){ const m=parseInt(t,10); return MONTHS.includes(m)?m:null; }
+    return null;
+  });
+}
+function rateList(v,n){
+  if(v===null||v===undefined) return Array(n).fill(null);
+  const s=String(v);
+  if(s.indexOf('/')>=0){ const t=s.split('/').map(parseRate); while(t.length<n)t.push(null); return t; }
+  return Array(n).fill(parseRate(s));
+}
+
+/* ---------- core: rows -> grouped management rows ---------- */
+function buildGroups(raw){
+  // raw: array of {sector,org,prod,mat,db,dc,irp}
+  const groups=new Map();
+  for(const r of raw){
+    if(!r.org) continue;
+    const isDefault = r.prod && String(r.prod).indexOf('디폴트옵션')>=0;
+    const fam=normFamily(r.prod);
+    const key=[r.sector,r.org,fam].join('||');
+    let g=groups.get(key);
+    if(!g){ g={sector:r.sector,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[]}; groups.set(key,g); }
+    g.srcCount++; if(r.prod) g.names.push(r.prod);
+    const months=parseMaturities(r.mat); const n=months.length;
+    const dbR=rateList(r.db,n), dcR=rateList(r.dc,n), irpR=rateList(r.irp,n);
+    let defTaken=false;
+    for(let i=0;i<n;i++){
+      const m=months[i]; if(m===null) continue;
+      const dcv = dcR[i]!=null ? dcR[i] : irpR[i];
+      if(isDefault){ if(m===36 && dcv!=null){ g.def=dcv; defTaken=true; } }
+      else { if(dbR[i]!=null) g.db[m]=dbR[i]; if(dcv!=null) g.dc[m]=dcv; }
+    }
+    if(isDefault && g.def===null){                      // fallback: any dc/irp value
+      for(let i=0;i<n;i++){ const dcv=dcR[i]!=null?dcR[i]:irpR[i]; if(dcv!=null){ g.def=dcv; break; } }
+      if(g.def===null){ const v=parseRate(r.dc)??parseRate(r.irp); if(v!=null) g.def=v; }
+    }
+  }
+  const rows=[...groups.values()];
+  rows.sort((a,b)=>{
+    const sa=SECTOR_ORDER.indexOf(a.sector), sb=SECTOR_ORDER.indexOf(b.sector);
+    if(sa!==sb) return (sa<0?99:sa)-(sb<0?99:sb);
+    if(a.org!==b.org) return String(a.org).localeCompare(b.org,'ko');
+    return String(a.fam).localeCompare(b.fam,'ko');
+  });
+  return rows;
+}
+
+/* ---------- read workbook ---------- */
+function readWorkbook(ab){
+  const wb=XLSX.read(ab,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  // find first data row: col A is a number and col C (org) present
+  const raw=[];
+  for(const row of aoa){
+    if(!row) continue;
+    const no=row[0];
+    if(typeof no!=='number') continue;
+    const org=row[2];
+    if(org===null||org===undefined||String(org).trim()==='') continue;
+    raw.push({ sector:(row[1]??'기타'), org:String(org).trim(), prod:row[3],
+               mat:row[4], db:row[5], dc:row[6], irp:row[7] });
+  }
+  if(!raw.length) throw new Error('데이터 행을 찾지 못했습니다. 업로드 양식을 확인해주세요.');
+  return raw;
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+const $=id=>document.getElementById(id);
+function toast(msg,err){ const t=$('toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2600); }
+
+function refreshMonthSel(){
+  const sel=$('monthSel'); const months=Object.keys(DB).sort().reverse();
+  const cur=thisMonth();
+  const all=[...new Set([cur,...months])].sort().reverse();
+  sel.innerHTML=all.map(m=>{
+    const has=DB[m]?' ●':'';
+    return `<option value="${m}">${m.replace('-','년 ')}월${has}</option>`;
+  }).join('');
+  if(!curMonth) curMonth = months[0]||cur;
+  sel.value=curMonth;
+}
+
+function loadMonth(m){
+  curMonth=m;
+  const rec=DB[m];
+  curRows = rec? rec.rows : [];
+  $('savedInfo').textContent = rec ? `저장됨 · ${rec.fileName||'파일'} · ${rec.uploadedAt}` : '해당 월 데이터 없음';
+  render();
+}
+
+function computeStats(rows){
+  const orgs=new Set(rows.map(r=>r.org));
+  let db=0,dc=0,def=0;
+  rows.forEach(r=>{ MONTHS.forEach(m=>{ if(r.db[m]>db)db=r.db[m]; if(r.dc[m]>dc)dc=r.dc[m]; }); if(r.def>def)def=r.def; });
+  return {orgs:orgs.size, prods:rows.length, db, dc, def};
+}
+
+function render(){
+  const has=curRows.length>0;
+  $('emptyState').style.display=has?'none':'';
+  $('grid').style.display=has?'':'none';
+  $('stats').style.display=has?'':'none';
+  $('filters').style.display=has?'':'none';
+  if(!has){ $('savedInfo').textContent = DB[curMonth]?'':'해당 월 데이터 없음'; return; }
+
+  // stats
+  const st=computeStats(curRows);
+  $('stOrg').innerHTML=st.orgs+'<small>개사</small>';
+  $('stProd').innerHTML=st.prods+'<small>건</small>';
+  $('stDb').innerHTML=(st.db||'-')+'<small>%</small>';
+  $('stDc').innerHTML=(st.dc||'-')+'<small>%</small>';
+  $('stDef').innerHTML=(st.def||'-')+'<small>%</small>';
+
+  // sector chips
+  const counts={}; curRows.forEach(r=>counts[r.sector]=(counts[r.sector]||0)+1);
+  const secs=SECTOR_ORDER.filter(s=>counts[s]);
+  $('secChips').innerHTML =
+    `<button class="chip ${filterSec==='ALL'?'on':''}" data-sec="ALL">전체<span class="n">${curRows.length}</span></button>`+
+    secs.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${counts[s]}</span></button>`).join('');
+  $('secChips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{filterSec=c.dataset.sec;render();});
+
+  renderHead();
+  renderBody();
+  syncHScroll();
+}
+
+/* keep the top horizontal scrollbar sized to the table width */
+function syncHScroll(){
+  const grid=$('grid'), inner=$('hscrollInner'), top=$('hscrollTop');
+  if(!grid) return;
+  top.style.display = curRows.length ? '' : 'none';
+  const ts=$('tableScroll');
+  const setW=()=>{ const gutter=ts.offsetWidth-ts.clientWidth; inner.style.width=(grid.scrollWidth+gutter)+'px'; };
+  setW();
+  setTimeout(setW,0);   // resettle after vertical scrollbar appears
+}
+
+function showDB(){ return viewMode==='all'||viewMode==='db'; }
+function showDC(){ return viewMode==='all'||viewMode==='dc'; }
+
+function renderHead(){
+  const dbSpan=showDB()?MONTHS.length:0, dcSpan=showDC()?MONTHS.length:0;
+  let r1=`<tr>
+    <th class="c-sec" rowspan="2">업권</th>
+    <th class="c-org" rowspan="2">상품제공기관</th>
+    <th class="c-prod" rowspan="2">상품구분</th>`;
+  if(dbSpan) r1+=`<th class="grp-db ${showDB()?'divL':''}" colspan="${dbSpan}">DB</th>`;
+  if(dcSpan) r1+=`<th class="grp-dc divL" colspan="${dcSpan}">DC / IRP</th>`;
+  r1+=`<th class="grp-def divL" rowspan="2">디폴트<br>옵션용<br><span style="font-weight:400">3년</span></th></tr>`;
+  let r2='<tr>';
+  if(dbSpan) MONTHS.forEach((m,i)=>r2+=`<th class="grp-db ${i===0?'divL':''}" style="font-weight:600">${MONTH_LABEL[m]}</th>`);
+  if(dcSpan) MONTHS.forEach((m,i)=>r2+=`<th class="grp-dc ${i===0?'divL':''}" style="font-weight:600">${MONTH_LABEL[m]}</th>`);
+  r2+='</tr>';
+  $('thead').innerHTML=r1+r2;
+}
+
+function cell(val,cls){
+  if(val===null||val===undefined) return `<td class="${cls}"></td>`;
+  const hi = val>=4.0 ? ' hi':'';
+  return `<td class="${cls}"><span class="rate${hi}">${val.toFixed(2)}</span></td>`;
+}
+
+function renderBody(){
+  const q=searchTxt.trim().toLowerCase();
+  let rows=curRows.filter(r=>filterSec==='ALL'||r.sector===filterSec);
+  if(q) rows=rows.filter(r=> (String(r.org)+' '+String(r.fam)+' '+r.names.join(' ')).toLowerCase().indexOf(q)>=0);
+  const tb=$('tbody');
+  if(!rows.length){ tb.innerHTML=`<tr><td colspan="99" style="padding:40px;color:#9CA3AF">조건에 맞는 상품이 없습니다.</td></tr>`; return; }
+  let html='';
+  for(const r of rows){
+    html+=`<tr>
+      <td class="c-sec"><span class="badge-sec s-${r.sector}">${r.sector}</span></td>
+      <td class="c-org" title="${(r.names[0]||'').replace(/"/g,'')}">${r.org}</td>
+      <td class="c-prod" title="${r.names.join('\n')}">${r.fam}</td>`;
+    if(showDB()) MONTHS.forEach((m,i)=>html+=cell(r.db[m]??null,'sec-db'+(i===0?' divL':'')));
+    if(showDC()) MONTHS.forEach((m,i)=>html+=cell(r.dc[m]??null,'sec-dc'+(i===0?' divL':'')));
+    html+=cell(r.def??null,'sec-def divL');
+    html+='</tr>';
+  }
+  tb.innerHTML=html;
+}
+
+/* ---------- upload ---------- */
+$('btnUpload').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const raw=readWorkbook(ev.target.result);
+      const rows=buildGroups(raw);
+      const m=curMonth||thisMonth();
+      DB[m]={ rows, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length };
+      save();
+      curMonth=m; refreshMonthSel(); loadMonth(m);
+      toast(`업로드 완료 · 원본 ${raw.length}행 → 관리 ${rows.length}건 (${m.replace('-','년 ')}월)`);
+    }catch(err){ console.error(err); toast('업로드 실패: '+err.message,true); }
+    $('fileInput').value='';
+  };
+  rd.readAsArrayBuffer(f);
+};
+
+/* ---------- template download ---------- */
+$('btnTemplate').onclick=()=>{
+  const aoa=[
+    ['번호','권역','상품제공기관명','상품명','만기(개월)','예정적용금리(%)',null,null],
+    [null,null,null,null,null,'DB','DC','IRP'],
+    [1,'기타','한국증권금융','한국증권금융/정기예금(디폴트옵션용)',36,'-',3.3,3.3],
+    [2,'기타','한국증권금융','한국증권금융/정기예금','1/3/6/9/12/18/24/36',
+      '2.350/2.350/2.500/2.900/3.200/3.200/3.200/3.300',
+      '2.350/2.350/2.500/2.900/3.200/3.200/3.200/3.300',
+      '2.350/2.350/2.500/2.900/3.200/3.200/3.200/3.300'],
+    [3,'생명보험','DB생명보험주식회사','DB생명/이율보증형보험/1년',12,3.57,3.57,3.57],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[
+    {s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},
+    {s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:1,c:4}},{s:{r:0,c:5},e:{r:0,c:7}}];
+  ws['!cols']=[{wch:6},{wch:10},{wch:22},{wch:40},{wch:26},{wch:26},{wch:26},{wch:26}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'금리정보_업로드');
+  XLSX.writeFile(wb,'금리정보_업로드_양식.xlsx');
+  toast('업로드 양식을 다운로드했습니다');
+};
+
+/* ---------- export current view ---------- */
+$('btnExport').onclick=()=>{
+  if(!curRows.length){ toast('내보낼 데이터가 없습니다',true); return; }
+  const head1=['업권','상품제공기관','상품구분'];
+  const head2=['','',''];
+  MONTHS.forEach(m=>{head1.push('DB');head2.push(MONTH_LABEL[m]);});
+  MONTHS.forEach(m=>{head1.push('DC/IRP');head2.push(MONTH_LABEL[m]);});
+  head1.push('디폴트옵션용'); head2.push('3년');
+  const aoa=[head1,head2];
+  const q=searchTxt.trim().toLowerCase();
+  let rows=curRows.filter(r=>filterSec==='ALL'||r.sector===filterSec);
+  if(q) rows=rows.filter(r=>(r.org+' '+r.fam+' '+r.names.join(' ')).toLowerCase().indexOf(q)>=0);
+  for(const r of rows){
+    const line=[r.sector,r.org,r.fam];
+    MONTHS.forEach(m=>line.push(r.db[m]??''));
+    MONTHS.forEach(m=>line.push(r.dc[m]??''));
+    line.push(r.def??'');
+    aoa.push(line);
+  }
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  const merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},
+    {s:{r:0,c:3},e:{r:0,c:3+MONTHS.length-1}},{s:{r:0,c:3+MONTHS.length},e:{r:0,c:3+2*MONTHS.length-1}},
+    {s:{r:0,c:3+2*MONTHS.length},e:{r:1,c:3+2*MONTHS.length}}];
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:10},{wch:24},{wch:28},...Array(19).fill({wch:8})];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,curMonth||'금리현황');
+  XLSX.writeFile(wb,`퇴직연금_금리현황_${curMonth||thisMonth()}.xlsx`);
+  toast('현재 화면을 엑셀로 다운로드했습니다');
+};
+
+/* ---------- delete month ---------- */
+$('btnDelete').onclick=()=>{
+  if(!DB[curMonth]){ toast('삭제할 데이터가 없습니다',true); return; }
+  if(!confirm(`${curMonth.replace('-','년 ')}월 저장 데이터를 삭제할까요?`)) return;
+  delete DB[curMonth]; save(); refreshMonthSel(); loadMonth(curMonth);
+  toast('삭제되었습니다');
+};
+
+/* ---------- events ---------- */
+$('monthSel').onchange=e=>loadMonth(e.target.value);
+$('search').oninput=e=>{searchTxt=e.target.value;renderBody();};
+$('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  viewMode=b.dataset.v; $('viewTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render();
+});
+
+/* ---------- sync top & bottom horizontal scrollbars ---------- */
+(function(){
+  const ts=$('tableScroll'), ht=$('hscrollTop');
+  let lock=false;
+  ts.addEventListener('scroll',()=>{ if(lock)return; lock=true; ht.scrollLeft=ts.scrollLeft; lock=false; });
+  ht.addEventListener('scroll',()=>{ if(lock)return; lock=true; ts.scrollLeft=ht.scrollLeft; lock=false; });
+  window.addEventListener('resize',syncHScroll);
+})();
+
+/* ---------- init ---------- */
+(function init(){
+  if(window.self!==window.top) document.body.classList.add('embedded');  // iframe 임베드 감지
+  refreshMonthSel();
+  loadMonth(curMonth);
+})();
+</script>

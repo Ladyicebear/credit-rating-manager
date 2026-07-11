@@ -837,15 +837,15 @@ def _kis_table(page, company: str, is_insurance: bool) -> tuple[str, str, str]:
     return '', '', ''
 
 
-# ─── 저축은행 2년 룰 ───────────────────────────────────────────────
-# user_instructions.md [8] (2026-06-02):
-# 저축은행은 등급공시일이 오늘 기준 2년을 초과하면 미공시 처리
+# ─── 2년 룰 ────────────────────────────────────────────────────────
+# user_instructions.md [8](2026-06-02) 저축은행 → [10](2026-07-10) 전 기관으로 확장:
+# 등급공시일이 오늘 기준 2년을 초과하면 미공시 처리 (전 카테고리 공통)
 
-def _apply_savings_2y_filter(r: str, d: str, t: str) -> tuple[str, str, str]:
-    """저축은행 등급 결과에 2년 룰 적용.
+def _apply_2y_filter(r: str, d: str, t: str) -> tuple[str, str, str]:
+    """등급 결과에 2년 룰 적용 (전 기관 공통).
     - 등급이 비어있거나 평정일이 없으면 그대로 반환 (필터링 안 함)
     - 평정일이 오늘 기준 정확히 2년 전 동일일자 미만이면 ('', '', '') 반환
-    예) 오늘이 2026-06-02 → 2024-06-02 미만 평정일은 미공시
+    예) 오늘이 2026-07-10 → 2024-07-10 미만 평정일은 미공시
     """
     if not r or not d:
         return r, d, t
@@ -879,11 +879,11 @@ def _scrape_one(name: str, is_insurance: bool, is_savings: bool = False) -> dict
         kr_r,   kr_d,   kr_t   = f_kr.result()
         kis_r,  kis_d,  kis_t  = f_kis.result()
 
-    # 저축은행 2년 룰: 오래된 평정일은 미공시 처리
-    if is_savings:
-        nice_r, nice_d, nice_t = _apply_savings_2y_filter(nice_r, nice_d, nice_t)
-        kr_r,   kr_d,   kr_t   = _apply_savings_2y_filter(kr_r,   kr_d,   kr_t)
-        kis_r,  kis_d,  kis_t  = _apply_savings_2y_filter(kis_r,  kis_d,  kis_t)
+    # 2년 룰(전 기관): 평정일이 오늘 기준 2년 초과면 미공시 처리
+    # (2026-07-10 사용자 지시 [10] — 기존 저축은행 한정에서 전 카테고리로 확장)
+    nice_r, nice_d, nice_t = _apply_2y_filter(nice_r, nice_d, nice_t)
+    kr_r,   kr_d,   kr_t   = _apply_2y_filter(kr_r,   kr_d,   kr_t)
+    kis_r,  kis_d,  kis_t  = _apply_2y_filter(kis_r,  kis_d,  kis_t)
 
     found = any([nice_r, kr_r, kis_r])
     logger.info(

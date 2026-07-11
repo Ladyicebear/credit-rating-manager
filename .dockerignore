@@ -9,6 +9,10 @@ data/ratings.backup_*.json
 수정내역_*.md
 debug*.py
 debug*.txt
-test_scraper.py
+test_*.py
+kis_*.txt
+meritz_*.txt
 _*.txt
 _*.xlsx
+data/*.bak_*
+data/ratings.json.bak_*

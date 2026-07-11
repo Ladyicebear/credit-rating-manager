@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>신용등급 관리 시스템</title>
+<title>퇴직연금 상품제공기관 통합관리</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
@@ -11,10 +11,32 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 
 /* ── Header ── */
 .hdr{background:#F68121;
-     color:#fff;padding:14px 28px;display:flex;align-items:center;
-     justify-content:space-between;position:sticky;top:0;z-index:100;
+     color:#fff;padding:20px 24px 0;display:block;position:sticky;top:0;z-index:100;
      box-shadow:0 3px 14px rgba(0,0,0,.2)}
-.hdr-title{font-size:1.2rem;font-weight:800;letter-spacing:-.4px;display:flex;align-items:center;gap:14px}
+.hdr-row1{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hdr-title{font-size:1.35rem;font-weight:800;letter-spacing:-.4px;display:flex;align-items:center;gap:14px}
+
+/* ── 상위 통합 탭 (원리금보장상품 금리 / 신용등급관리) ── */
+.super-tabs{display:flex;gap:0;margin-top:22px;margin-bottom:-1px;padding-left:0}
+.super-tab{padding:8px 20px;border:none;border-radius:9px 9px 0 0;font-size:.85rem;
+           font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:-.3px;transition:all .12s;
+           box-shadow:0 -1px 4px rgba(0,0,0,.08)}
+.super-tab.active{background:#16335B;color:#fff}                 /* 선택: 네이비 */
+.super-tab:not(.active){background:#fff;color:#16335B}           /* 미선택: 흰색 */
+.super-tab:not(.active):hover{background:#eef1f5}
+
+/* ── 신용등급관리 서브바(설명 + 조회 컨트롤) : 회색 ── */
+.credit-subbar{background:#e8eaee;color:#333;padding:8px 24px 11px;display:flex;
+               align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.credit-subbar .hdr-sub{color:#5b6472;margin-top:0}
+.credit-subbar .upd-lbl{color:#7a828e}
+.credit-subbar .upd-lbl strong{color:#16335B}
+.credit-subbar .btn-ghost{background:#fff;color:#16335B;border:1px solid #cbd0d8}
+.credit-subbar .btn-ghost:hover{background:#eef0f3}
+
+/* ── 통합 패널 / 임베드 iframe ── */
+.super-panel{}
+.pension-frame{width:100%;height:calc(100vh - 118px);border:none;display:block;background:#f4f5f7}
 .hdr-logo-svg{height:48px;width:auto;display:block}
 .hdr-sub{font-size:.7rem;color:#ffe2cc;margin-top:3px}
 .hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -44,6 +66,11 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
            margin-bottom:14px;font-size:.8rem;color:#6d4c00}
 .alert-bar.hidden{display:none}
 .alert-bar .ack-all{margin-left:auto}
+.chg-names{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.chg-name-chip{background:#fff;border:1px solid #f0b429;color:#8a5a00;
+               padding:2px 9px;border-radius:12px;font-size:.72rem;font-weight:700;
+               cursor:pointer;transition:all .13s;font-family:inherit}
+.chg-name-chip:hover{background:#F68121;color:#fff;border-color:#F68121}
 .info-bar{background:#fff;border-radius:9px;padding:9px 16px;margin-bottom:14px;
           display:flex;align-items:center;gap:8px;font-size:.76rem;color:#666;
           box-shadow:0 1px 4px rgba(0,0,0,.07)}
@@ -58,6 +85,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .tab-badge{display:inline-block;padding:1px 6px;border-radius:9px;font-size:.67rem;margin-left:3px}
 .tab-btn.active .tab-badge{background:#F68121;color:#fff}
 .tab-btn:not(.active) .tab-badge{background:#eef1f7;color:#777}
+.tab-history{margin-left:10px;border-color:#e0e4ec}
+.tab-history:hover{border-color:#16335B;color:#16335B}
+.tab-history.active{background:#F68121;color:#fff;border-color:#F68121}
+.tab-history.active .tab-badge{background:#fff;color:#F68121}
 .tab-chg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;
              background:#F68121;margin-left:4px;vertical-align:middle}
 
@@ -228,12 +259,25 @@ tr.row-done td{transition:background .3s}
 
 <!-- ═══ HEADER ═══ -->
 <header class="hdr">
-  <div>
-    <div class="hdr-title">
-      신용등급 관리 시스템
-    </div>
-    <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFSR) &nbsp;|&nbsp; 1순위 기업신용등급 2순위 회사채 선순위 적용</div>
+  <div class="hdr-row1">
+    <div class="hdr-title">퇴직연금 상품제공기관 통합관리</div>
+    <a class="btn btn-ghost btn-sm" href="/logout" title="로그아웃">🔓 로그아웃</a>
   </div>
+  <div class="super-tabs">
+    <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')">원리금보장상품 금리</button>
+    <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')">신용등급관리</button>
+  </div>
+</header>
+
+<!-- ═══ [통합탭1] 원리금보장상품 금리 ═══ -->
+<div id="super-pension" class="super-panel">
+  <iframe id="pension-frame" class="pension-frame" src="/pension" title="원리금보장상품 금리관리"></iframe>
+</div>
+
+<!-- ═══ [통합탭2] 신용등급관리 ═══ -->
+<!-- 신용등급 서브바(설명 + 조회 컨트롤) -->
+<div class="credit-subbar" id="credit-subbar">
+  <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFSR) &nbsp;|&nbsp; 1순위 기업신용등급 2순위 회사채 선순위 적용</div>
   <div class="hdr-right">
     <div class="upd-lbl">마지막 업데이트<br><strong id="hdr-upd">{{ last_updated }}</strong></div>
     <button class="btn btn-ghost btn-sm" onclick="openAdd()">＋ 기관 추가</button>
@@ -242,15 +286,21 @@ tr.row-done td{transition:background .3s}
     {% endif %}
     <button class="btn btn-navy" id="ref-btn" onclick="doRefresh()">🔄 지금 조회</button>
   </div>
-</header>
+</div>
 
-<!-- ═══ MAIN ═══ -->
+<!-- ═══ MAIN (신용등급관리 본문) ═══ -->
 <div class="main">
 
   <!-- Alert -->
   <div class="alert-bar {% if total_changed == 0 %}hidden{% endif %}" id="alert-bar">
     <span style="font-size:1.1rem">🔔</span>
-    <span><strong>{{ total_changed }}개 기관</strong>의 신용등급 변경이 감지되었습니다. 아래 <span style="color:#c0392b;font-weight:700">주황색 행</span>을 확인하세요.</span>
+    <span><strong>{{ total_changed }}개 기관</strong>의 신용등급 변경이 감지되었습니다:</span>
+    <span class="chg-names">
+      {% for ci in changed_institutions %}
+      <button class="chg-name-chip" title="해당 기관으로 이동"
+              onclick="jumpTo('{{ ci.category }}','{{ ci.name }}')">{{ ci.name }}</button>
+      {% endfor %}
+    </span>
     <button class="btn btn-sm btn-warn ack-all" onclick="acknowledgeAll()">모두 확인</button>
   </div>
 
@@ -279,6 +329,9 @@ tr.row-done td{transition:background .3s}
       {% if n_chg > 0 %}<span class="tab-chg-dot" title="{{ n_chg }}건 변경"></span>{% endif %}
     </button>
     {% endfor %}
+    <button class="tab-btn tab-history" data-tab="__history__" onclick="switchTab('__history__')">
+      📜 변경이력<span class="tab-badge">{{ history|length }}</span>
+    </button>
   </div>
 
   <!-- Panels -->
@@ -434,6 +487,9 @@ tr.row-done td{transition:background .3s}
               <!-- 관리 -->
               <td class="td-act">
                 <div style="display:flex;flex-direction:column;gap:3px">
+                  <button class="btn btn-sm"
+                    style="background:#eef8f0;color:#1e7e34;border:1px solid #c3e6cb;font-size:.7rem"
+                    onclick="refreshOne('{{ row.name }}',this)">🔄 재조회</button>
                   <button class="btn btn-ghost btn-sm"
                     style="background:#eef2ff;color:#1a2a5e;border:none;font-size:.7rem"
                     onclick="openEdit(
@@ -467,6 +523,59 @@ tr.row-done td{transition:background .3s}
     </div><!-- card -->
   </div><!-- panel -->
   {% endfor %}
+
+  <!-- 변경이력 패널 -->
+  <div class="panel" id="panel-__history__">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📜 신용등급 변경이력</span>
+        <div class="card-head-right">
+          <span class="card-note">등급 변경이 감지될 때마다 자동 누적됩니다 &nbsp;|&nbsp; 총 <strong>{{ history|length }}</strong>건</span>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="th-name">기관명</th>
+              <th style="min-width:120px">신용평가사</th>
+              <th style="min-width:110px">등급 유형</th>
+              <th style="min-width:150px">변경 전 → 변경 후</th>
+              <th style="min-width:100px">변경일<br><span style="font-weight:400;font-size:.67rem">평가일</span></th>
+              <th style="min-width:140px">감지일시</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in history %}
+            <tr data-hist-name="{{ h.name }}">
+              <td class="td-name">{{ h.name }}</td>
+              <td>{{ h.agency_label }}</td>
+              <td>
+                <span class="ag-type-badge
+                  {% if '기업신용' in h.type_label %}type-ICR
+                  {% elif '회사채' in h.type_label %}type-SB
+                  {% elif '보험' in h.type_label %}type-IFS
+                  {% else %}type-none{% endif %}">{{ h.type_label }}</span>
+              </td>
+              <td>
+                <span class="chg-tag {% if h.direction=='down' %}chg-down{% elif h.direction=='up' %}chg-up{% else %}chg-same{% endif %}">
+                  {{ h.prev }}&nbsp;{% if h.direction=='down' %}▼{% elif h.direction=='up' %}▲{% else %}→{% endif %}&nbsp;{{ h.current }}
+                </span>
+              </td>
+              <td>{{ h.eval_date or '-' }}</td>
+              <td style="font-size:.72rem;color:#777">{{ h.detected_at }}</td>
+            </tr>
+            {% endfor %}
+            {% if not history %}
+            <tr><td colspan="6" style="padding:28px;color:#999;text-align:center">
+              아직 변경이력이 없습니다. 조회에서 등급 변경이 감지되면 여기에 자동으로 쌓입니다.
+            </td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div><!-- card -->
+  </div><!-- panel -->
 </div><!-- main -->
 
 <!-- ═══ EDIT MODAL ═══ -->
@@ -531,6 +640,22 @@ tr.row-done td{transition:background .3s}
 <div id="toast"></div>
 
 <script>
+/* ── 상위 통합 탭 (원리금보장상품 금리 / 신용등급관리) ── */
+function switchSuper(which){
+  const pen = which==='pension';
+  document.getElementById('super-pension').style.display = pen ? 'block' : 'none';
+  document.getElementById('credit-subbar').style.display = pen ? 'none' : 'flex';
+  document.querySelector('.main').style.display          = pen ? 'none' : 'block';
+  document.getElementById('stab-pension').classList.toggle('active', pen);
+  document.getElementById('stab-credit').classList.toggle('active', !pen);
+  try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
+}
+(function initSuper(){
+  let t='pension';
+  try{ t = localStorage.getItem('goun_super_tab') || 'pension'; }catch(e){}
+  switchSuper(t);
+})();
+
 /* ── Tabs ── */
 function switchTab(cat){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -690,6 +815,45 @@ function _resetRefresh(){
   const btn=document.getElementById('ref-btn');
   btn.disabled=false;
   btn.innerHTML='🔄 지금 조회';
+}
+
+/* ── 변경 기관으로 이동 ── */
+function jumpTo(cat,name){
+  switchTab(cat);
+  const tr=document.querySelector(`tr[data-name="${CSS.escape(name)}"]`);
+  if(tr){
+    tr.scrollIntoView({behavior:'smooth',block:'center'});
+    const prev=tr.style.background;
+    tr.style.transition='background .25s';
+    tr.style.background='#ffd699';
+    setTimeout(()=>{tr.style.background=prev;},1300);
+  }
+}
+
+/* ── 단일 기관 재조회 ── */
+function refreshOne(name,btn){
+  const tr=btn.closest('tr');
+  const orig=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin" style="border-color:rgba(30,126,52,.35);border-top-color:#1e7e34"></span> 조회…';
+  if(tr){tr.classList.add('row-loading');tr.classList.remove('row-done');}
+  fetch(`/api/refresh_one/${encodeURIComponent(name)}`,{method:'POST'})
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.success){
+        showToast(`'${name}' 재조회 완료${d.scrape_status?' ('+d.scrape_status+')':''}`,'ok');
+        setTimeout(()=>location.reload(),600);
+      }else{
+        if(tr)tr.classList.remove('row-loading');
+        btn.disabled=false;btn.innerHTML=orig;
+        showToast(d.message||'재조회 오류','err');
+      }
+    })
+    .catch(()=>{
+      if(tr)tr.classList.remove('row-loading');
+      btn.disabled=false;btn.innerHTML=orig;
+      showToast('네트워크 오류','err');
+    });
 }
 
 /* ── Acknowledge ── */

@@ -6,12 +6,64 @@ import threading
 from collections import Counter
 from datetime import datetime
 from markupsafe import Markup
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import (Flask, render_template, jsonify, request, send_file,
+                   redirect, url_for, session)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# 세션 쿠키 서명 키. 배포 시엔 반드시 SECRET_KEY 환경변수로 고정값 지정
+# (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+
+# ── 접근 제한 (로그인) ─────────────────────────────────────────────────
+# 아이디/비밀번호는 환경변수로 주입. 미설정 시 로컬 개발용 기본값(배포 시 반드시 변경).
+APP_USER = os.environ.get('APP_USER', 'admin')
+APP_PASSWORD = os.environ.get('APP_PASSWORD', 'goun')
+if not (os.environ.get('APP_USER') and os.environ.get('APP_PASSWORD')):
+    logger.warning('기본 로그인 계정(admin) 사용 중 — 배포 시 APP_USER/APP_PASSWORD 환경변수를 반드시 설정하세요.')
+
+# 로그인 없이 접근 허용할 엔드포인트
+_PUBLIC_ENDPOINTS = {'login', 'static'}
+
+
+@app.before_request
+def _require_login():
+    if request.endpoint in _PUBLIC_ENDPOINTS:
+        return
+    if session.get('logged_in'):
+        return
+    # API(fetch) 요청은 401 JSON, 일반 페이지는 로그인 화면으로 유도
+    if request.path.startswith('/api/'):
+        return jsonify({'success': False, 'message': '로그인이 필요합니다',
+                        'login_required': True}), 401
+    return redirect(url_for('login', next=request.path))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = ''
+    if request.method == 'POST':
+        u = request.form.get('username', '').strip()
+        p = request.form.get('password', '')
+        if u == APP_USER and p == APP_PASSWORD:
+            session['logged_in'] = True
+            session['user'] = u
+            nxt = request.args.get('next') or '/'
+            if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
+                nxt = '/'
+            return redirect(nxt)
+        error = '아이디 또는 비밀번호가 올바르지 않습니다.'
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 # ── 백그라운드 조회 상태 ───────────────────────────────────────────────
 _refresh_lock = threading.Lock()
@@ -26,6 +78,7 @@ RATINGS_FILE = os.path.join(DATA_DIR, 'ratings.json')
 INSTITUTIONS_FILE = os.path.join(DATA_DIR, 'institutions.json')
 EXPORT_TEMPLATE = os.path.join(BASE_DIR, 'export_template.xlsx')
 OVERRIDES_FILE = os.path.join(DATA_DIR, 'overrides.json')
+HISTORY_FILE = os.path.join(DATA_DIR, 'rating_history.json')
 
 # 서버 포트: 클라우드(Cloud Run 등)는 환경변수 PORT를 지정함. 없으면 로컬 기본 5000.
 PORT = int(os.environ.get('PORT', 5000))
@@ -96,6 +149,33 @@ def save_ratings(data: dict):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(RATINGS_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ── 신용등급 변경이력 ──────────────────────────────────────────────────
+# 조회 중 등급 변경이 감지되면 이력을 누적한다.
+# 레코드: {name, agency, agency_label, prev, current, direction,
+#          type_label, eval_date(변경일=평가일), detected_at(감지일시)}
+
+def load_history() -> list:
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def append_history(records: list):
+    """새 변경 레코드들을 이력 파일에 누적(append). 비어 있으면 아무것도 안 함."""
+    if not records:
+        return
+    os.makedirs(DATA_DIR, exist_ok=True)
+    hist = load_history()
+    hist.extend(records)
+    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(hist, f, ensure_ascii=False, indent=2)
 
 
 # ── 사용자 강제 정정(override) ─────────────────────────────────────────
@@ -309,6 +389,12 @@ def rating_select_options() -> Markup:
 
 # ── Routes ────────────────────────────────────────────────────────────
 
+@app.route('/pension')
+def pension():
+    """원리금보장상품 금리관리 화면(통합 탭). 순수 HTML을 그대로 서빙(Jinja 미처리)."""
+    return send_file(os.path.join(BASE_DIR, 'pension.html'))
+
+
 @app.route('/')
 def index():
     institutions = load_institutions()
@@ -316,10 +402,19 @@ def index():
     data = build_response_data(institutions, ratings)
     meta = ratings.get('_meta', {})
 
-    # 변경 알람 요약
-    total_changed = sum(
-        1 for rows in data.values()
+    # 변경 알람 요약 + 변경 감지된 기관 목록(이름·카테고리)
+    changed_institutions = [
+        {'name': row['name'], 'category': category}
+        for category, rows in data.items()
         for row in rows if row['any_changed']
+    ]
+    total_changed = len(changed_institutions)
+
+    # 변경이력 (최신순)
+    history = sorted(
+        load_history(),
+        key=lambda h: (h.get('detected_at', ''), h.get('eval_date', '')),
+        reverse=True,
     )
 
     return render_template(
@@ -328,6 +423,8 @@ def index():
         last_updated=meta.get('updated', '-'),
         scrape_summary=meta.get('scrape_summary', ''),
         total_changed=total_changed,
+        changed_institutions=changed_institutions,
+        history=history,
         rating_scale=RATING_SCALE,
         agencies=AGENCIES,
         agency_labels=AGENCY_LABELS,
@@ -395,12 +492,32 @@ def api_ratings():
     return jsonify({'data': data, 'last_updated': meta.get('updated', '-')})
 
 
-def _apply_scrape_results(scrape_result: dict) -> tuple[int, int]:
-    """스크래핑 결과를 ratings.json에 반영. (success_count, changed_count) 반환"""
+def _apply_scrape_results(scrape_result: dict, update_meta: bool = True,
+                          alive_override: set | None = None) -> tuple[int, int]:
+    """스크래핑 결과를 ratings.json에 반영. (success_count, changed_count) 반환.
+
+    - update_meta: False면 전역 요약/타임스탬프(_meta)를 갱신하지 않음 (단일 기관 재조회용).
+    - alive_override: 지정 시 이 평가사 집합을 'alive'로 간주 (단일 기관 재조회는 교차 판단이
+      불가하므로, 전체 조회가 해당 기관을 처리하는 것과 동일하게 3사를 alive로 넘겨 사용).
+    """
     ratings = load_ratings()
     overrides = load_overrides()
     success_count = 0
     changed_count = 0
+    history_records = []  # 이번 실행에서 감지된 등급 변경 이력
+    _now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 평가사별 '이번 실행 전체 생존' 판단: 어느 한 기관에서라도 값을 반환했으면 정상.
+    # 특정 평가사가 모든 기관에서 빈값이면 사이트/API 전면 장애로 보고 stale 값을 지우지 않는다.
+    if alive_override is not None:
+        agency_alive = {ag: (ag in alive_override) for ag in AGENCIES}
+    else:
+        agency_alive = {ag: False for ag in AGENCIES}
+        for _n, _d in scrape_result.items():
+            if _n == '_meta':
+                continue
+            for ag in AGENCIES:
+                if _d.get(ag, ''):
+                    agency_alive[ag] = True
     for name, new_data in scrape_result.items():
         if name == '_meta':
             continue
@@ -427,10 +544,31 @@ def _apply_scrape_results(scrape_result: dict) -> tuple[int, int]:
                     entry[f'{ag}_prev'] = old_rating
                     entry[f'{ag}_changed'] = True
                     changed_count += 1
+                    history_records.append({
+                        'name': name,
+                        'agency': ag,
+                        'agency_label': AGENCY_LABELS[ag],
+                        'prev': old_rating,
+                        'current': new_rating,
+                        'direction': compare_ratings(old_rating, new_rating),
+                        'type_label': get_rating_type_label(new_data.get(f'{ag}_type', '')),
+                        'eval_date': new_date,        # 변경일(평가일)
+                        'detected_at': _now,          # 감지일시
+                    })
                 entry[ag] = new_rating
                 entry[f'{ag}_eval_date'] = new_data.get(f'{ag}_eval_date', prev_entry.get(f'{ag}_eval_date', ''))
                 entry[f'{ag}_type']      = new_data.get(f'{ag}_type',      prev_entry.get(f'{ag}_type', ''))
                 any_ag_updated = True
+        # stale 잔존값 정리: 이 기관 조회가 성공(다른 평가사 값 확보)했고, 해당 평가사가
+        # 이번 실행에서 다른 기관들엔 정상 응답했는데 이 기관에서만 빈값이면 → 과거 오파싱으로
+        # 남은 값(예: KB손해보험 KIS 'AAA')을 제거한다. 평가사 전면 장애(agency_alive=False)나
+        # 기관 전체 실패(any_ag_updated=False) 시에는 보존한다.
+        if any_ag_updated:
+            for ag in AGENCIES:
+                if not new_data.get(ag, '') and agency_alive[ag] and entry.get(ag, ''):
+                    entry[ag] = ''
+                    entry[f'{ag}_eval_date'] = ''
+                    entry[f'{ag}_type'] = ''
         old_final = prev_entry.get('final', '')
         new_finals = [entry.get(ag, '') for ag in AGENCIES]
         new_final  = get_lowest_rating(new_finals)
@@ -453,11 +591,13 @@ def _apply_scrape_results(scrape_result: dict) -> tuple[int, int]:
             _apply_overrides(name, entry, overrides)
             entry['final'] = get_lowest_rating([entry.get(ag, '') for ag in AGENCIES])
         ratings[name] = entry
-    ratings['_meta'] = {
-        'updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'scrape_summary': f'조회 성공 {success_count}건 / 등급 변경 감지 {changed_count}건',
-    }
+    if update_meta:
+        ratings['_meta'] = {
+            'updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'scrape_summary': f'조회 성공 {success_count}건 / 등급 변경 감지 {changed_count}건',
+        }
     save_ratings(ratings)
+    append_history(history_records)
     return success_count, changed_count
 
 
@@ -510,6 +650,37 @@ def api_refresh():
 def api_refresh_status():
     with _refresh_lock:
         return jsonify(dict(_refresh_state))
+
+
+@app.route('/api/refresh_one/<path:name>', methods=['POST'])
+def api_refresh_one(name):
+    """기관 1개만 즉시 재조회 (전체 조회 없이). 전역 요약 배너는 갱신하지 않는다."""
+    institutions = load_institutions()
+    category = next(
+        (cat for cat, items in institutions.items()
+         if any(i['name'] == name for i in items)),
+        None,
+    )
+    if category is None:
+        return jsonify({'success': False, 'message': '기관을 찾을 수 없습니다'}), 404
+
+    from scraper import _scrape_one, SAVING_BANK_CATEGORIES
+    is_ins = category in INSURANCE_CATEGORIES
+    is_sav = category in SAVING_BANK_CATEGORIES
+    try:
+        data = _scrape_one(name, is_ins, is_sav)
+    except Exception as e:
+        logger.exception('단일 재조회 실패 [%s]', name)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+    # 단일 기관이라 평가사 교차 생존 판단이 불가 → 전체 조회와 동일하게 3사를 alive로 취급.
+    # 전역 _meta(마지막 업데이트/요약)는 건드리지 않음.
+    _apply_scrape_results({name: data}, update_meta=False, alive_override=set(AGENCIES))
+
+    ratings = load_ratings()
+    row = build_row(name, category, ratings.get(name, {}), load_overrides())
+    return jsonify({'success': True, 'row': row,
+                    'scrape_status': ratings.get(name, {}).get('scrape_status', '')})
 
 
 @app.route('/api/ratings/<path:name>', methods=['PUT'])

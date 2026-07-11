@@ -45,3 +45,8 @@ data/ratings.backup_*.json
 *.zip
 _*.txt
 _*.xlsx
+
+# 로컬 백업 복사본/폴더 (git 제외)
+백업/
+*_backup_*.py
+*_backup_*.html
