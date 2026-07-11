@@ -9,34 +9,39 @@
 body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
      background:#f4f5f7;color:#222;min-height:100vh;font-size:13px}
 
-/* ── Header ── */
-.hdr{background:#F68121;
-     color:#fff;padding:20px 24px 0;display:block;position:sticky;top:0;z-index:100;
-     box-shadow:0 3px 14px rgba(0,0,0,.2)}
-.hdr-row1{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.hdr-title{font-size:1.35rem;font-weight:800;letter-spacing:-.4px;display:flex;align-items:center;gap:14px}
+/* ── Header (화이트 브랜드 헤더) ── */
+.hdr{background:linear-gradient(180deg,#ffffff 0%,#f5f7f9 100%);
+     color:#16335B;padding:18px 28px 0;display:block;position:sticky;top:0;z-index:100;
+     box-shadow:0 2px 10px rgba(16,24,40,.06);border-bottom:1px solid #e7eaee}
+.hdr-row1{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.brand-logo{font-size:1.7rem;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.brand-logo .b-nav{color:#16335B}
+.brand-logo .b-org{color:#F68121}
+.brand-logo .b-gray{color:#b3bac4}
+.brand-sub{font-size:.82rem;color:#6b7280;margin-top:5px;font-weight:600}
+.hdr-row1 .btn{background:#fff;color:#4b5563;border:1px solid #d5d9e0}
+.hdr-row1 .btn:hover{background:#f4f6f8}
 
-/* ── 상위 통합 탭 (원리금보장상품 금리 / 신용등급관리) ── */
-.super-tabs{display:flex;gap:0;margin-top:22px;margin-bottom:-1px;padding-left:0}
-.super-tab{padding:8px 20px;border:none;border-radius:9px 9px 0 0;font-size:.85rem;
-           font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:-.3px;transition:all .12s;
-           box-shadow:0 -1px 4px rgba(0,0,0,.08)}
-.super-tab.active{background:#16335B;color:#fff}                 /* 선택: 네이비 */
-.super-tab:not(.active){background:#fff;color:#16335B}           /* 미선택: 흰색 */
-.super-tab:not(.active):hover{background:#eef1f5}
+/* ── 상위 통합 탭 (밑줄형: 선택=오렌지, 미선택=회색) ── */
+.super-tabs{display:flex;gap:8px;margin-top:16px;border-bottom:1px solid #e5e7eb}
+.super-tab{padding:10px 18px;border:none;border-bottom:3px solid transparent;background:none;
+           font-size:.95rem;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:-.3px;
+           color:#8a92a0;transition:all .12s;margin-bottom:-1px;border-radius:0}
+.super-tab.active{color:#F68121;border-bottom-color:#F68121}    /* 선택: 오렌지 글자+밑줄 */
+.super-tab:not(.active):hover{color:#16335B}                    /* 미선택: 회색→호버 네이비 */
 
-/* ── 신용등급관리 서브바(설명 + 조회 컨트롤) : 회색 ── */
-.credit-subbar{background:#e8eaee;color:#333;padding:8px 24px 11px;display:flex;
+/* ── 신용등급관리 서브바(설명 + 조회 컨트롤) : 네이비 ── */
+.credit-subbar{background:#16335B;color:#fff;padding:10px 28px 12px;display:flex;
                align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.credit-subbar .hdr-sub{color:#5b6472;margin-top:0}
-.credit-subbar .upd-lbl{color:#7a828e}
-.credit-subbar .upd-lbl strong{color:#16335B}
-.credit-subbar .btn-ghost{background:#fff;color:#16335B;border:1px solid #cbd0d8}
-.credit-subbar .btn-ghost:hover{background:#eef0f3}
+.credit-subbar .hdr-sub{color:#cdd6e3;margin-top:0}
+.credit-subbar .upd-lbl{color:#aeb9c9}
+.credit-subbar .upd-lbl strong{color:#fff}
+.credit-subbar .btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.32)}
+.credit-subbar .btn-ghost:hover{background:rgba(255,255,255,.22)}
 
 /* ── 통합 패널 / 임베드 iframe ── */
 .super-panel{}
-.pension-frame{width:100%;height:calc(100vh - 118px);border:none;display:block;background:#f4f5f7}
+.pension-frame{width:100%;height:calc(100vh - 124px);border:none;display:block;background:#f4f5f7}
 .hdr-logo-svg{height:48px;width:auto;display:block}
 .hdr-sub{font-size:.7rem;color:#ffe2cc;margin-top:3px}
 .hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -260,8 +265,11 @@ tr.row-done td{transition:background .3s}
 <!-- ═══ HEADER ═══ -->
 <header class="hdr">
   <div class="hdr-row1">
-    <div class="hdr-title">퇴직연금 상품제공기관 통합관리</div>
-    <a class="btn btn-ghost btn-sm" href="/logout" title="로그아웃">🔓 로그아웃</a>
+    <div>
+      <div class="brand-logo"><span class="b-nav">Retirement</span> <span class="b-org">Pension</span> <span class="b-gray">Management System</span></div>
+      <div class="brand-sub">퇴직연금 상품제공기관 통합관리</div>
+    </div>
+    <a class="btn btn-sm" href="/logout" title="로그아웃">🔓 로그아웃</a>
   </div>
   <div class="super-tabs">
     <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')">원리금보장상품 금리</button>
