@@ -88,14 +88,14 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
          background:#fff;color:#555;font-size:.8rem;font-weight:700;cursor:pointer;
          transition:all .14s;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .tab-btn:hover{border-color:#F68121;color:#F68121}
-.tab-btn.active{background:#16335B;color:#fff;border-color:#16335B}
+.tab-btn.active{background:#FCEAD8;color:#C77B2E;border-color:#F1C99E}
 .tab-badge{display:inline-block;padding:1px 6px;border-radius:9px;font-size:.67rem;margin-left:3px}
 .tab-btn.active .tab-badge{background:#F68121;color:#fff}
 .tab-btn:not(.active) .tab-badge{background:#eef1f7;color:#777}
 .tab-history{margin-left:10px;border-color:#e0e4ec}
 .tab-history:hover{border-color:#16335B;color:#16335B}
-.tab-history.active{background:#F68121;color:#fff;border-color:#F68121}
-.tab-history.active .tab-badge{background:#fff;color:#F68121}
+.tab-history.active{background:#FCEAD8;color:#C77B2E;border-color:#F1C99E}
+.tab-history.active .tab-badge{background:#fff;color:#C77B2E}
 .tab-chg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;
              background:#F68121;margin-left:4px;vertical-align:middle}
 
@@ -115,22 +115,22 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 table{width:100%;border-collapse:collapse;font-size:.78rem}
 thead th{position:sticky;top:0;z-index:2;background:#fff}
 
-/* 헤더 그룹 색상 */
-.th-grp-nice {background:#eef1f6!important}
-.th-grp-kr   {background:#eef1f6!important}
-.th-grp-kis  {background:#eef1f6!important}
-.th-grp-final{background:#fdeee2!important}
-.th-grp-chg  {background:#f4f5f7!important}
+/* 헤더 그룹 색상 (뮤트 웜톤: 중립 회색 + 최종적용 피치) */
+.th-grp-nice {background:#EEF0F3!important}
+.th-grp-kr   {background:#EEF0F3!important}
+.th-grp-kis  {background:#EEF0F3!important}
+.th-grp-final{background:#FCEAD8!important}
+.th-grp-chg  {background:#F4F5F7!important}
 
-thead th{color:#16335B;font-weight:800;padding:8px 10px;
-         text-align:center;border-bottom:2px solid #dde3ec;
+thead th{color:#3F4854;font-weight:800;padding:8px 10px;
+         text-align:center;border-bottom:2px solid #C7CDD6;
          white-space:nowrap;vertical-align:middle;font-size:.75rem}
-th.th-name{text-align:left;min-width:120px;background:#eef1f6}
+th.th-name{text-align:left;min-width:120px;background:#EEF0F3}
 th.th-agency{min-width:145px}
 th.th-final-r{min-width:100px}
 th.th-basis {min-width:160px}
 th.th-chg   {min-width:190px}
-th.th-act   {min-width:80px;background:#eef1f6}
+th.th-act   {min-width:80px;background:#EEF0F3}
 
 tbody tr{border-bottom:1px solid #f0f2f7;transition:background .1s}
 tbody tr:hover{background:#f7f9fc}
@@ -499,10 +499,10 @@ tr.row-done td{transition:background .3s}
               <td class="td-act">
                 <div style="display:flex;flex-direction:column;gap:3px">
                   <button class="btn btn-sm"
-                    style="background:#eef8f0;color:#1e7e34;border:1px solid #c3e6cb;font-size:.7rem"
+                    style="background:#EAF0F9;color:#16335B;border:1px solid #C6D3E8;font-size:.7rem"
                     onclick="refreshOne('{{ row.name }}',this)">🔄 재조회</button>
                   <button class="btn btn-ghost btn-sm"
-                    style="background:#eef2ff;color:#1a2a5e;border:none;font-size:.7rem"
+                    style="background:#F1F3F6;color:#4B5563;border:1px solid #D9DDE3;font-size:.7rem"
                     onclick="openEdit(
                       '{{ row.name }}',
                       '{{ row.agencies.nice.rating }}','{{ row.agencies.nice.eval_date }}','{{ row.agencies.nice.type }}',
@@ -510,7 +510,7 @@ tr.row-done td{transition:background .3s}
                       '{{ row.agencies.kis.rating }}', '{{ row.agencies.kis.eval_date }}', '{{ row.agencies.kis.type }}'
                     )">✏️ 수정</button>
                   <button class="btn btn-sm"
-                    style="background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb;font-size:.7rem"
+                    style="background:#FDF1EE;color:#E06A4A;border:1px solid #F0B4A4;font-size:.7rem"
                     onclick="deleteInst('{{ row.name }}')">🗑 삭제</button>
                 </div>
               </td>
