@@ -314,11 +314,38 @@ function buildGroups(raw){
   return rows;
 }
 
+/* ---------- 기준년월 파싱 ---------- */
+function extractYM(text){
+  if(text===null||text===undefined) return null;
+  const s=String(text).replace(/\s/g,'');
+  // 2026-06 / 2026.06 / 2026/06 / 2026년6월 / 2026년06월
+  let m=s.match(/(20\d{2})\s*[.\-\/년]?\s*(\d{1,2})\s*월?/);
+  if(m){ const mo=parseInt(m[2],10); if(mo>=1&&mo<=12) return m[1]+'-'+String(mo).padStart(2,'0'); }
+  // 202606 (연속 6자리)
+  m=s.match(/(20\d{2})(0[1-9]|1[0-2])/);
+  if(m) return m[1]+'-'+m[2];
+  return null;
+}
+function parseBaseMonth(aoa){
+  for(const row of aoa){
+    if(!row) continue;
+    const idx=row.findIndex(c=>c!=null && String(c).replace(/\s/g,'').indexOf('기준년월')>=0);
+    if(idx<0) continue;
+    // 라벨 우측 셀들: Date 우선, 없으면 텍스트 결합해서 연·월 추출
+    const rest=row.slice(idx+1);
+    for(const c of rest){ if(c instanceof Date && !isNaN(c)) return c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0'); }
+    const ym=extractYM(rest.map(c=>c==null?'':String(c)).join(' '));
+    if(ym) return ym;
+  }
+  return null;
+}
+
 /* ---------- read workbook ---------- */
 function readWorkbook(ab){
   const wb=XLSX.read(ab,{type:'array'});
   const ws=wb.Sheets[wb.SheetNames[0]];
   const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const baseMonth=parseBaseMonth(aoa);   // 파일에 적힌 기준년월(YYYY-MM) 또는 null
   // find first data row: col A is a number and col C (org) present
   const raw=[];
   for(const row of aoa){
@@ -331,7 +358,7 @@ function readWorkbook(ab){
                mat:row[4], db:row[5], dc:row[6], irp:row[7] });
   }
   if(!raw.length) throw new Error('데이터 행을 찾지 못했습니다. 업로드 양식을 확인해주세요.');
-  return raw;
+  return { raw, baseMonth };
 }
 
 /* ============================================================
@@ -356,7 +383,7 @@ function loadMonth(m){
   curMonth=m;
   const rec=DB[m];
   curRows = rec? rec.rows : [];
-  $('savedInfo').textContent = rec ? `저장됨 · ${rec.fileName||'파일'} · ${rec.uploadedAt}` : '해당 월 데이터 없음';
+  $('savedInfo').textContent = rec ? `기준년월 ${m.replace('-','.')} · ${rec.fileName||'파일'} · 업로드 ${rec.uploadedAt}` : '해당 월 데이터 없음';
   render();
 }
 
@@ -459,13 +486,17 @@ $('fileInput').onchange=e=>{
   const rd=new FileReader();
   rd.onload=ev=>{
     try{
-      const raw=readWorkbook(ev.target.result);
+      const {raw, baseMonth}=readWorkbook(ev.target.result);
       const rows=buildGroups(raw);
-      const m=curMonth||thisMonth();
-      DB[m]={ rows, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length };
+      const m = baseMonth || curMonth || thisMonth();   // 파일의 기준년월 우선, 없으면 선택월
+      DB[m]={ rows, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length, baseMonth:m, baseFromFile:!!baseMonth };
       save();
       curMonth=m; refreshMonthSel(); loadMonth(m);
-      toast(`업로드 완료 · 원본 ${raw.length}행 → 관리 ${rows.length}건 (${m.replace('-','년 ')}월)`);
+      if(baseMonth){
+        toast(`업로드 완료 · 기준년월 ${m.replace('-','년 ')}월 · 원본 ${raw.length}행 → 관리 ${rows.length}건`);
+      }else{
+        toast(`기준년월이 파일에 없어 선택월(${m.replace('-','년 ')}월)로 저장했습니다. 양식 A1에 기준년월을 넣어주세요.`, true);
+      }
     }catch(err){ console.error(err); toast('업로드 실패: '+err.message,true); }
     $('fileInput').value='';
   };
@@ -474,7 +505,9 @@ $('fileInput').onchange=e=>{
 
 /* ---------- template download ---------- */
 $('btnTemplate').onclick=()=>{
+  const [yy,mm]=(curMonth||thisMonth()).split('-');
   const aoa=[
+    ['기준년월', yy+'년', String(parseInt(mm,10))+'월', null,null,null,null,null],
     ['번호','권역','상품제공기관명','상품명','만기(개월)','예정적용금리(%)',null,null],
     [null,null,null,null,null,'DB','DC','IRP'],
     [1,'기타','한국증권금융','한국증권금융/정기예금(디폴트옵션용)',36,'-',3.3,3.3],
@@ -485,13 +518,14 @@ $('btnTemplate').onclick=()=>{
     [3,'생명보험','DB생명보험주식회사','DB생명/이율보증형보험/1년',12,3.57,3.57,3.57],
   ];
   const ws=XLSX.utils.aoa_to_sheet(aoa);
+  // 헤더 2줄이 기준년월 아래(행 인덱스 1~2)로 이동
   ws['!merges']=[
-    {s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},
-    {s:{r:0,c:3},e:{r:1,c:3}},{s:{r:0,c:4},e:{r:1,c:4}},{s:{r:0,c:5},e:{r:0,c:7}}];
-  ws['!cols']=[{wch:6},{wch:10},{wch:22},{wch:40},{wch:26},{wch:26},{wch:26},{wch:26}];
+    {s:{r:1,c:0},e:{r:2,c:0}},{s:{r:1,c:1},e:{r:2,c:1}},{s:{r:1,c:2},e:{r:2,c:2}},
+    {s:{r:1,c:3},e:{r:2,c:3}},{s:{r:1,c:4},e:{r:2,c:4}},{s:{r:1,c:5},e:{r:1,c:7}}];
+  ws['!cols']=[{wch:8},{wch:10},{wch:22},{wch:40},{wch:26},{wch:26},{wch:26},{wch:26}];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'금리정보_업로드');
   XLSX.writeFile(wb,'금리정보_업로드_양식.xlsx');
-  toast('업로드 양식을 다운로드했습니다');
+  toast('업로드 양식을 다운로드했습니다 (A1에 기준년월 입력)');
 };
 
 /* ---------- export current view ---------- */
@@ -502,7 +536,9 @@ $('btnExport').onclick=()=>{
   MONTHS.forEach(m=>{head1.push('DB');head2.push(MONTH_LABEL[m]);});
   MONTHS.forEach(m=>{head1.push('DC/IRP');head2.push(MONTH_LABEL[m]);});
   head1.push('디폴트옵션용'); head2.push('3년');
-  const aoa=[head1,head2];
+  const bm=curMonth||thisMonth();
+  const titleRow=['기준년월', bm.replace('-','년 ')+'월'];
+  const aoa=[titleRow,head1,head2];
   const q=searchTxt.trim().toLowerCase();
   let rows=curRows.filter(r=>filterSec==='ALL'||r.sector===filterSec);
   if(q) rows=rows.filter(r=>(r.org+' '+r.fam+' '+r.names.join(' ')).toLowerCase().indexOf(q)>=0);
@@ -514,9 +550,11 @@ $('btnExport').onclick=()=>{
     aoa.push(line);
   }
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  const merges=[{s:{r:0,c:0},e:{r:1,c:0}},{s:{r:0,c:1},e:{r:1,c:1}},{s:{r:0,c:2},e:{r:1,c:2}},
-    {s:{r:0,c:3},e:{r:0,c:3+MONTHS.length-1}},{s:{r:0,c:3+MONTHS.length},e:{r:0,c:3+2*MONTHS.length-1}},
-    {s:{r:0,c:3+2*MONTHS.length},e:{r:1,c:3+2*MONTHS.length}}];
+  // 기준년월 타이틀 행(r:0)이 추가되어 헤더 병합은 r:1~2로 이동
+  const merges=[{s:{r:0,c:0},e:{r:0,c:1}},
+    {s:{r:1,c:0},e:{r:2,c:0}},{s:{r:1,c:1},e:{r:2,c:1}},{s:{r:1,c:2},e:{r:2,c:2}},
+    {s:{r:1,c:3},e:{r:1,c:3+MONTHS.length-1}},{s:{r:1,c:3+MONTHS.length},e:{r:1,c:3+2*MONTHS.length-1}},
+    {s:{r:1,c:3+2*MONTHS.length},e:{r:2,c:3+2*MONTHS.length}}];
   ws['!merges']=merges;
   ws['!cols']=[{wch:10},{wch:24},{wch:28},...Array(19).fill({wch:8})];
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,curMonth||'금리현황');
