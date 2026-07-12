@@ -79,7 +79,7 @@
   .hscroll-top::-webkit-scrollbar{height:11px}
   .hscroll-top::-webkit-scrollbar-thumb{background:#C4CAD3;border-radius:6px;border:2px solid #F7F8FA}
   .hscroll-top::-webkit-scrollbar-thumb:hover{background:var(--orange)}
-  .table-scroll{overflow:auto;max-height:calc(100vh - 145px)}
+  .table-scroll{overflow:auto;height:520px;min-height:220px}  /* 높이는 JS(fitTable)가 뷰포트에 맞춰 고정 */
   table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;white-space:nowrap}
   th,td{padding:7px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center}
   #grid{border-top:1px solid var(--line);border-left:1px solid var(--line)}
@@ -93,11 +93,15 @@
   td.sec-db{background:#fff}
   td.sec-dc{background:#fff}
   td.sec-def{background:#FAFBFC;font-weight:700}
+  /* 디폴트옵션 열: 우측 고정(항상 보이도록) */
+  th.grp-def,td.sec-def{position:sticky;right:0;z-index:4;min-width:66px;max-width:66px;
+    box-shadow:-6px 0 8px -5px rgba(16,24,40,.18)}
+  thead th.grp-def{z-index:6}
   /* sticky left cols */
   .c-sec,.c-org,.c-prod{text-align:left}
-  th.c-sec,td.c-sec{position:sticky;left:0;z-index:4;background:#fff;min-width:78px}
-  th.c-org,td.c-org{position:sticky;left:78px;z-index:4;background:#fff;min-width:190px;font-weight:600}
-  th.c-prod,td.c-prod{position:sticky;left:268px;z-index:4;background:#fff;min-width:210px;border-right:2px solid var(--line);color:#111}
+  th.c-sec,td.c-sec{position:sticky;left:0;z-index:4;background:#fff;min-width:70px;max-width:70px}
+  th.c-org,td.c-org{position:sticky;left:70px;z-index:4;background:#fff;min-width:132px;max-width:132px;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  th.c-prod,td.c-prod{position:sticky;left:202px;z-index:4;background:#fff;min-width:150px;max-width:150px;border-right:2px solid var(--line);color:#111;overflow:hidden;text-overflow:ellipsis}
   thead th.c-sec,thead th.c-org,thead th.c-prod{z-index:6;background:#F7F8FA}
   tbody tr:hover td{background:#FFF9F3}
   tbody tr:hover td.c-sec,tbody tr:hover td.c-org,tbody tr:hover td.c-prod{background:#FFF4E8}
@@ -427,7 +431,16 @@ function render(){
 
   renderHead();
   renderBody();
+  fitTable();
   syncHScroll();
+}
+
+/* 금리표 높이 고정: 뷰포트 하단까지 꽉 채우되 행 수와 무관하게 일정 */
+function fitTable(){
+  const ts=$('tableScroll'); if(!ts) return;
+  const top=ts.getBoundingClientRect().top;   // 표 상단 위치(툴바·통계·필터는 필터링과 무관하게 고정)
+  const h=Math.round(window.innerHeight - top - 12);
+  ts.style.height = Math.max(h, 220) + 'px';
 }
 
 /* keep the top horizontal scrollbar sized to the table width */
@@ -609,7 +622,7 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   let lock=false;
   ts.addEventListener('scroll',()=>{ if(lock)return; lock=true; ht.scrollLeft=ts.scrollLeft; lock=false; });
   ht.addEventListener('scroll',()=>{ if(lock)return; lock=true; ts.scrollLeft=ht.scrollLeft; lock=false; });
-  window.addEventListener('resize',syncHScroll);
+  window.addEventListener('resize',()=>{ fitTable(); syncHScroll(); });
 })();
 
 /* ---------- init ---------- */
@@ -617,5 +630,6 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   if(window.self!==window.top) document.body.classList.add('embedded');  // iframe 임베드 감지
   refreshMonthSel();
   loadMonth(curMonth);
+  fitTable();
 })();
 </script>
