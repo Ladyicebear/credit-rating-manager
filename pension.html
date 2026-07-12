@@ -420,7 +420,10 @@ function refreshMonthSel(){
 function loadMonth(m){
   curMonth=m;
   const rec=DB[m];
-  curRows = rec? rec.rows : [];
+  // raw(원본행)가 저장돼 있으면 항상 최신 규칙으로 재그룹핑(예전 저장분도 자동 정정).
+  // raw가 없는 옛 저장분은 rows 사용. 어느 쪽이든 정기예금 코호트(월/일단위)행은 제외.
+  const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
+  curRows = base.filter(r=>!isDepositCohort(r));
   $('savedInfo').textContent = rec ? `기준년월 ${m.replace('-','.')} · ${rec.fileName||'파일'} · 업로드 ${rec.uploadedAt}` : '해당 월 데이터 없음';
   render();
 }
@@ -506,6 +509,11 @@ function cell(val,cls){
   return `<td class="${cls}"><span class="rate${hi}">${val.toFixed(2)}</span></td>`;
 }
 
+/* 정기예금 코호트(월단위/일단위) 행은 화면에서 항상 제외 — 옛 저장분 안전망 */
+function isDepositCohort(r){
+  return String(r.fam).indexOf('정기예금')>=0 && /일단위|월단위/.test(String(r.fam));
+}
+
 function renderBody(){
   const q=searchTxt.trim().toLowerCase();
   let rows=curRows.filter(r=>filterSec==='ALL'||r.sector===filterSec);
@@ -536,7 +544,7 @@ $('fileInput').onchange=e=>{
       const {raw, baseMonth}=readWorkbook(ev.target.result);
       const rows=buildGroups(raw);
       const m = baseMonth || curMonth || thisMonth();   // 파일의 기준년월 우선, 없으면 선택월
-      DB[m]={ rows, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length, baseMonth:m, baseFromFile:!!baseMonth };
+      DB[m]={ rows, raw, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length, baseMonth:m, baseFromFile:!!baseMonth };
       save();
       curMonth=m; refreshMonthSel(); loadMonth(m);
       if(baseMonth){
