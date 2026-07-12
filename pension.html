@@ -33,7 +33,8 @@
   .page-head .sub{color:var(--muted);font-size:12.5px;margin-bottom:2px}
   /* ---------- toolbar card ---------- */
   .toolbar{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
-    padding:14px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+    padding:14px 16px;display:flex;flex-wrap:nowrap;align-items:center;gap:10px;margin-bottom:14px;overflow-x:auto}
+  .toolbar .btn{flex:0 0 auto}
   .tb-group{display:flex;align-items:center;gap:8px}
   .tb-label{font-size:11px;color:var(--muted);font-weight:700}
   .tb-sep{width:1px;height:26px;background:var(--line);margin:0 4px}
@@ -160,7 +161,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-5m4 5V8m4 9v-3"/></svg>
       금리현황 다운로드
     </button>
-    <span id="savedInfo" class="muted-note"></span>
+    <span id="savedInfo" class="muted-note" style="display:none"></span>
     <div class="spacer"></div>
     <button class="btn navy" id="btnView" title="선택한 기준월의 금리 조회">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>

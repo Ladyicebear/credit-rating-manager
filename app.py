@@ -513,7 +513,7 @@ def pension_report():
     DB_C0, DC_C0, X_C, RP_C = 6, 15, 24, {'db': 26, 'dc': 27, 'irp': 28}
     cur_sec = cur_inst = None
     matched = 0
-    for r in range(7, 101):
+    for r in range(7, ws.max_row + 1):   # 양식 행 추가/변경에도 대응(상품구분 없는 행은 스킵)
         b = ws.cell(r, 2).value
         c = ws.cell(r, 3).value
         e = ws.cell(r, 5).value
