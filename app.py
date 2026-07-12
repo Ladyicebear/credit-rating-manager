@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import json
 import logging
 import threading
@@ -393,6 +394,179 @@ def rating_select_options() -> Markup:
 def pension():
     """원리금보장상품 금리관리 화면(통합 탭). 순수 HTML을 그대로 서빙(Jinja 미처리)."""
     return send_file(os.path.join(BASE_DIR, 'pension.html'))
+
+
+# ── 원리금보장 금리현황 레포트: 양식(pension_report_template.xlsx)에 현재 화면 금리 채워 반환 ──
+_PENSION_MONTHS = [3, 6, 12, 18, 24, 30, 36, 48, 60]
+_PENSION_ALIAS = {  # 레포트 표기 -> 데이터 표기(예외)
+    '기업은행': '중소기업은행', '산업은행': '한국산업은행', 'SBI저축은행': '에스비아이저축은행',
+    'NH저축은행': '엔에이치저축은행', 'DB저축은행': '디비저축은행', 'JT친애저축은행': '제이티친애저축은행',
+    'BNK투자증권': '비엔케이투자증권', '신한생명': '신한라이프',
+}
+_PENSION_SECMAP = {'증권': '증권', '은행': '은행', '생보': '생명보험', '손보': '손해보험', '저축은행': '저축은행'}
+_ROMAN = [('Ⅲ', '3'), ('Ⅱ', '2'), ('Ⅰ', '1'), ('Ⅳ', '4'), ('Ⅴ', '5'),
+          ('ⅲ', '3'), ('ⅱ', '2'), ('ⅰ', '1'), ('III', '3'), ('II', '2'), ('IV', '4'), ('V', '5'), ('I', '1')]
+
+
+def _pen_core(s):
+    s = str(s).lower()
+    s = re.sub(r'주식회사|㈜|\(주\)|\s', '', s)
+    s = re.sub(r'(생명보험|손해보험|화재보험|연금보험)$', '', s)
+    s = re.sub(r'(화재|생명|손보|손해|연금)$', '', s)
+    return s
+
+
+def _pen_inst_key(name, is_report=False):
+    if is_report and name in _PENSION_ALIAS:
+        name = _PENSION_ALIAS[name]
+    return _pen_core(name)
+
+
+def _pen_secnorm(s):
+    return _PENSION_SECMAP.get(str(s).replace('\n', '').strip(), str(s))
+
+
+def _pen_roman(s):
+    s = str(s)
+    for k, v in _ROMAN:
+        s = s.replace(k, v)
+    return s
+
+
+def _pen_iyul(fam):
+    f = _pen_roman(fam)
+    bonus = '보너스' in f
+    base = re.sub(r'/.*$', '', f)
+    m = re.search(r'이율보증형(보험)?\s*([123])', base)
+    if m:
+        return (bonus, m.group(2))
+    if '이율보증형' in base:
+        return (bonus, '1')
+    return (None, None)
+
+
+def _pen_match_product(rp, g):
+    fam = g['fam']
+    text = fam + ' ' + g['names']
+    rp = rp.strip()
+    if rp == '정기예금':
+        return '정기예금' in text
+    if rp == 'ELB':
+        return ('ELB' in text) and (('ELB' in fam) or ('DLB' not in fam))
+    if rp == 'DLB':
+        return 'DLB' in text
+    if rp == 'ELB/DLB':
+        return ('ELB' in text) or ('DLB' in text)
+    if rp == '발행어음':
+        return '발행어음' in text
+    if rp == 'RP':
+        return (fam == 'RP') or ('RP' in fam) or ('환매조건부' in text)
+    if '보너스이율보증형' in rp:
+        b, _ = _pen_iyul(fam)
+        return b is True
+    m = re.search(r'이율보증형보험\s*([123])?', rp)
+    if m:
+        want = m.group(1) or '1'
+        b, num = _pen_iyul(fam)
+        return (b is False) and (num == want)
+    return bool(rp) and rp in text
+
+
+@app.route('/api/pension_report', methods=['POST'])
+def pension_report():
+    """현재 화면(기준월)의 금리를 레포트 양식에 채워 xlsx로 반환."""
+    import io as _io
+    import openpyxl
+    from openpyxl.cell.cell import MergedCell
+
+    payload = request.get_json(force=True) or {}
+    month = payload.get('month', '')
+    rows = payload.get('rows', [])
+
+    # 클라이언트 그룹 rows 정규화(db/dc 키 int화)
+    G = []
+    for r in rows:
+        db = {int(k): v for k, v in (r.get('db') or {}).items() if v is not None}
+        dc = {int(k): v for k, v in (r.get('dc') or {}).items() if v is not None}
+        G.append({'sector': r.get('sector'), 'org': r.get('org') or '', 'fam': r.get('fam') or '',
+                  'names': ' '.join(r.get('names') or []), 'db': db, 'dc': dc, 'def': r.get('def')})
+
+    def find_rp(ikey):
+        c = [g for g in G if _pen_inst_key(g['org']) == ikey
+             and (g['fam'] == 'RP' or 'RP' in g['fam'] or '환매조건부' in (g['fam'] + g['names']) or '발행어음' in (g['fam'] + g['names']))]
+        c.sort(key=lambda x: len(x['db']) + len(x['dc']), reverse=True)
+        return c[0] if c else None
+
+    wb = openpyxl.load_workbook(os.path.join(BASE_DIR, 'pension_report_template.xlsx'))
+    ws = wb.worksheets[0]
+
+    def setcell(rr, cc, v):
+        cell = ws.cell(rr, cc)
+        if isinstance(cell, MergedCell):   # 병합 비앵커 셀은 건너뜀(디폴트 X 섹션병합 등)
+            return
+        cell.value = v
+
+    if month and re.match(r'\d{4}-\d{2}', month):
+        y, mm = month.split('-')
+        setcell(1, 2, f"          퇴직연금 원리금지급형상품 공시금리 현황 [{y}년 {int(mm):02d}월]                ")
+
+    DB_C0, DC_C0, X_C, RP_C = 6, 15, 24, {'db': 26, 'dc': 27, 'irp': 28}
+    cur_sec = cur_inst = None
+    matched = 0
+    for r in range(7, 101):
+        b = ws.cell(r, 2).value
+        c = ws.cell(r, 3).value
+        e = ws.cell(r, 5).value
+        if b:
+            cur_sec = b
+        if c:
+            cur_inst = c
+        if not e:
+            continue
+        ikey = _pen_inst_key(cur_inst, is_report=True)
+        dsec = _pen_secnorm(cur_sec)
+        cand = [g for g in G if _pen_secnorm(g['sector']) == dsec and _pen_inst_key(g['org']) == ikey]
+        if not cand:
+            cand = [g for g in G if _pen_inst_key(g['org']) == ikey]
+        if not cand:
+            continue
+        pm = [g for g in cand if _pen_match_product(str(e), g)]
+        if not pm:
+            continue
+        pm.sort(key=lambda x: len(x['db']) + len(x['dc']) + (1 if x['def'] else 0), reverse=True)
+        mdb, mdc, mdef = {}, {}, None
+        for g in pm:
+            for m in _PENSION_MONTHS:
+                if m in g['db'] and m not in mdb:
+                    mdb[m] = g['db'][m]
+                if m in g['dc'] and m not in mdc:
+                    mdc[m] = g['dc'][m]
+            if mdef is None and g['def'] is not None:
+                mdef = g['def']
+        matched += 1
+        for i, m in enumerate(_PENSION_MONTHS):
+            if m in mdb:
+                setcell(r, DB_C0 + i, round(float(mdb[m]), 3))
+            if m in mdc:
+                setcell(r, DC_C0 + i, round(float(mdc[m]), 3))
+        if mdef is not None:
+            setcell(r, X_C, round(float(mdef), 3))
+        if c and dsec == '증권':   # RP금리(1년): 기관 첫 행에 기록
+            rp = find_rp(ikey)
+            if rp:
+                if 12 in rp['db']:
+                    setcell(r, RP_C['db'], round(float(rp['db'][12]), 3))
+                if 12 in rp['dc']:
+                    setcell(r, RP_C['dc'], round(float(rp['dc'][12]), 3))
+                    setcell(r, RP_C['irp'], round(float(rp['dc'][12]), 3))
+
+    bio = _io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    fname = f"퇴직연금 금리정보 현황_{month}.xlsx" if month else "퇴직연금 금리정보 현황.xlsx"
+    logger.info('금리현황 레포트 생성: month=%s, 데이터 %d행, 매칭 %d행', month, len(G), matched)
+    return send_file(bio, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 @app.route('/')

@@ -156,12 +156,16 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0 5-5m-5 5-5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
       현재 화면 엑셀 다운로드
     </button>
+    <button class="btn ghost" id="btnReport" title="현재 화면의 금리현황 레포트를 엑셀로 생성">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-5m4 5V8m4 9v-3"/></svg>
+      금리현황 다운로드
+    </button>
+    <span id="savedInfo" class="muted-note"></span>
     <div class="spacer"></div>
     <button class="btn navy" id="btnView" title="선택한 기준월의 금리 조회">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
       조회
     </button>
-    <span id="savedInfo" class="muted-note"></span>
   </div>
 
   <!-- stats -->
@@ -570,6 +574,25 @@ $('btnView').onclick=()=>{
   loadMonth(m);
   if(DB[m]) toast(`${m.replace('-','년 ')}월 금리를 조회했습니다`);
   else toast(`${m.replace('-','년 ')}월 데이터가 없습니다. 엑셀을 업로드하세요.`, true);
+};
+
+/* ---------- 금리현황 레포트(양식) 다운로드 : 서버(Flask)에서 양식 채워 반환 ---------- */
+$('btnReport').onclick=async()=>{
+  if(!curRows.length){ toast('레포트를 만들 데이터가 없습니다',true); return; }
+  const btn=$('btnReport'); const orig=btn.innerHTML;
+  btn.disabled=true; toast('금리현황 레포트 생성 중…');
+  try{
+    const res=await fetch('/api/pension_report',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:curMonth, rows:curRows})});
+    if(!res.ok){ const t=await res.text().catch(()=>res.status); throw new Error('서버 오류 '+res.status); }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download=`퇴직연금 금리정보 현황_${(curMonth||'').replace('-','년 ')}월.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('금리현황 레포트를 다운로드했습니다');
+  }catch(err){ console.error(err); toast('레포트 생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
+  finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
 
 /* ---------- events ---------- */
