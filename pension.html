@@ -157,9 +157,9 @@
       현재 화면 엑셀 다운로드
     </button>
     <div class="spacer"></div>
-    <button class="btn danger" id="btnDelete" title="현재 기준월 데이터 삭제">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6"/></svg>
-      기준월 삭제
+    <button class="btn navy" id="btnView" title="선택한 기준월의 금리 조회">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      조회
     </button>
     <span id="savedInfo" class="muted-note"></span>
   </div>
@@ -565,11 +565,11 @@ $('btnExport').onclick=()=>{
 };
 
 /* ---------- delete month ---------- */
-$('btnDelete').onclick=()=>{
-  if(!DB[curMonth]){ toast('삭제할 데이터가 없습니다',true); return; }
-  if(!confirm(`${curMonth.replace('-','년 ')}월 저장 데이터를 삭제할까요?`)) return;
-  delete DB[curMonth]; save(); refreshMonthSel(); loadMonth(curMonth);
-  toast('삭제되었습니다');
+$('btnView').onclick=()=>{
+  const m=$('monthSel').value;
+  loadMonth(m);
+  if(DB[m]) toast(`${m.replace('-','년 ')}월 금리를 조회했습니다`);
+  else toast(`${m.replace('-','년 ')}월 데이터가 없습니다. 엑셀을 업로드하세요.`, true);
 };
 
 /* ---------- events ---------- */
