@@ -295,19 +295,46 @@ function buildGroups(raw){
   const groups=new Map();
   for(const r of raw){
     if(!r.org) continue;
-    const isDefault = r.prod && String(r.prod).indexOf('디폴트옵션')>=0;
-    const fam=normFamily(r.prod);
+    const prod = r.prod ? String(r.prod) : '';
+    const isDefault = prod.indexOf('디폴트옵션')>=0;
+
+    /* ── 정기예금 표기 규칙 ──
+       정기예금(비디폴트, 증권/발행어음 제외) 중 '일단위/월단위' 코호트 변형은 화면에서 숨김.
+       (국민은행 특례: 일단위 만기 93일~182일→3개월, 183일~273일→6개월만 기본 정기예금에 반영)
+       그 외(기본 org/정기예금, 만기분할, 우체국·카카오 등 서술형)는 '정기예금'으로 통합. */
+    let fam, monthsOverride=null;
+    const isDeposit = prod.indexOf('정기예금')>=0 && !isDefault
+                      && r.sector!=='증권' && prod.indexOf('발행어음')<0;
+    if(isDeposit){
+      const rest = prod.split('/').slice(1).join('/');   // 기관명 제거 후
+      if(/일단위|월단위/.test(rest)){
+        const mm = (r.mat==null?'':String(r.mat)).replace(/\s/g,'');
+        if(r.org==='국민은행' && mm==='93일~182일'){ fam='정기예금'; monthsOverride=[3]; }
+        else if(r.org==='국민은행' && mm==='183일~273일'){ fam='정기예금'; monthsOverride=[6]; }
+        else continue;   // 코호트 변형 숨김
+      } else {
+        fam='정기예금';
+      }
+    } else {
+      fam = normFamily(prod);
+    }
+
     const key=[r.sector,r.org,fam].join('||');
     let g=groups.get(key);
     if(!g){ g={sector:r.sector,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[]}; groups.set(key,g); }
-    g.srcCount++; if(r.prod) g.names.push(r.prod);
-    const months=parseMaturities(r.mat); const n=months.length;
-    const dbR=rateList(r.db,n), dcR=rateList(r.dc,n), irpR=rateList(r.irp,n);
-    let defTaken=false;
+    g.srcCount++; if(prod) g.names.push(prod);
+    let months, n, dbR, dcR, irpR;
+    if(monthsOverride){
+      months=monthsOverride; n=1;
+      dbR=[parseRate(r.db)]; dcR=[parseRate(r.dc)]; irpR=[parseRate(r.irp)];
+    } else {
+      months=parseMaturities(r.mat); n=months.length;
+      dbR=rateList(r.db,n); dcR=rateList(r.dc,n); irpR=rateList(r.irp,n);
+    }
     for(let i=0;i<n;i++){
       const m=months[i]; if(m===null) continue;
       const dcv = dcR[i]!=null ? dcR[i] : irpR[i];
-      if(isDefault){ if(m===36 && dcv!=null){ g.def=dcv; defTaken=true; } }
+      if(isDefault){ if(m===36 && dcv!=null){ g.def=dcv; } }
       else { if(dbR[i]!=null) g.db[m]=dbR[i]; if(dcv!=null) g.dc[m]=dcv; }
     }
     if(isDefault && g.def===null){                      // fallback: any dc/irp value
