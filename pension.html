@@ -343,10 +343,14 @@ function buildGroups(raw){
     }
   }
   const rows=[...groups.values()];
+  // 증권사 상품 순서: ELB(0) → DLB(1) → RP·환매조건부(2) → 기타(3). 기관별로 ELB/DLB 먼저, RP 나중
+  const prodRank=(fam)=>{ const f=String(fam); if(/ELB/.test(f)) return 0; if(/DLB/.test(f)) return 1; if(/RP|환매조건부/.test(f)) return 2; return 3; };
   rows.sort((a,b)=>{
     const sa=SECTOR_ORDER.indexOf(a.sector), sb=SECTOR_ORDER.indexOf(b.sector);
     if(sa!==sb) return (sa<0?99:sa)-(sb<0?99:sb);
     if(a.org!==b.org) return String(a.org).localeCompare(b.org,'ko');
+    const ra=prodRank(a.fam), rb=prodRank(b.fam);
+    if(ra!==rb) return ra-rb;                       // 같은 기관 내: ELB/DLB 먼저, RP 다음
     return String(a.fam).localeCompare(b.fam,'ko');
   });
   return rows;
