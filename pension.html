@@ -148,7 +148,7 @@
       <select id="monthSel" title="기준월 선택"></select>
     </div>
     <div class="tb-sep"></div>
-    <button class="btn primary" id="btnUpload">
+    <button class="btn ghost" id="btnUpload">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
       엑셀 업로드
     </button>
@@ -157,9 +157,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       업로드 양식 다운로드
     </button>
-    <button class="btn navy" id="btnExport">
+    <button class="btn ghost" id="btnExport">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12m0 0 5-5m-5 5-5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
-      현재 화면 엑셀 다운로드
+      기준월 금리 다운로드
     </button>
     <button class="btn ghost" id="btnReport" title="현재 화면의 금리현황 레포트를 엑셀로 생성">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-5m4 5V8m4 9v-3"/></svg>
@@ -616,9 +616,32 @@ $('btnTemplate').onclick=()=>{
   toast('업로드 양식을 다운로드했습니다 (A1에 기준년월 입력)');
 };
 
-/* ---------- export current view ---------- */
+/* ---------- 기준월 금리 다운로드: 업로드한 원본 전체를 내보냄(화면 표시분이 아님) ---------- */
 $('btnExport').onclick=()=>{
-  if(!curRows.length){ toast('내보낼 데이터가 없습니다',true); return; }
+  const m = curMonth || thisMonth();
+  const rec = DB[m];
+  const raw = rec && rec.raw;
+  if(raw && raw.length){
+    const [yy,mm]=m.split('-');
+    const aoa=[
+      ['기준년월', yy+'년', String(parseInt(mm,10))+'월', null,null,null,null,null],
+      ['번호','권역','상품제공기관명','상품명','만기(개월)','예정적용금리(%)',null,null],
+      [null,null,null,null,null,'DB','DC','IRP'],
+    ];
+    raw.forEach((r,i)=>aoa.push([i+1, r.sector??'', r.org??'', r.prod??'', r.mat??'', r.db??'', r.dc??'', r.irp??'']));
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=[
+      {s:{r:1,c:0},e:{r:2,c:0}},{s:{r:1,c:1},e:{r:2,c:1}},{s:{r:1,c:2},e:{r:2,c:2}},
+      {s:{r:1,c:3},e:{r:2,c:3}},{s:{r:1,c:4},e:{r:2,c:4}},{s:{r:1,c:5},e:{r:1,c:7}}];
+    ws['!cols']=[{wch:6},{wch:10},{wch:22},{wch:40},{wch:26},{wch:26},{wch:26},{wch:26}];
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'금리정보');
+    XLSX.writeFile(wb,`퇴직연금_기준월금리_${m}.xlsx`);
+    toast(`기준월(${m.replace('-','년 ')}월) 업로드 원본 ${raw.length}행을 다운로드했습니다`);
+    return;
+  }
+  // 원본(raw)이 없는 옛 저장분 → 화면 그룹뷰로 폴백
+  if(!curRows.length){ toast('내보낼 데이터가 없습니다. 엑셀을 다시 업로드해주세요.',true); return; }
+  toast('원본이 없어 화면 데이터로 내보냈습니다. 원본 전체는 엑셀을 재업로드 후 받으세요.', true);
   const head1=['업권','상품제공기관','상품구분'];
   const head2=['','',''];
   MONTHS.forEach(m=>{head1.push('DB');head2.push(MONTH_LABEL[m]);});
