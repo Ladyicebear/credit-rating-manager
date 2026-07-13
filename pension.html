@@ -356,6 +356,30 @@ function buildGroups(raw){
   return rows;
 }
 
+/* 정기예금 표시 정규화 — 신규/예전저장분 어디든 조회 시점에 적용.
+   ① 정기예금(비증권·비발행어음) 중 일단위/월단위 코호트 행은 제외
+   ② 나머지 정기예금 계열(정기예금, 정기예금/3~6, 정기예금/12~18, 우체국퇴직연금정기예금/A 등)은
+      기관별로 하나의 '정기예금' 행으로 병합(만기 union). 상품명 뒤 추가정보가 있어도 통합. */
+function isDepositFam(r){
+  const f=String(r.fam);
+  return f.indexOf('정기예금')>=0 && r.sector!=='증권' && f.indexOf('발행어음')<0;
+}
+function normalizeDepositRows(rows){
+  const out=[]; const merged=new Map();
+  for(const r of rows){
+    if(!isDepositFam(r)){ out.push(r); continue; }
+    if(/일단위|월단위/.test(String(r.fam))) continue;   // 코호트 숨김
+    const key=r.sector+'||'+r.org;
+    let m=merged.get(key);
+    if(!m){ m={sector:r.sector,org:r.org,fam:'정기예금',db:{},dc:{},def:null,srcCount:0,names:[]}; merged.set(key,m); out.push(m); }
+    m.srcCount++; if(r.names) m.names.push(...r.names);
+    for(const k in r.db){ if(m.db[k]==null && r.db[k]!=null) m.db[k]=r.db[k]; }
+    for(const k in r.dc){ if(m.dc[k]==null && r.dc[k]!=null) m.dc[k]=r.dc[k]; }
+    if(m.def==null && r.def!=null) m.def=r.def;
+  }
+  return out;
+}
+
 /* ---------- 기준년월 파싱 ---------- */
 function extractYM(text){
   if(text===null||text===undefined) return null;
@@ -424,10 +448,10 @@ function refreshMonthSel(){
 function loadMonth(m){
   curMonth=m;
   const rec=DB[m];
-  // raw(원본행)가 저장돼 있으면 항상 최신 규칙으로 재그룹핑(예전 저장분도 자동 정정).
-  // raw가 없는 옛 저장분은 rows 사용. 어느 쪽이든 정기예금 코호트(월/일단위)행은 제외.
+  // raw(원본행)가 저장돼 있으면 최신 규칙으로 재그룹핑. 어느 쪽이든 normalizeDepositRows로
+  // 정기예금을 기관별 1행으로 병합 + 코호트(월/일단위) 제외 → 예전 저장분도 새로고침만으로 정정.
   const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
-  curRows = base.filter(r=>!isDepositCohort(r));
+  curRows = normalizeDepositRows(base);
   $('savedInfo').textContent = rec ? `기준년월 ${m.replace('-','.')} · ${rec.fileName||'파일'} · 업로드 ${rec.uploadedAt}` : '해당 월 데이터 없음';
   render();
 }
