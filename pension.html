@@ -177,9 +177,13 @@
   <div class="stats" id="stats" style="display:none">
     <div class="stat"><div class="k"><span class="dot" style="background:var(--orange)"></span>상품제공기관</div><div class="v" id="stOrg">0<small>개사</small></div></div>
     <div class="stat"><div class="k"><span class="dot" style="background:var(--navy)"></span>관리 상품구분</div><div class="v" id="stProd">0<small>건</small></div></div>
-    <div class="stat"><div class="k"><span class="dot" style="background:var(--db)"></span>DB 최고금리</div><div class="v" id="stDb">-<small>%</small></div></div>
-    <div class="stat"><div class="k"><span class="dot" style="background:var(--dc)"></span>DC/IRP 최고금리</div><div class="v" id="stDc">-<small>%</small></div></div>
-    <div class="stat"><div class="k"><span class="dot" style="background:var(--def)"></span>디폴트옵션 최고금리</div><div class="v" id="stDef">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#1D4ED8"></span>은행 정기예금 1년 최고</div><div class="v" id="stBank1y">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#7C3AED"></span>증권 ELB 1년 최고</div><div class="v" id="stSec1y">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#059669"></span>생보 이율보증형 3년 최고</div><div class="v" id="stLife3y">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#EA580C"></span>손보 이율보증형 3년 최고</div><div class="v" id="stNonlife3y">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#1D4ED8"></span>은행 디폴트옵션 최고</div><div class="v" id="stDefBank">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#059669"></span>생보 디폴트옵션 최고</div><div class="v" id="stDefLife">-<small>%</small></div></div>
+    <div class="stat"><div class="k"><span class="dot" style="background:#EA580C"></span>손보 디폴트옵션 최고</div><div class="v" id="stDefNonlife">-<small>%</small></div></div>
   </div>
 
   <!-- filters -->
@@ -463,9 +467,22 @@ function loadMonth(m){
 
 function computeStats(rows){
   const orgs=new Set(rows.map(r=>r.org));
-  let db=0,dc=0,def=0;
-  rows.forEach(r=>{ MONTHS.forEach(m=>{ if(r.db[m]>db)db=r.db[m]; if(r.dc[m]>dc)dc=r.dc[m]; }); if(r.def>def)def=r.def; });
-  return {orgs:orgs.size, prods:rows.length, db, dc, def};
+  // 제도별 특정 상품·만기의 최고금리(DB·DC/IRP 중 최고)
+  const maxRate=(pred,month)=>{
+    let mx=null;
+    for(const r of rows){ if(!pred(r)) continue;
+      for(const c of ['db','dc']){ const v=r[c]&&r[c][month]; if(v!=null && (mx==null||v>mx)) mx=v; } }
+    return mx;
+  };
+  const maxDef=(sec)=>{ let mx=null; for(const r of rows){ if(r.sector===sec && r.def!=null && (mx==null||r.def>mx)) mx=r.def; } return mx; };
+  return {
+    orgs:orgs.size, prods:rows.length,
+    bank1y:    maxRate(r=>r.sector==='은행'   && r.fam==='정기예금',        12),
+    sec1y:     maxRate(r=>r.sector==='증권'   && /ELB/.test(r.fam),         12),
+    life3y:    maxRate(r=>r.sector==='생명보험'&& /이율보증형/.test(r.fam),  36),
+    nonlife3y: maxRate(r=>r.sector==='손해보험'&& /이율보증형/.test(r.fam),  36),
+    defBank:   maxDef('은행'), defLife: maxDef('생명보험'), defNonlife: maxDef('손해보험')
+  };
 }
 
 function render(){
@@ -478,11 +495,16 @@ function render(){
 
   // stats
   const st=computeStats(curRows);
+  const pct=v=>(v!=null? v.toFixed(2):'-')+'<small>%</small>';
   $('stOrg').innerHTML=st.orgs+'<small>개사</small>';
   $('stProd').innerHTML=st.prods+'<small>건</small>';
-  $('stDb').innerHTML=(st.db||'-')+'<small>%</small>';
-  $('stDc').innerHTML=(st.dc||'-')+'<small>%</small>';
-  $('stDef').innerHTML=(st.def||'-')+'<small>%</small>';
+  $('stBank1y').innerHTML=pct(st.bank1y);
+  $('stSec1y').innerHTML=pct(st.sec1y);
+  $('stLife3y').innerHTML=pct(st.life3y);
+  $('stNonlife3y').innerHTML=pct(st.nonlife3y);
+  $('stDefBank').innerHTML=pct(st.defBank);
+  $('stDefLife').innerHTML=pct(st.defLife);
+  $('stDefNonlife').innerHTML=pct(st.defNonlife);
 
   // sector chips
   const counts={}; curRows.forEach(r=>counts[r.sector]=(counts[r.sector]||0)+1);
