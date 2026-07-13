@@ -364,6 +364,11 @@ function isDepositFam(r){
   const f=String(r.fam);
   return f.indexOf('정기예금')>=0 && r.sector!=='증권' && f.indexOf('발행어음')<0;
 }
+/* 화면에서 제외할 상품(판매중단 등) */
+function isExcludedProduct(r){
+  const t=String(r.fam)+' '+((r.names||[]).join(' '));
+  return /실버연금예금/.test(t);   // NH실버연금예금(판매중단) 제외
+}
 function normalizeDepositRows(rows){
   const out=[]; const merged=new Map();
   for(const r of rows){
@@ -451,7 +456,7 @@ function loadMonth(m){
   // raw(원본행)가 저장돼 있으면 최신 규칙으로 재그룹핑. 어느 쪽이든 normalizeDepositRows로
   // 정기예금을 기관별 1행으로 병합 + 코호트(월/일단위) 제외 → 예전 저장분도 새로고침만으로 정정.
   const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
-  curRows = normalizeDepositRows(base);
+  curRows = normalizeDepositRows(base).filter(r=>!isExcludedProduct(r));
   $('savedInfo').textContent = rec ? `기준년월 ${m.replace('-','.')} · ${rec.fileName||'파일'} · 업로드 ${rec.uploadedAt}` : '해당 월 데이터 없음';
   render();
 }
