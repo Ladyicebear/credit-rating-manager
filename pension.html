@@ -108,8 +108,7 @@
   td.sec-dc{background:#fff}
   td.sec-def{background:#FAFBFC;font-weight:700}
   /* 디폴트옵션 열: 우측 고정(항상 보이도록) */
-  th.grp-def,td.sec-def{position:sticky;right:0;z-index:4;min-width:66px;max-width:66px;
-    box-shadow:-6px 0 8px -5px rgba(16,24,40,.18)}
+  th.grp-def,td.sec-def{position:sticky;right:0;z-index:4;min-width:66px;max-width:66px}
   thead th.grp-def{z-index:6}
   /* sticky left cols */
   .c-sec,.c-org,.c-prod{text-align:center}
@@ -541,8 +540,17 @@ function render(){
 
   renderHead();
   renderBody();
+  syncStickyHeader();
   fitTable();
   syncHScroll();
+}
+
+/* 2줄 헤더: 아래 행(월)의 sticky top을 실제 그룹헤더 행 높이에 맞춤(헤더 사이 흰 틈 제거) */
+function syncStickyHeader(){
+  const gh=document.querySelector('#thead tr:first-child th.grp-db, #thead tr:first-child th.grp-dc, #thead tr:first-child th.grp-def');
+  if(!gh) return;
+  const h=Math.round(gh.getBoundingClientRect().height);
+  document.querySelectorAll('#thead tr:nth-child(2) th').forEach(th=>{ th.style.top=h+'px'; });
 }
 
 /* 금리표 높이 고정: 뷰포트 하단까지 꽉 채우되 행 수와 무관하게 일정 */
@@ -764,7 +772,7 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   let lock=false;
   ts.addEventListener('scroll',()=>{ if(lock)return; lock=true; ht.scrollLeft=ts.scrollLeft; lock=false; });
   ht.addEventListener('scroll',()=>{ if(lock)return; lock=true; ts.scrollLeft=ht.scrollLeft; lock=false; });
-  window.addEventListener('resize',()=>{ fitTable(); syncHScroll(); });
+  window.addEventListener('resize',()=>{ syncStickyHeader(); fitTable(); syncHScroll(); });
 })();
 
 /* ---------- init ---------- */
