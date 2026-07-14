@@ -396,6 +396,50 @@ def pension():
     return send_file(os.path.join(BASE_DIR, 'pension.html'))
 
 
+# ── 소비자물가지수(e-나라지표) 최신월 상승률 ──
+_CPI_CACHE = {'ts': 0, 'data': None}
+_CPI_URL = ('https://www.index.go.kr/unity/potal/eNara/sub/showStblGams3.do'
+            '?stts_cd=106001&idx_cd=1060&freq=M&period=N')
+
+
+@app.route('/api/cpi')
+def cpi_rate():
+    """지표누리 e-나라지표 소비자물가지수에서 최신월 소비자물가 상승률(전년동월비)과 전월대비 변동을 반환."""
+    import time
+    now = time.time()
+    if _CPI_CACHE['data'] and now - _CPI_CACHE['ts'] < 6 * 3600:
+        return jsonify(_CPI_CACHE['data'])
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        html = requests.get(_CPI_URL, timeout=12, headers={'User-Agent': 'Mozilla/5.0'}).text
+        soup = BeautifulSoup(html, 'lxml')
+        target = next((t for t in soup.find_all('table') if '소비자물가' in t.get_text()), None)
+        heads = [c.get_text(strip=True) for c in target.select('thead th, thead td')]
+        row = None
+        for tr in target.select('tbody tr'):
+            cells = [c.get_text(strip=True) for c in tr.find_all(['th', 'td'])]
+            if cells and cells[0].replace(' ', '') == '소비자물가':
+                row = cells
+                break
+        months = [(i, h) for i, h in enumerate(heads) if re.match(r'^\d{6}월$', h)]
+        li = months[-1][0]
+        rate = float(row[li])
+        pi = months[-2][0] if len(months) >= 2 else li - 1
+        prev = float(row[pi])
+        data = {'ok': True, 'year': months[-1][1][:4], 'month': months[-1][1][4:6],
+                'rate': rate, 'prev': prev, 'diff': round(rate - prev, 2),
+                'source': 'e-나라지표 소비자물가지수'}
+        _CPI_CACHE['ts'] = now
+        _CPI_CACHE['data'] = data
+        return jsonify(data)
+    except Exception as e:  # noqa
+        logger.exception('소비자물가지수 조회 실패')
+        if _CPI_CACHE['data']:
+            return jsonify(_CPI_CACHE['data'])
+        return jsonify({'ok': False, 'message': str(e)})
+
+
 # ── 원리금보장 금리현황 레포트: 양식(pension_report_template.xlsx)에 현재 화면 금리 채워 반환 ──
 _PENSION_MONTHS = [3, 6, 12, 18, 24, 30, 36, 48, 60]
 _PENSION_ALIAS = {  # 레포트 표기 -> 데이터 표기(예외)

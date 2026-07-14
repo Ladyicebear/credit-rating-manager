@@ -53,9 +53,16 @@
   .btn svg{width:15px;height:15px}
   .spacer{flex:1}
   /* ---------- 제도별 최고금리 요약 ---------- */
-  .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:nowrap;align-items:flex-start}
-  .stats > .sv-box{flex:1 1 0;min-width:0}
+  .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:nowrap;align-items:stretch}
+  .stats > .sv-box, .stats > .sv-col{flex:1 1 0;min-width:0}
+  .sv-col{display:flex;flex-direction:column;gap:12px}
+  .sv-col .cpi-box{flex:1 1 auto}   /* 물가상승률 박스가 남는 세로공간을 채워 옆 열과 줄맞춤 */
   .sv-box{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 13px}
+  .cpi-box{display:flex;flex-direction:column}
+  .cpi-when{font-size:12px;color:#4B5563;font-weight:700;margin-top:2px}
+  .cpi-rate{font-size:26px;font-weight:800;color:#BE8639;letter-spacing:-.5px;margin:6px 0 4px;text-align:center}
+  .cpi-diff{font-size:12px;font-weight:700;color:#374151}
+  .cpi-src{font-size:10px;color:#9CA3AF;margin-top:auto;padding-top:6px}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
   .sv-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
   .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 8px;text-align:left;border-bottom:1px solid var(--line)}
@@ -238,6 +245,7 @@ let curRows = [];
 let filterSec = 'ALL';
 let viewMode = 'all';
 let searchTxt = '';
+let cpiData = null;        // 소비자물가지수 최신월 상승률(/api/cpi)
 
 /* ---------- storage ---------- */
 function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
@@ -490,11 +498,26 @@ function renderSummary(){
     : `<tr><td class="sv-none">-</td><td></td><td></td></tr>`;
   const head=`<thead><tr><th>상품제공기관</th><th>상품구분</th><th>금리</th></tr></thead>`;
   const tbl=field=>`<table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo))).join('')+`</tbody></table>`;
-  const defTbl=`<table class="sv-tbl">${head}<tbody>`+Gdef.map(([n,p])=>row(top(p,'def'))).join('')+`</tbody></table>`;
+  // 디폴트옵션: 전체 최고금리 1건만
+  const defTop=top(r=>r.def!=null,'def');
+  const defTbl=`<table class="sv-tbl">${head}<tbody>${row(defTop)}</tbody></table>`;
+  // 물가상승률(소비자물가지수) 박스
+  const c=cpiData;
+  const cpiBox = `<div class="sv-box cpi-box"><div class="sv-title" style="color:var(--navy)">물가상승률</div>`+
+    (c && c.ok
+      ? `<div class="cpi-when">${c.year}년 ${c.month}월</div>`+
+        `<div class="cpi-rate">${c.rate.toFixed(2)}%</div>`+
+        `<div class="cpi-diff">전월대비 ${c.diff>=0?'+':''}${Math.abs(c.diff).toFixed(2)}% ${c.diff>0?'▲':(c.diff<0?'▼':'-')}</div>`+
+        `<div class="cpi-src">e-나라지표 소비자물가지수</div>`
+      : `<div class="cpi-when" style="color:#9CA3AF">소비자물가지수 불러오는 중…</div>`)+
+    `</div>`;
   $('stats').innerHTML=
     `<div class="sv-box"><div class="sv-title" style="color:var(--db)">DB제도 최고금리</div>${tbl('db')}</div>`+
     `<div class="sv-box"><div class="sv-title" style="color:var(--dc)">DC / IRP 최고금리</div>${tbl('dc')}</div>`+
-    `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`;
+    `<div class="sv-col">`+
+      `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`+
+      cpiBox+
+    `</div>`;
 }
 
 function render(){
@@ -746,5 +769,7 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   refreshMonthSel();
   loadMonth(curMonth);
   fitTable();
+  // 소비자물가지수(e-나라지표) 최신월 상승률 로드 → 요약 갱신
+  fetch('/api/cpi').then(r=>r.json()).then(d=>{ cpiData=d; if(curRows.length) renderSummary(); }).catch(()=>{});
 })();
 </script>
