@@ -530,12 +530,12 @@ function render(){
   // 제도별 최고금리 요약
   renderSummary();
 
-  // sector chips
+  // sector chips — 데이터 유무와 무관하게 전체 업권 고정 표시(없으면 0)
   const counts={}; curRows.forEach(r=>counts[r.sector]=(counts[r.sector]||0)+1);
-  const secs=SECTOR_ORDER.filter(s=>counts[s]);
+  const secs=SECTOR_ORDER;   // 은행·저축은행·생명보험·손해보험·증권·기타 항상 표시
   $('secChips').innerHTML =
     `<button class="chip ${filterSec==='ALL'?'on':''}" data-sec="ALL">전체<span class="n">${curRows.length}</span></button>`+
-    secs.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${counts[s]}</span></button>`).join('');
+    secs.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${counts[s]||0}</span></button>`).join('');
   $('secChips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{filterSec=c.dataset.sec;render();});
 
   renderHead();
