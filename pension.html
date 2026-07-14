@@ -54,14 +54,15 @@
   .spacer{flex:1}
   /* ---------- 제도별 최고금리 요약 ---------- */
   .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-start}
-  .sv-box{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
-    padding:11px 13px;flex:1;min-width:300px}
+  .stats > .sv-box{flex:1;min-width:320px}
+  .sv-col{flex:1;min-width:320px;display:flex;flex-direction:column;gap:12px}
+  .sv-box{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 13px}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
   .sv-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
-  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 7px;text-align:left;border-bottom:1px solid var(--line)}
-  .sv-tbl td{padding:5px 7px;border-bottom:1px solid var(--line-2);vertical-align:top}
+  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 8px;text-align:left;border-bottom:1px solid var(--line)}
+  .sv-tbl td{padding:5px 8px;border-bottom:1px solid var(--line-2);vertical-align:middle}
   .sv-tbl tr:last-child td{border-bottom:none}
-  .sv-tbl td.sv-sec{font-weight:700;color:#374151;white-space:nowrap;width:44px}
+  .sv-tbl th:last-child,.sv-tbl td:last-child{text-align:right}
   .sv-tbl b{color:#111;font-weight:700}
   .sv-rate{color:var(--orange-d);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .sv-none{color:#C9CED6}
@@ -461,7 +462,9 @@ function loadMonth(m){
   render();
 }
 
-/* 제도별 최고금리 요약 표 렌더 (저축은행 제외, 은행=은행+기타 합산) */
+/* 제도별 최고금리 요약 표 렌더
+   저축은행 제외 / 은행=은행+기타 합산 / 증권=ELB만 / 보험=이율보증형만
+   만기: 은행·증권=1년(12), 생보·손보=3년(36). 표 = 상품제공기관·상품구분·금리 */
 function renderSummary(){
   const rows=curRows;
   const top=(pred,field,month)=>{
@@ -471,29 +474,30 @@ function renderSummary(){
       if(v!=null && (b==null || v>b.rate)) b={org:r.org, fam:r.fam, rate:v}; }
     return b;
   };
-  const cell=t=> t ? `<b>${t.org}</b> ${t.fam} <span class="sv-rate">${t.rate.toFixed(2)}%</span>` : '<span class="sv-none">-</span>';
-  // 업권 정의(저축은행 제외)
+  // [업권라벨, 조건, 만기]
   const G=[
-    ['은행', r=>(r.sector==='은행'||r.sector==='기타') && r.fam==='정기예금'],   // 은행+기타, 정기예금
-    ['증권', r=>r.sector==='증권' && /ELB|DLB|RP|환매조건부/.test(r.fam)],       // ELB/DLB/RP
-    ['생보', r=>r.sector==='생명보험' && /이율보증형/.test(r.fam)],              // 이율보증형보험만
-    ['손보', r=>r.sector==='손해보험' && /이율보증형/.test(r.fam)],
+    ['은행', r=>(r.sector==='은행'||r.sector==='기타') && r.fam==='정기예금', 12],  // 은행+기타 정기예금, 1년
+    ['증권', r=>r.sector==='증권' && /ELB/.test(r.fam),                       12],  // ELB만, 1년
+    ['생보', r=>r.sector==='생명보험' && /이율보증형/.test(r.fam),             36],  // 이율보증형, 3년
+    ['손보', r=>r.sector==='손해보험' && /이율보증형/.test(r.fam),             36],
   ];
   const Gdef=[
     ['은행', r=>(r.sector==='은행'||r.sector==='기타')],
     ['생보', r=>r.sector==='생명보험'],
     ['손보', r=>r.sector==='손해보험'],
   ];
-  const tbl=field=>`<table class="sv-tbl"><thead><tr><th>업권</th><th>1년</th><th>3년</th></tr></thead><tbody>`+
-    G.map(([n,p])=>`<tr><td class="sv-sec">${n}</td><td>${cell(top(p,field,12))}</td><td>${cell(top(p,field,36))}</td></tr>`).join('')+
-    `</tbody></table>`;
-  const defTbl=`<table class="sv-tbl"><thead><tr><th>업권</th><th>디폴트옵션 금리(3년)</th></tr></thead><tbody>`+
-    Gdef.map(([n,p])=>`<tr><td class="sv-sec">${n}</td><td>${cell(top(p,'def'))}</td></tr>`).join('')+
-    `</tbody></table>`;
+  const row=t=> t
+    ? `<tr><td><b>${t.org}</b></td><td>${t.fam}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td></tr>`
+    : `<tr><td class="sv-none">-</td><td></td><td></td></tr>`;
+  const head=`<thead><tr><th>상품제공기관</th><th>상품구분</th><th>금리</th></tr></thead>`;
+  const tbl=field=>`<table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo))).join('')+`</tbody></table>`;
+  const defTbl=`<table class="sv-tbl">${head}<tbody>`+Gdef.map(([n,p])=>row(top(p,'def'))).join('')+`</tbody></table>`;
   $('stats').innerHTML=
     `<div class="sv-box"><div class="sv-title" style="color:var(--db)">DB제도 최고금리</div>${tbl('db')}</div>`+
-    `<div class="sv-box"><div class="sv-title" style="color:var(--dc)">DC / IRP 최고금리</div>${tbl('dc')}</div>`+
-    `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`;
+    `<div class="sv-col">`+
+      `<div class="sv-box"><div class="sv-title" style="color:var(--dc)">DC / IRP 최고금리</div>${tbl('dc')}</div>`+
+      `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`+
+    `</div>`;
 }
 
 function render(){
