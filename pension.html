@@ -546,11 +546,15 @@ function render(){
 }
 
 /* 금리표 높이 고정: 뷰포트 하단까지 꽉 채우되 행 수와 무관하게 일정 */
+/* 금리표 높이 = 헤더 + 10행 고정. 나머지는 내부 스크롤(상단 메뉴·요약은 항상 노출) */
+const VISIBLE_ROWS=10;
 function fitTable(){
   const ts=$('tableScroll'); if(!ts) return;
-  const top=ts.getBoundingClientRect().top;   // 표 상단 위치(툴바·통계·필터는 필터링과 무관하게 고정)
-  const h=Math.round(window.innerHeight - top - 12);
-  ts.style.height = Math.max(h, 220) + 'px';
+  const thead=$('thead'); const firstRow=$('tbody') && $('tbody').querySelector('tr');
+  if(!thead || !firstRow){ ts.style.height='420px'; return; }
+  const th=thead.getBoundingClientRect().height;      // 2줄 고정 헤더
+  const rh=firstRow.getBoundingClientRect().height;   // 데이터 1행
+  ts.style.height = Math.round(th + rh*VISIBLE_ROWS + 2) + 'px';
 }
 
 /* keep the top horizontal scrollbar sized to the table width */
