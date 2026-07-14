@@ -53,9 +53,8 @@
   .btn svg{width:15px;height:15px}
   .spacer{flex:1}
   /* ---------- 제도별 최고금리 요약 ---------- */
-  .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-start}
-  .stats > .sv-box{flex:1;min-width:320px}
-  .sv-col{flex:1;min-width:320px;display:flex;flex-direction:column;gap:12px}
+  .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:nowrap;align-items:flex-start}
+  .stats > .sv-box{flex:1 1 0;min-width:0}
   .sv-box{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 13px}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
   .sv-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
@@ -494,10 +493,8 @@ function renderSummary(){
   const defTbl=`<table class="sv-tbl">${head}<tbody>`+Gdef.map(([n,p])=>row(top(p,'def'))).join('')+`</tbody></table>`;
   $('stats').innerHTML=
     `<div class="sv-box"><div class="sv-title" style="color:var(--db)">DB제도 최고금리</div>${tbl('db')}</div>`+
-    `<div class="sv-col">`+
-      `<div class="sv-box"><div class="sv-title" style="color:var(--dc)">DC / IRP 최고금리</div>${tbl('dc')}</div>`+
-      `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`+
-    `</div>`;
+    `<div class="sv-box"><div class="sv-title" style="color:var(--dc)">DC / IRP 최고금리</div>${tbl('dc')}</div>`+
+    `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`;
 }
 
 function render(){
