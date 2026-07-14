@@ -95,7 +95,7 @@
   .hscroll-top::-webkit-scrollbar-thumb:hover{background:var(--orange)}
   .table-scroll{overflow:auto;height:520px;min-height:220px}  /* 높이는 JS(fitTable)가 뷰포트에 맞춰 고정 */
   table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;white-space:nowrap}
-  th,td{padding:7px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center}
+  th,td{padding:10px 10px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:center}
   #grid{border-top:1px solid var(--line);border-left:1px solid var(--line)}
   .divL{border-left:2px solid #B9C0CA !important}
   thead th{position:sticky;top:0;z-index:5;background:#F7F8FA;font-weight:700;color:#374151;border-bottom:1px solid var(--line)}
@@ -112,9 +112,9 @@
     box-shadow:-6px 0 8px -5px rgba(16,24,40,.18)}
   thead th.grp-def{z-index:6}
   /* sticky left cols */
-  .c-sec,.c-org,.c-prod{text-align:left}
+  .c-sec,.c-org,.c-prod{text-align:center}
   th.c-sec,td.c-sec{position:sticky;left:0;z-index:4;background:#fff;min-width:70px;max-width:70px}
-  th.c-org,td.c-org{position:sticky;left:70px;z-index:4;background:#fff;min-width:132px;max-width:132px;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  th.c-org,td.c-org{position:sticky;left:70px;z-index:4;background:#fff;min-width:132px;max-width:132px;font-weight:700;overflow:hidden;text-overflow:ellipsis}
   th.c-prod,td.c-prod{position:sticky;left:202px;z-index:4;background:#fff;min-width:150px;max-width:150px;border-right:2px solid var(--line);color:#111;overflow:hidden;text-overflow:ellipsis}
   thead th.c-sec,thead th.c-org,thead th.c-prod{z-index:6;background:#F7F8FA}
   tbody tr:hover td{background:#FFF9F3}
