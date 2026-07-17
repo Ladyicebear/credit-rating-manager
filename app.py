@@ -396,6 +396,31 @@ def pension():
     return send_file(os.path.join(BASE_DIR, 'pension.html'))
 
 
+# ── 퇴직연금 금리 데이터 서버 저장(모든 기기/브라우저 공유) ──
+_PENSION_STORE = os.path.join(BASE_DIR, 'data', 'pension_store.json')
+
+
+@app.route('/api/pension_store', methods=['GET'])
+def pension_store_get():
+    """저장된 월별 금리 데이터(DB) 반환."""
+    if os.path.exists(_PENSION_STORE):
+        with open(_PENSION_STORE, encoding='utf-8') as f:
+            return app.response_class(f.read(), mimetype='application/json')
+    return jsonify({})
+
+
+@app.route('/api/pension_store', methods=['POST'])
+def pension_store_post():
+    """월별 금리 데이터(DB)를 서버에 저장 → 다른 기기에서도 조회 가능."""
+    data = request.get_json(force=True, silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'invalid'}), 400
+    os.makedirs(os.path.dirname(_PENSION_STORE), exist_ok=True)
+    with open(_PENSION_STORE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False)
+    return jsonify({'ok': True, 'months': sorted(data.keys())})
+
+
 # ── 과거 금리 추이(내부 보관 데이터) ──
 #   data/rate_history.xlsx : 원본 엑셀 바이트 그대로 보관(다운로드용)
 #   data/rate_history.json : 구조화 테이블(향후 개발에서 재사용)

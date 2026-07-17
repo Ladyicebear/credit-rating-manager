@@ -49,9 +49,9 @@
   .btn.navy:hover{background:var(--navy-d)}
   .btn.navy2{background:#2E6FB0;color:#fff;border-color:#2E6FB0}
   .btn.navy2:hover{background:#255d96}
-  /* 당월/전체 금리 다운로드: 흰 배경·얇은 테두리·네이비 글자, 얇고 작게 */
-  .btn.btn-export{background:#fff;color:#1F5AA6;border:1px solid #C3D0E2;height:28px;padding:0 11px;font-size:12px;font-weight:700}
-  .btn.btn-export:hover{background:#EEF3FA;border-color:#9DB4D6}
+  /* 당월/전체 금리 다운로드: 연한 하늘색 배경, 얇고 작게 */
+  .btn.btn-export{background:#CFE6F7;color:#123E7C;border:1px solid #AECFE9;height:28px;padding:0 11px;font-size:12px;font-weight:700}
+  .btn.btn-export:hover{background:#BFDCF2;border-color:#98C0E2}
   .btn.ghost{background:#fff}
   .btn.danger{background:#fff;color:#E06A4A;border-color:#F0B4A4}
   .btn.danger:hover{background:#FDF1EE}
@@ -335,7 +335,24 @@ let cpiData = null;        // 소비자물가지수 최신월 상승률(/api/cpi
 
 /* ---------- storage ---------- */
 function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
-function save(){ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
+  // 서버에도 저장 → 휴대폰/다른 브라우저에서도 조회 가능
+  try{ fetch('/api/pension_store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)}); }catch(e){}
+}
+/* 서버 저장분을 불러와 병합(다른 기기에서 업로드한 데이터도 반영) */
+function syncFromServer(){
+  fetch('/api/pension_store').then(r=>r.json()).then(srv=>{
+    if(!srv || typeof srv!=='object') return;
+    const keys=Object.keys(srv); if(!keys.length) return;
+    const localEmpty = !Object.keys(DB).length;
+    keys.forEach(m=>{ DB[m]=srv[m]; });          // 서버 데이터 반영
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
+    if(localEmpty || !curMonth || !DB[curMonth]) curMonth = Object.keys(DB).sort().reverse()[0];
+    refreshMonthSel();
+    loadMonth(curMonth);
+  }).catch(()=>{});
+}
 function thisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
 /* ---------- parsing helpers ---------- */
@@ -1067,6 +1084,7 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   refreshMonthSel();
   loadMonth(curMonth);
   fitTable();
+  syncFromServer();   // 서버 저장분 반영(휴대폰/다른 브라우저에서도 조회)
   // 소비자물가지수(e-나라지표) 최신월 상승률 로드 → 요약 갱신
   fetch('/api/cpi').then(r=>r.json()).then(d=>{ cpiData=d; if(curRows.length) renderSummary(); }).catch(()=>{});
 })();
