@@ -175,6 +175,14 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-5m4 5V8m4 9v-3"/></svg>
       금리현황 다운로드
     </button>
+    <button class="btn ghost" id="btnHistory" title="과거 금리 추이 데이터를 엑셀로 다운로드">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>
+      과거 금리 추이
+    </button>
+    <button class="btn ghost" id="btnCompare" title="과거 금리 추이를 비교하는 그래프 엑셀 생성">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/><path d="M7 20l3-2 3 1 4-3" opacity=".55"/></svg>
+      금리비교하기
+    </button>
     <span id="savedInfo" class="muted-note" style="display:none"></span>
     <div class="spacer"></div>
     <button class="btn navy" id="btnView" title="선택한 기준월의 금리 조회">
@@ -756,6 +764,40 @@ $('btnReport').onclick=async()=>{
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     toast('금리현황 레포트를 다운로드했습니다');
   }catch(err){ console.error(err); toast('레포트 생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
+  finally{ btn.disabled=false; btn.innerHTML=orig; }
+};
+
+/* ---------- 과거 금리 추이 다운로드 : 내부 보관된 원본 엑셀을 그대로 반환 ---------- */
+$('btnHistory').onclick=async()=>{
+  const btn=$('btnHistory'); const orig=btn.innerHTML;
+  btn.disabled=true; toast('과거 금리 추이 파일 준비 중…');
+  try{
+    const res=await fetch('/download/rate_history');
+    if(!res.ok) throw new Error('서버 오류 '+res.status);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download='과거 금리 추이.xlsx';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('과거 금리 추이 파일을 다운로드했습니다');
+  }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
+  finally{ btn.disabled=false; btn.innerHTML=orig; }
+};
+
+/* ---------- 금리비교하기 : 과거 금리 추이로 5개 꺾은선 그래프 엑셀 생성 ---------- */
+$('btnCompare').onclick=async()=>{
+  const btn=$('btnCompare'); const orig=btn.innerHTML;
+  btn.disabled=true; toast('금리 비교 그래프 생성 중…');
+  try{
+    const res=await fetch('/download/rate_compare');
+    if(!res.ok) throw new Error('서버 오류 '+res.status);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download='금리 비교.xlsx';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('금리 비교 그래프 엑셀을 다운로드했습니다');
+  }catch(err){ console.error(err); toast('생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
 

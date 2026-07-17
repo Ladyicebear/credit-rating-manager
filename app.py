@@ -396,6 +396,127 @@ def pension():
     return send_file(os.path.join(BASE_DIR, 'pension.html'))
 
 
+# ── 과거 금리 추이(내부 보관 데이터) ──
+#   data/rate_history.xlsx : 원본 엑셀 바이트 그대로 보관(다운로드용)
+#   data/rate_history.json : 구조화 테이블(향후 개발에서 재사용)
+_RATE_HISTORY_XLSX = os.path.join(BASE_DIR, 'data', 'rate_history.xlsx')
+_RATE_HISTORY_JSON = os.path.join(BASE_DIR, 'data', 'rate_history.json')
+
+
+@app.route('/download/rate_history')
+def download_rate_history():
+    """'과거 금리 추이' 버튼 → 내부 보관된 원본 엑셀을 그대로 다운로드."""
+    if not os.path.exists(_RATE_HISTORY_XLSX):
+        return jsonify({'error': 'rate_history.xlsx not found'}), 404
+    return send_file(_RATE_HISTORY_XLSX, as_attachment=True,
+                     download_name='과거 금리 추이.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.route('/api/rate_history')
+def api_rate_history():
+    """과거 금리 추이 구조화 테이블(JSON). 향후 개발에서 재사용."""
+    if not os.path.exists(_RATE_HISTORY_JSON):
+        return jsonify({'error': 'rate_history.json not found'}), 404
+    with open(_RATE_HISTORY_JSON, encoding='utf-8') as f:
+        return app.response_class(f.read(), mimetype='application/json')
+
+
+@app.route('/download/rate_compare')
+def download_rate_compare():
+    """'금리비교하기' 버튼 → 과거 금리 추이 데이터로 5개 꺾은선 그래프가 든 엑셀 생성.
+       완성본 Sheet2 사용(Sheet1은 #DIV/0! 다수로 값 누락). 컬럼: 1 DATE,
+       2 증권평균, 3 은행평균, 4 생보평균, 5 손보평균, 6 저축평균, 7 원리금보장DB, 8 기준금리."""
+    import openpyxl
+    from openpyxl.chart import LineChart, Reference
+    from openpyxl.chart.axis import ChartLines
+    from openpyxl.chart.text import RichText
+    from openpyxl.drawing.text import (Paragraph, ParagraphProperties,
+                                       CharacterProperties, RichTextProperties)
+    if not os.path.exists(_RATE_HISTORY_JSON):
+        return jsonify({'error': 'rate_history.json not found'}), 404
+    with open(_RATE_HISTORY_JSON, encoding='utf-8') as f:
+        hist = json.load(f)
+    sh = hist['sheets']['Sheet2']
+    headers = sh['headers']
+    rows = sh['rows']
+
+    NCOL = 8  # DATE ~ 기준금리 (Sheet2 인덱스 0~7)
+
+    def num(v):
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, (int, float)):
+            return round(v, 2)  # 금리 소수점 둘째자리
+        try:
+            return round(float(v), 2)
+        except (TypeError, ValueError):
+            return None  # '#DIV/0!' · 빈값 등은 공백 처리
+
+    wb = openpyxl.Workbook()
+    wsd = wb.active
+    wsd.title = '데이터'
+    wsd.append(headers[:NCOL])
+    for r in rows:
+        wsd.append([r[0]] + [num(r[i]) for i in range(1, NCOL)])
+    last = wsd.max_row  # 헤더 포함 마지막 행
+    cats = Reference(wsd, min_col=1, min_row=2, max_row=last)
+
+    def x_label_style():
+        """X축 날짜 라벨: 세로(-90°) 회전 + 작은 글꼴 → 겹침 없이 식별 가능."""
+        return RichText(
+            bodyPr=RichTextProperties(rot=-5400000, vert='horz'),
+            p=[Paragraph(pPr=ParagraphProperties(defRPr=CharacterProperties(sz=700)))])
+
+    def make_chart(title, cols, legend):
+        ch = LineChart()
+        # 다중 시리즈: 상단 범례·제목없음(참조①) / 단일 시리즈: 제목표시·범례없음(참조 원리금보장)
+        #  단일 라인차트는 엑셀 특성상 범례에 날짜(카테고리)가 나열되므로 범례를 끄고 제목으로 구분
+        if title:
+            ch.title = title
+        ch.type = 'line'
+        ch.style = 2
+        ch.height = 13
+        ch.width = 30
+        ch.y_axis.delete = False
+        ch.x_axis.delete = False
+        ch.y_axis.numFmt = '0.00'          # 금리 소수점 둘째자리
+        ch.y_axis.majorGridlines = ChartLines()
+        ch.x_axis.txPr = x_label_style()    # 날짜 라벨 세로 회전
+        ch.x_axis.tickLblPos = 'low'
+        for c in cols:
+            ref = Reference(wsd, min_col=c, min_row=1, max_row=last)
+            ch.add_data(ref, titles_from_data=True)
+        ch.set_categories(cats)
+        for s in ch.series:
+            s.smooth = False
+        if legend:
+            ch.legend.position = legend     # 't'=상단, 'b'=하단
+        else:
+            ch.legend = None                # 단일 시리즈는 범례 숨김
+        return ch
+
+    # (제목, 시트명, 데이터 열[1-based], 범례위치)
+    #  다중 시리즈(①④⑤): 제목없음(None)+상단범례('t')
+    #  단일 시리즈(②③): 제목표시+범례없음(None) → 상단 날짜 나열 제거
+    specs = [
+        (None, '①업권평균비교', [2, 3, 4, 5, 6, 7], 't'),
+        ('증권사 ELB', '②증권ELB', [2], None),
+        ('원리금보장상품 금리 평균 (1년, DB)', '③원리금보장평균', [7], None),
+        (None, '④증권vs기준금리', [2, 8], 't'),
+        (None, '⑤업권별사업자금리', [2, 3, 4], 't'),
+    ]
+    for title, sheet_name, cols, legend in specs:
+        wsc = wb.create_sheet(title=sheet_name)
+        wsc.add_chart(make_chart(title, cols, legend), 'B2')
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return send_file(bio, as_attachment=True, download_name='금리 비교.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 # ── 소비자물가지수(e-나라지표) 최신월 상승률 ──
 _CPI_CACHE = {'ts': 0, 'data': None}
 _CPI_URL = ('https://www.index.go.kr/unity/potal/eNara/sub/showStblGams3.do'

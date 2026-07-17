@@ -113,17 +113,17 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 /* ── Table ── */
 .tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:75vh}
 table{width:100%;border-collapse:collapse;font-size:.78rem}
-thead th{position:sticky;top:0;z-index:2;background:#fff}
+thead th{position:sticky;top:0;z-index:2;background:#EEF0F3}
 
 /* 헤더 그룹 색상 (뮤트 웜톤: 중립 회색 + 최종적용 피치) */
-.th-grp-nice {background:#EEF0F3!important}
-.th-grp-kr   {background:#EEF0F3!important}
-.th-grp-kis  {background:#EEF0F3!important}
-.th-grp-final{background:#FCEAD8!important}
-.th-grp-chg  {background:#F4F5F7!important}
+th.th-grp-nice {background:#EEF0F3!important}
+th.th-grp-kr   {background:#EEF0F3!important}
+th.th-grp-kis  {background:#EEF0F3!important}
+th.th-grp-final{background:#EEF0F3!important}
+th.th-grp-chg  {background:#EEF0F3!important}
 
 thead th{color:#3F4854;font-weight:800;padding:8px 10px;
-         text-align:center;border-bottom:2px solid #C7CDD6;
+         text-align:center;border:1px solid #E5E7EB;
          white-space:nowrap;vertical-align:middle;font-size:.75rem}
 th.th-name{text-align:left;min-width:120px;background:#EEF0F3}
 th.th-agency{min-width:145px}
@@ -132,20 +132,20 @@ th.th-basis {min-width:160px}
 th.th-chg   {min-width:190px}
 th.th-act   {min-width:80px;background:#EEF0F3}
 
-tbody tr{border-bottom:1px solid #f0f2f7;transition:background .1s}
+tbody tr{transition:background .1s}
 tbody tr:hover{background:#f7f9fc}
 tbody tr.row-changed{background:#fdf2e9}
 tbody tr.row-changed:hover{background:#fbe7d6}
 
-td{padding:8px 10px;text-align:center;vertical-align:middle}
+td{padding:8px 10px;text-align:center;vertical-align:middle;border:1px solid #E5E7EB}
 td.td-name{text-align:left;font-weight:700;color:#16335B;min-width:120px}
 td.td-agency{vertical-align:middle}
-td.td-final-r{background:#fdf6ef;font-weight:800}
-td.td-basis {background:#fdf6ef;text-align:left;font-size:.72rem;color:#555;padding:7px 10px}
+td.td-final-r{background:#F5F7F9;font-weight:800}
+td.td-basis {background:#F5F7F9;text-align:left;font-size:.72rem;color:#555;padding:7px 10px}
 td.td-chg   {text-align:left;padding:7px 10px}
-.basis-mismatch{margin-top:6px;padding-top:6px;border-top:1px dashed #e6b8b0}
-.mismatch-msg{display:inline-block;font-weight:700;color:#c0392b;font-size:.7rem}
-.mismatch-agencies{margin-top:2px;font-size:.68rem;color:#a94442;line-height:1.35}
+.basis-mismatch{margin-top:6px;padding-top:6px;border-top:1px dashed #F6D3B8}
+.mismatch-msg{display:inline-block;font-weight:700;color:#B8500F;font-size:.7rem}
+.mismatch-agencies{margin-top:2px;font-size:.68rem;color:#B8500F;line-height:1.35}
 td.td-act   {padding:6px 7px}
 
 /* ── Agency Cell ── */
@@ -161,23 +161,23 @@ td.td-act   {padding:6px 7px}
 /* ── Rating Badge ── */
 .rbadge{display:inline-block;padding:3px 10px;border-radius:18px;
         font-size:.77rem;font-weight:800;min-width:46px;text-align:center;letter-spacing:.3px}
-.rating-AAA{background:#b8e0c2;color:#0a4020}
-.rating-AA {background:#c8e8d0;color:#155724}
-.rating-A  {background:#dff0d8;color:#276221}
-.rating-BBB{background:#fff3cd;color:#856404}
-.rating-BB {background:#fde8d0;color:#874d00}
-.rating-B  {background:#fddcdc;color:#721c24}
-.rating-CCC{background:#f5c6cb;color:#491217}
-.rating-low{background:#dc3545;color:#fff}
+.rating-AAA{background:#D6E4F5;color:#16335B}
+.rating-AA {background:#D6E4F5;color:#16335B}
+.rating-A  {background:#D6E4F5;color:#16335B}
+.rating-BBB{background:#D6E4F5;color:#16335B}
+.rating-BB {background:#D6E4F5;color:#16335B}
+.rating-B  {background:#D6E4F5;color:#16335B}
+.rating-CCC{background:#D6E4F5;color:#16335B}
+.rating-low{background:#D6E4F5;color:#16335B}
 .no-rating {color:#ccc;font-size:.77rem}
 .rbadge-final{font-size:.83rem;padding:4px 13px}
 
 /* ── Change tag ── */
 .chg-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;
          border-radius:11px;font-size:.73rem;font-weight:700;white-space:nowrap}
-.chg-down{background:#fff0f0;color:#c0392b;border:1px solid #f5c6cb}
-.chg-up  {background:#f0fff4;color:#1e7e34;border:1px solid #c3e6cb}
-.chg-same{background:#f5f5f5;color:#666;border:1px solid #ddd}
+.chg-down{background:#FCE9DA;color:#B8500F;border:1px solid #F6D3B8}
+.chg-up  {background:#E1EAF6;color:#16335B;border:1px solid #C6D6EC}
+.chg-same{background:#F1F3F5;color:#666;border:1px solid #E5E7EB}
 
 /* 변경사항 행 */
 .chg-row{display:flex;align-items:baseline;gap:5px;margin:2px 0;flex-wrap:nowrap}
@@ -192,11 +192,11 @@ td.td-act   {padding:6px 7px}
 /* ── Status pill ── */
 .spill{display:inline-block;padding:1px 6px;border-radius:7px;
        font-size:.63rem;font-weight:700;margin-left:4px;vertical-align:middle}
-.spill-ok    {background:#e2f0d9;color:#276221}
-.spill-manual{background:#fff3cd;color:#856404}
-.spill-fail  {background:#f5f5f5;color:#aaa}
-.spill-ifs   {background:#f0d8ff;color:#7a1a8f}
-.spill-sb    {background:#e0d8ff;color:#4a1a8f}
+.spill-ok    {background:#E1EAF6;color:#16335B}
+.spill-manual{background:#FCE9DA;color:#B8500F}
+.spill-fail  {background:#F1F3F5;color:#aaa}
+.spill-ifs   {background:#FCE9DA;color:#B8500F}
+.spill-sb    {background:#E1EAF6;color:#16335B}
 
 /* ── Bell / alert ── */
 .bell{font-size:.85rem;margin-left:4px;cursor:pointer;opacity:.85}
@@ -212,7 +212,7 @@ td.td-act   {padding:6px 7px}
 .ag-section{border:1px solid #e8ecf5;border-radius:8px;padding:12px 14px;margin-bottom:10px}
 .ag-section-title{font-size:.75rem;font-weight:800;margin-bottom:10px;padding-bottom:6px;
                    border-bottom:1px solid #eee}
-.ag-sec-nice{color:#1a3a8f}.ag-sec-kr{color:#4a1a8f}.ag-sec-kis{color:#1a6a3a}
+.ag-sec-nice{color:#16335B}.ag-sec-kr{color:#B8500F}.ag-sec-kis{color:#555}
 .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg label{font-size:.7rem;font-weight:700;color:#555}
@@ -224,9 +224,9 @@ td.td-act   {padding:6px 7px}
        padding:10px 16px;border-radius:8px;font-size:.8rem;z-index:999;
        opacity:0;transform:translateY(10px);transition:all .22s;pointer-events:none;max-width:320px}
 #toast.show{opacity:1;transform:translateY(0)}
-#toast.ok  {border-left:4px solid #28a745}
-#toast.err {border-left:4px solid #dc3545}
-#toast.info{border-left:4px solid #17a2b8}
+#toast.ok  {border-left:4px solid #16335B}
+#toast.err {border-left:4px solid #B8500F}
+#toast.info{border-left:4px solid #8A93A0}
 
 /* ── Spinner ── */
 .spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);
@@ -403,7 +403,7 @@ tr.row-done td{transition:background .3s}
 
               <!-- 나이스 -->
               {% set n = row.agencies['nice'] %}
-              <td class="td-agency th-grp-nice" style="background:#f5f8ff">
+              <td class="td-agency th-grp-nice" style="background:#fff">
                 <div class="ag-wrap">
                   <span class="ag-type-badge {% if n.type=='ICR' %}type-ICR{% elif n.type=='회사채선순위' %}type-SB{% elif n.type=='IFS' %}type-IFS{% else %}type-none{% endif %}">
                     {% if n.type=='ICR' %}기업신용등급{% elif n.type=='회사채선순위' %}회사채 선순위{% elif n.type=='IFS' %}보험지급능력{% elif n.rating %}기타{% else %}미공시{% endif %}
@@ -415,7 +415,7 @@ tr.row-done td{transition:background .3s}
 
               <!-- 한국기업 -->
               {% set k = row.agencies['kr'] %}
-              <td class="td-agency th-grp-kr" style="background:#f8f5ff">
+              <td class="td-agency th-grp-kr" style="background:#fff">
                 <div class="ag-wrap">
                   <span class="ag-type-badge {% if k.type=='ICR' %}type-ICR{% elif k.type=='회사채선순위' %}type-SB{% elif k.type=='IFS' %}type-IFS{% else %}type-none{% endif %}">
                     {% if k.type=='ICR' %}기업신용등급{% elif k.type=='회사채선순위' %}회사채 선순위{% elif k.type=='IFS' %}보험지급능력{% elif k.rating %}기타{% else %}미공시{% endif %}
@@ -427,7 +427,7 @@ tr.row-done td{transition:background .3s}
 
               <!-- 한국신용 -->
               {% set s = row.agencies['kis'] %}
-              <td class="td-agency th-grp-kis" style="background:#f5fff8">
+              <td class="td-agency th-grp-kis" style="background:#fff">
                 <div class="ag-wrap">
                   <span class="ag-type-badge {% if s.type=='ICR' %}type-ICR{% elif s.type=='회사채선순위' %}type-SB{% elif s.type=='IFS' %}type-IFS{% else %}type-none{% endif %}">
                     {% if s.type=='ICR' %}기업신용등급{% elif s.type=='회사채선순위' %}회사채 선순위{% elif s.type=='IFS' %}보험지급능력{% elif s.rating %}기타{% else %}미공시{% endif %}
