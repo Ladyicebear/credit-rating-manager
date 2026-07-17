@@ -65,9 +65,10 @@
   .cpi-src{font-size:10px;color:#9CA3AF;white-space:nowrap}
   .cpi-rate{font-size:19px;font-weight:800;color:#BE8639;letter-spacing:-.5px;text-align:center;margin-top:2px;line-height:1.1}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
-  .sv-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
-  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 8px;text-align:left;border-bottom:1px solid var(--line)}
-  .sv-tbl td{padding:5px 8px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  .sv-tbl{width:100%;border-collapse:collapse;font-size:11px}
+  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:left;border-bottom:1px solid var(--line)}
+  .sv-tbl td{padding:5px 5px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  .sv-tbl th.sv-per,.sv-tbl td.sv-per{text-align:center;white-space:nowrap;color:#4B5563;font-weight:700}
   .sv-tbl tr:last-child td{border-bottom:none}
   .sv-tbl th:last-child,.sv-tbl td:last-child{text-align:right}
   .sv-tbl b{color:#111;font-weight:700}
@@ -583,14 +584,14 @@ function renderSummary(){
     ['생보', r=>r.sector==='생명보험'],
     ['손보', r=>r.sector==='손해보험'],
   ];
-  const row=t=> t
-    ? `<tr><td><b>${t.org}</b></td><td>${t.fam}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td></tr>`
-    : `<tr><td class="sv-none">-</td><td></td><td></td></tr>`;
-  const head=`<thead><tr><th>상품제공기관</th><th>상품구분</th><th>금리</th></tr></thead>`;
-  const tbl=field=>`<table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo))).join('')+`</tbody></table>`;
-  // 디폴트옵션: 전체 최고금리 1건만
+  const row=(t,per)=> t
+    ? `<tr><td><b>${t.org}</b></td><td>${t.fam}</td><td class="sv-per">${per}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td></tr>`
+    : `<tr><td class="sv-none">-</td><td></td><td></td><td></td></tr>`;
+  const head=`<thead><tr><th>상품제공기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>`;
+  const tbl=field=>`<table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo), MONTH_LABEL[mo]||'')).join('')+`</tbody></table>`;
+  // 디폴트옵션: 전체 최고금리 1건만(3년)
   const defTop=top(r=>r.def!=null,'def');
-  const defTbl=`<table class="sv-tbl">${head}<tbody>${row(defTop)}</tbody></table>`;
+  const defTbl=`<table class="sv-tbl">${head}<tbody>${row(defTop,'3년')}</tbody></table>`;
   // 물가상승률(소비자물가지수) 박스
   const c=cpiData;
   const cpiBox = c && c.ok
@@ -604,10 +605,10 @@ function renderSummary(){
     : `<div class="sv-box cpi-box"><div class="sv-title" style="color:var(--navy)">물가상승률</div>`+
       `<div class="cpi-when" style="color:#9CA3AF">소비자물가지수 불러오는 중…</div></div>`;
   $('stats').innerHTML=
-    `<div class="sv-box"><div class="sv-title" style="color:var(--db)">DB제도 최고금리</div>${tbl('db')}</div>`+
-    `<div class="sv-box"><div class="sv-title" style="color:var(--dc)">DC / IRP 최고금리</div>${tbl('dc')}</div>`+
+    `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DB제도 최고금리</div>${tbl('db')}</div>`+
+    `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DC/IRP제도 최고금리</div>${tbl('dc')}</div>`+
     `<div class="sv-col">`+
-      `<div class="sv-box"><div class="sv-title" style="color:var(--def)">디폴트옵션 최고금리</div>${defTbl}</div>`+
+      `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">디폴트옵션 최고금리</div>${defTbl}</div>`+
       cpiBox+
     `</div>`;
 }
