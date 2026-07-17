@@ -21,7 +21,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .brand-sub{font-size:.82rem;color:#6b7280;margin-top:5px;font-weight:600}
 .hdr-row1 .btn{background:#fff;color:#4b5563;border:1px solid #d5d9e0}
 .hdr-row1 .btn:hover{background:#f4f6f8}
-.brand-mark{position:absolute;right:26px;bottom:9px;width:62px;height:auto;
+.brand-mark{position:absolute;right:40px;top:50px;width:62px;height:auto;
             filter:drop-shadow(0 2px 5px rgba(16,24,40,.20));pointer-events:none;user-select:none}
 
 /* ── 상위 통합 탭 (밑줄형: 선택=오렌지, 미선택=회색) ── */
@@ -255,10 +255,30 @@ tr.row-done td{transition:background .3s}
         border-top:1px solid #f0f2f7;font-size:.7rem;color:#666;align-items:center}
 .ldot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:3px}
 
-@media(max-width:700px){
-  .hdr{flex-direction:column;align-items:flex-start;gap:8px}
-  .main{padding:10px}
+/* ── 휴대폰(앱형) 반응형 : 데스크톱 웹 형태는 그대로, 모바일만 재구성 ── */
+@media(max-width:768px){
+  body{font-size:12.5px}
+  .hdr{padding:9px 13px 0}
+  .brand-logo{font-size:1.12rem;letter-spacing:-.3px}
+  .brand-sub{font-size:.66rem;margin-top:3px}
+  .brand-mark{width:34px;right:39px;top:38px}
+  /* 상단 통합탭: 화면폭 꽉 채운 앱형 탭 */
+  .super-tabs{margin-top:9px;gap:0}
+  .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
+  /* 신용등급 서브바: 긴 설명은 숨기고 컨트롤만 */
+  .credit-subbar{padding:8px 13px;gap:8px}
+  .credit-subbar .hdr-sub{display:none}
+  .credit-subbar .hdr-right{width:100%;justify-content:space-between}
+  .credit-subbar .upd-lbl{font-size:.66rem}
+  .main{padding:10px 10px 44px}
   .form-row{grid-template-columns:1fr}
+  /* 신용등급 표: 폰트/여백 축소 + 가로 스크롤(터치) */
+  .tbl-wrap{-webkit-overflow-scrolling:touch}
+  table{font-size:.72rem}
+  thead th{padding:6px 6px!important;font-size:.67rem}
+  td{padding:6px 6px}
+  .card-head{flex-wrap:wrap;gap:6px;padding:10px 12px}
+  .modal{width:96vw;padding:18px 16px}
 }
 </style>
 </head>
@@ -652,6 +672,24 @@ tr.row-done td{transition:background .3s}
 
 <script>
 /* ── 상위 통합 탭 (원리금보장상품 금리 / 신용등급관리) ── */
+/* pension iframe 높이를 헤더 실제높이에 맞춰 동적 계산(데스크톱/모바일 모두 정확) */
+function fitPensionFrame(){
+  const hdr = document.querySelector('.hdr');
+  const fr  = document.getElementById('pension-frame');
+  if(hdr && fr){
+    fr.style.height = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height)) + 'px';
+  }
+}
+window.addEventListener('resize', fitPensionFrame);
+window.addEventListener('orientationchange', fitPensionFrame);
+window.addEventListener('load', fitPensionFrame);
+document.addEventListener('DOMContentLoaded', function(){
+  var fr=document.getElementById('pension-frame');
+  if(fr) fr.addEventListener('load', fitPensionFrame);
+  fitPensionFrame();
+  setTimeout(fitPensionFrame, 300);   // 레이아웃 안정 후 재보정
+});
+
 function switchSuper(which){
   const pen = which==='pension';
   document.getElementById('super-pension').style.display = pen ? 'block' : 'none';
@@ -659,12 +697,14 @@ function switchSuper(which){
   document.querySelector('.main').style.display          = pen ? 'none' : 'block';
   document.getElementById('stab-pension').classList.toggle('active', pen);
   document.getElementById('stab-credit').classList.toggle('active', !pen);
+  if(pen) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
 (function initSuper(){
   let t='pension';
   try{ t = localStorage.getItem('goun_super_tab') || 'pension'; }catch(e){}
   switchSuper(t);
+  fitPensionFrame();
 })();
 
 /* ── Tabs ── */

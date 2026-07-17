@@ -141,6 +141,40 @@
   .hist-tag{font-size:11px;font-weight:700;color:var(--navy);background:var(--navy-l);padding:3px 9px;border-radius:6px}
   .foot{color:var(--muted);font-size:11px;text-align:center;padding:16px}
   .foot b{color:#4B5563}
+
+  /* ══════════ 휴대폰(앱형) 반응형 : 데스크톱은 그대로, 모바일만 재구성 ══════════ */
+  @media(max-width:640px){
+    .wrap{padding:10px}
+    .topbar{height:48px;padding:0 14px}
+    .topbar .sys-title{font-size:15px}
+    .topbar .env{display:none}
+    /* 툴바: 가로 스크롤 대신 줄바꿈 + 터치 크게 */
+    .toolbar{flex-wrap:wrap;overflow:visible;padding:10px 12px;gap:8px}
+    .toolbar .tb-group{flex:1 1 100%}
+    .toolbar .tb-group select{flex:1}
+    .toolbar .tb-sep{display:none}
+    .toolbar .btn{flex:1 1 44%;height:42px;justify-content:center}
+    .toolbar .btn#btnView{flex:1 1 100%}
+    .toolbar .spacer,.toolbar .muted-note{display:none}
+    /* 제도별 요약: 세로로 스택 */
+    .stats{flex-direction:column;gap:10px}
+    .stats > .sv-box,.stats > .sv-col{flex:1 1 auto;width:100%}
+    /* 필터/뷰탭 */
+    .filters{padding:10px 12px;gap:10px}
+    .view-tabs{width:100%}
+    .view-tabs button{flex:1}
+    /* 표: 고정컬럼 폭 축소해 금리 열이 보이도록 + 터치 스크롤 */
+    .table-scroll,.hscroll-top{-webkit-overflow-scrolling:touch}
+    table{font-size:11px}
+    th,td{padding:7px 6px}
+    th.c-sec,td.c-sec{min-width:50px;max-width:50px}
+    th.c-org,td.c-org{left:50px;min-width:98px;max-width:98px}
+    th.c-prod,td.c-prod{left:148px;min-width:90px;max-width:90px}
+    thead th.c-sec,thead th.c-org,thead th.c-prod{}
+    th.grp-def,td.sec-def{min-width:54px;max-width:54px}
+    .badge-sec{font-size:10px;padding:2px 5px}
+    .empty{padding:44px 16px}
+  }
 </style>
 
 <div class="topbar">
