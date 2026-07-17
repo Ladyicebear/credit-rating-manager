@@ -460,7 +460,10 @@ function isDepositFam(r){
 /* 화면에서 제외할 상품(판매중단 등) */
 function isExcludedProduct(r){
   const t=String(r.fam)+' '+((r.names||[]).join(' '));
-  return /실버연금예금/.test(t);   // NH실버연금예금(판매중단) 제외
+  if(/실버연금예금/.test(t)) return true;   // NH실버연금예금(판매중단) 제외
+  // 생보·손보: 이율변동형·금리혼합형보험 제외
+  if((r.sector==='생명보험'||r.sector==='손해보험') && /이율변동형|금리혼합형/.test(t)) return true;
+  return false;
 }
 function normalizeDepositRows(rows){
   const out=[]; const merged=new Map();
