@@ -108,6 +108,14 @@
   .view-tabs button{border:none;background:#fff;padding:7px 14px;font-size:12px;font-weight:700;color:#4B5563;border-right:1px solid #E5E7EB}
   .view-tabs button:last-child{border-right:none}
   .view-tabs button.on{background:#FCEAD8;color:#C77B2E}
+  /* 검색 래퍼(입력 + 돋보기버튼 + 상품구분) */
+  .search-wrap{display:flex;align-items:center;gap:6px}
+  .search-wrap input{min-width:180px}
+  .sch-btn{width:38px;padding:0;justify-content:center;flex:0 0 auto}
+  .sch-btn svg{width:16px;height:16px}
+  .prod-sel{height:36px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;color:var(--ink);font-size:12.5px;font-weight:700;padding:0 8px;cursor:pointer}
+  .prod-sel:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
+  .filters #btnSort{display:none}   /* 정렬버튼은 앱(모바일)에서만 */
   /* ---------- table ---------- */
   .tablecard{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
   .hscroll-top{overflow-x:auto;overflow-y:hidden;height:15px;background:#F7F8FA;border-bottom:1px solid var(--line)}
@@ -176,6 +184,21 @@
   .etc-tbl tbody tr:hover td{background:#FFF9F3}
   .etc-tbl .etc-none{color:#9CA3AF;padding:22px;text-align:center}
   .etc-note{font-size:12px;color:#B8500F;margin-top:4px}
+  /* ---------- 앱(모바일) 5열 압축표: 한 화면 폭에 맞춤 ---------- */
+  .mobile-table{padding:8px 8px 14px;overflow-x:hidden}
+  .mtbl-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:8px}
+  .mtbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+  .mtbl th,.mtbl td{border:1px solid var(--line);padding:6px 4px;text-align:center;vertical-align:middle;word-break:break-all}
+  .mtbl thead th{background:#F1F3F5;color:#374151;font-weight:700;position:sticky;top:0;z-index:2}
+  .mtbl th:nth-child(1),.mtbl td:nth-child(1){width:15%}
+  .mtbl th:nth-child(2),.mtbl td:nth-child(2){width:28%}
+  .mtbl th:nth-child(3),.mtbl td:nth-child(3){width:26%}
+  .mtbl th:nth-child(4),.mtbl td:nth-child(4){width:16%}
+  .mtbl th:nth-child(5),.mtbl td:nth-child(5){width:15%}
+  .mtbl td.l{text-align:left}
+  .mtbl td.rt{font-weight:700;color:#1F2937;white-space:nowrap}
+  .mtbl .badge-sec{font-size:9.5px;padding:1px 4px;white-space:nowrap}
+  .mtbl .mtbl-none{color:#9CA3AF;padding:22px;text-align:center}
 
   /* ══════════ 휴대폰(앱형) 반응형 : 데스크톱은 그대로, 모바일만 재구성 ══════════ */
   @media(max-width:640px){
@@ -183,19 +206,25 @@
     .topbar{height:48px;padding:0 14px}
     .topbar .sys-title{font-size:15px}
     .topbar .env{display:none}
-    /* 툴바: 가로 스크롤 대신 줄바꿈 + 터치 크게 */
+    /* 툴바(모바일): 기준월 + 금리현황 다운로드 한 줄 → 조회. 나머지 버튼 숨김, 행 간격 균일 */
     .toolbar{flex-wrap:wrap;overflow:visible;padding:10px 12px;gap:8px}
-    .toolbar .tb-group{flex:1 1 100%}
-    .toolbar .tb-group select{flex:1}
-    .toolbar .tb-sep{display:none}
-    .toolbar .btn{flex:1 1 44%;height:42px;justify-content:center}
-    .toolbar .btn#btnView{flex:1 1 100%}
-    .toolbar .spacer,.toolbar .muted-note{display:none}
+    .toolbar .tb-group{flex:1 1 0;min-width:0}
+    .toolbar .tb-group select{flex:1;min-width:0}
+    .toolbar .tb-sep,.toolbar .spacer,.toolbar .muted-note{display:none}
+    .toolbar #btnUpload,.toolbar #btnTemplate,.toolbar #btnExport,.toolbar #btnHistory,.toolbar #btnCompare{display:none}
+    .toolbar #btnReport{flex:1 1 0;min-width:0;height:42px;justify-content:center}
+    .toolbar #btnView{flex:1 1 100%;height:42px;justify-content:center}
     /* 제도별 요약: 세로로 스택 */
     .stats{flex-direction:column;gap:10px}
     .stats > .sv-box,.stats > .sv-col{flex:1 1 auto;width:100%}
     /* 필터/뷰탭 */
-    .filters{padding:10px 12px;gap:10px}
+    .filters{padding:10px 12px;gap:8px}
+    .search-wrap{flex:1 1 100%}
+    .search-wrap input{flex:1;min-width:0}
+    .filters .spacer,.filters .lbl-view{display:none}
+    /* 당월·전체: 글씨 작게 균등 한 줄 / 정렬: 흰색·더 작게 */
+    .filters #btnMonthExport,.filters #btnAllExport{flex:1 1 0;height:34px;font-size:11.5px;padding:0 6px;justify-content:center;text-align:center}
+    .filters #btnSort{display:inline-flex;flex:0 0 auto;height:30px;font-size:10px;padding:0 9px;background:#fff;color:#1F5AA6;border:1px solid #C3D0E2}
     .view-tabs{width:100%}
     .view-tabs button{flex:1}
     /* 표: 고정컬럼 폭 축소해 금리 열이 보이도록 + 터치 스크롤 */
@@ -267,11 +296,23 @@
   <div class="filters" id="filters" style="display:none">
     <span class="tb-label">업권</span>
     <div class="chips" id="secChips"></div>
-    <input type="text" id="search" placeholder="🔍 기관·상품명 검색" style="min-width:220px">
+    <div class="search-wrap">
+      <input type="text" id="search" placeholder="기관·상품명 검색">
+      <button class="btn ghost sch-btn" id="btnSearch" title="검색">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <select id="prodSel" class="prod-sel" title="상품구분으로 검색">
+        <option value="ALL">상품구분 ▾</option>
+        <option value="이율보증형보험">이율보증형보험</option>
+        <option value="정기예금">정기예금</option>
+        <option value="ELB/DLB">ELB/DLB</option>
+      </select>
+    </div>
     <div class="spacer"></div>
     <button class="btn btn-export" id="btnMonthExport" title="당월 금리표를 엑셀로 다운로드">당월 금리 다운로드</button>
     <button class="btn btn-export" id="btnAllExport" title="등록된 모든 월을 시트별로 다운로드">전체 금리 다운로드</button>
-    <span class="tb-label">제도 보기</span>
+    <button class="btn btn-export" id="btnSort" title="금리 정렬" onclick="toggleSort()">금리정렬</button>
+    <span class="tb-label lbl-view">제도 보기</span>
     <div class="view-tabs" id="viewTabs">
       <button data-v="all" class="on">전체</button>
       <button data-v="db">DB</button>
@@ -296,6 +337,7 @@
       </table>
     </div>
     <div id="specialView" class="special-view" style="display:none"></div>
+    <div id="mobileTable" class="mobile-table" style="display:none"></div>
   </div>
 
   <div class="foot">
@@ -328,6 +370,8 @@ let DB = load();            // { "YYYY-MM": { rows:[...], fileName, uploadedAt }
 let curMonth = null;
 let curRows = [];
 let filterSec = 'ALL';
+let prodFilter = 'ALL';    // 상품구분 필터(이율보증형보험/정기예금/ELB·DLB)
+let sortMode = '';         // ''|'desc'(금리높은순)|'asc'(금리낮은순)
 let curSpecial = {rateLinked:[], period:[]};   // 기타 탭: 금리연동형 / 기간식 특수상품
 let viewMode = 'all';
 let searchTxt = '';
@@ -686,6 +730,18 @@ function render(){
     `<button class="chip ${filterSec==='ALL'?'on':''}" data-sec="ALL">전체<span class="n">${curRows.length}</span></button>`+
     secs.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${counts[s]||0}</span></button>`).join('');
   $('secChips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{filterSec=c.dataset.sec;render();});
+  { const _sb=$('btnSort'); if(_sb) _sb.textContent=sortLabel(); }   // 정렬버튼 라벨 갱신
+
+  // 앱(모바일): 넓은 그리드 대신 5열 압축표(업권·상품제공기관·상품구분·기간·금리)
+  if(isMobileView()){
+    $('hscrollTop').style.display='none';
+    $('tableScroll').style.display='none';
+    $('specialView').style.display='none';
+    $('mobileTable').style.display='';
+    renderMobileTable();
+    return;
+  }
+  $('mobileTable').style.display='none';
 
   // 기타 탭: 기본 그리드 대신 특수상품 두 표(금리연동형 / 기간식) 표시
   const isEtc = filterSec==='기타';
@@ -701,12 +757,86 @@ function render(){
   syncHScroll();
 }
 
+/* ---------- 앱(모바일) 압축표: 업권·상품제공기관·상품구분·기간·금리(%) ---------- */
+function isMobileView(){ try{ return window.matchMedia('(max-width:640px)').matches; }catch(e){ return window.innerWidth<=640; } }
+/* 상품구분 필터: 이율보증형보험(=이율보증형 키워드 포함) / 정기예금 / ELB·DLB */
+function prodMatch(fam){
+  if(prodFilter==='ALL') return true;
+  const f=String(fam||'');
+  if(prodFilter==='이율보증형보험') return /이율보증형/.test(f);
+  if(prodFilter==='정기예금') return /정기예금/.test(f);
+  if(prodFilter==='ELB/DLB') return /ELB|DLB/.test(f);
+  return true;
+}
+/* 기간 → 개월수(정렬 동률 시 tie-break: 긴 순) */
+const _MLBL2MONTH={'3개월':3,'6개월':6,'1년':12,'18개월':18,'2년':24,'30개월':30,'3년':36,'4년':48,'5년':60};
+function periodMonths(p){
+  if(p==null) return -1;
+  const s=String(p).trim();
+  if(s==='-'||s==='') return -1;
+  if(_MLBL2MONTH[s]!=null) return _MLBL2MONTH[s];
+  if(/디폴트/.test(s)) return 36;
+  let m=s.match(/(\d+)\s*일/); if(m) return parseInt(m[1],10)/30;
+  m=s.match(/(\d+)\s*년/); if(m) return parseInt(m[1],10)*12;
+  m=s.match(/(\d+)\s*개월/); if(m) return parseInt(m[1],10);
+  return 0;
+}
+function toggleSort(){ sortMode = (sortMode==='desc') ? 'asc' : 'desc'; render(); }
+function sortLabel(){ return sortMode==='asc'?'금리낮은순 ▲': sortMode==='desc'?'금리높은순 ▼':'금리정렬'; }
+function mobileFlatRows(){
+  const q=searchTxt.trim().toLowerCase();
+  const onlyEtc = filterSec==='기타';
+  const useDC = viewMode==='dc';
+  const out=[];
+  if(!onlyEtc){
+    for(const r of curRows){
+      if(filterSec!=='ALL' && r.sector!==filterSec) continue;
+      const map = useDC ? r.dc : r.db;
+      MONTHS.forEach(m=>{ const v=map&&map[m]; if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:MONTH_LABEL[m],rate:v}); });
+      if(viewMode!=='db' && r.def!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:'디폴트(3년)',rate:r.def});
+    }
+  }
+  (curSpecial.rateLinked||[]).forEach(r=>{ if((filterSec==='ALL'||filterSec==='기타') && r.rate!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:'-',rate:r.rate}); });
+  (curSpecial.period||[]).forEach(r=>{ if(filterSec!=='ALL'&&filterSec!=='기타') return; const v=(r.db??r.dc??r.irp); if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:r.mat,rate:v}); });
+  let rows=out.filter(r=>prodMatch(r.fam));
+  if(q) rows=rows.filter(r=>(String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0);
+  if(sortMode==='desc'||sortMode==='asc'){
+    const dir = sortMode==='desc' ? -1 : 1;
+    rows=rows.slice().sort((a,b)=>{
+      const ra=(typeof a.rate==='number'?a.rate:-999), rb=(typeof b.rate==='number'?b.rate:-999);
+      if(ra!==rb) return dir*(ra-rb);
+      return periodMonths(b.period)-periodMonths(a.period);   // 금리 동률: 기간 긴 순
+    });
+  }
+  return rows;
+}
+function renderMobileTable(){
+  const rows=mobileFlatRows();
+  const fmt=v=> (typeof v==='number') ? v.toFixed(2) : v;
+  let body='';
+  if(!rows.length) body=`<tr><td colspan="5" class="mtbl-none">조건에 맞는 금리가 없습니다.</td></tr>`;
+  else rows.forEach(r=>{ body+=`<tr><td><span class="badge-sec s-${r.sector}">${r.sector}</span></td><td class="l">${r.org}</td><td class="l">${r.fam}</td><td>${r.period}</td><td class="rt">${fmt(r.rate)}</td></tr>`; });
+  $('mobileTable').innerHTML =
+    `<div class="mtbl-scroll" id="mtblScroll"><table class="mtbl">`+
+      `<thead><tr><th>업권</th><th>상품제공기관</th><th>상품구분</th><th>기간</th><th>금리(%)</th></tr></thead>`+
+      `<tbody>${body}</tbody></table></div>`;
+  fitMobileTable();
+}
+/* 헤더 고정 + 15행 박스(그 이상은 박스 안에서 스크롤) */
+function fitMobileTable(){
+  const sc=$('mtblScroll'); if(!sc) return;
+  const thead=sc.querySelector('thead'); const fr=sc.querySelector('tbody tr');
+  if(!thead||!fr){ sc.style.maxHeight=''; return; }
+  const th=thead.getBoundingClientRect().height, rh=fr.getBoundingClientRect().height;
+  sc.style.maxHeight = Math.round(th + rh*15 + 2)+'px';
+}
+
 /* 기타 탭: 금리연동형 표 + 기간식(만기지정·일단위) 표 렌더 */
 function renderSpecial(){
   const q=searchTxt.trim().toLowerCase();
   const so=r=>{ const i=SECTOR_ORDER.indexOf(r.sector); return i<0?99:i; };
   const bySec=(a,b)=> so(a)-so(b) || String(a.org).localeCompare(b.org,'ko');
-  const match=r=> !q || ((String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0);
+  const match=r=> prodMatch(r.fam) && (!q || ((String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0));
   let rl=curSpecial.rateLinked.filter(match).slice().sort(bySec);
   let pd=curSpecial.period.filter(match).slice().sort(bySec);
   const rt=v=> (v===null||v===undefined) ? `<span class="rate empty">-</span>`
@@ -791,7 +921,7 @@ function isDepositCohort(r){
 
 function renderBody(){
   const q=searchTxt.trim().toLowerCase();
-  let rows=curRows.filter(r=>filterSec==='ALL'||r.sector===filterSec);
+  let rows=curRows.filter(r=>(filterSec==='ALL'||r.sector===filterSec) && prodMatch(r.fam));
   if(q) rows=rows.filter(r=> (String(r.org)+' '+String(r.fam)+' '+r.names.join(' ')).toLowerCase().indexOf(q)>=0);
   const tb=$('tbody');
   if(!rows.length){ tb.innerHTML=`<tr><td colspan="99" style="padding:40px;color:#9CA3AF">조건에 맞는 상품이 없습니다.</td></tr>`; return; }
@@ -1064,7 +1194,11 @@ $('btnAllExport').onclick=function(){
 
 /* ---------- events ---------- */
 $('monthSel').onchange=e=>loadMonth(e.target.value);
-$('search').oninput=e=>{searchTxt=e.target.value; if(filterSec==='기타') renderSpecial(); else renderBody();};
+/* 검색: 입력 중에는 실행 안 함, 돋보기 버튼/Enter로 실행 */
+function doSearch(){ searchTxt=$('search').value; render(); }
+$('search').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doSearch(); } });
+$('btnSearch').onclick=doSearch;
+$('prodSel').onchange=()=>{ prodFilter=$('prodSel').value; render(); };
 $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   viewMode=b.dataset.v; $('viewTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render();
 });
@@ -1075,7 +1209,7 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   let lock=false;
   ts.addEventListener('scroll',()=>{ if(lock)return; lock=true; ht.scrollLeft=ts.scrollLeft; lock=false; });
   ht.addEventListener('scroll',()=>{ if(lock)return; lock=true; ts.scrollLeft=ht.scrollLeft; lock=false; });
-  window.addEventListener('resize',()=>{ syncStickyHeader(); fitTable(); syncHScroll(); });
+  window.addEventListener('resize',()=>{ if(curRows.length) render(); syncStickyHeader(); fitTable(); syncHScroll(); });
 })();
 
 /* ---------- init ---------- */

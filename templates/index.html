@@ -21,7 +21,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .brand-sub{font-size:.82rem;color:#6b7280;margin-top:5px;font-weight:600}
 .hdr-row1 .btn{background:#fff;color:#4b5563;border:1px solid #d5d9e0}
 .hdr-row1 .btn:hover{background:#f4f6f8}
-.brand-mark{position:absolute;right:40px;top:50px;width:62px;height:auto;
+.brand-mark{position:absolute;right:126px;top:10px;width:46px;height:auto;
             filter:drop-shadow(0 2px 5px rgba(16,24,40,.20));pointer-events:none;user-select:none}
 
 /* ── 상위 통합 탭 (밑줄형: 선택=오렌지, 미선택=회색) ── */
@@ -139,6 +139,7 @@ tbody tr.row-changed:hover{background:#fbe7d6}
 
 td{padding:8px 10px;text-align:center;vertical-align:middle;border:1px solid #E5E7EB}
 td.td-name{text-align:left;font-weight:700;color:#16335B;min-width:120px}
+.mo-final{display:none}   /* 최종등급 주황박스: 모바일에서만 표시(기관명 아래) */
 td.td-agency{vertical-align:middle}
 td.td-final-r{background:#F5F7F9;font-weight:800}
 td.td-basis {background:#F5F7F9;text-align:left;font-size:.72rem;color:#555;padding:7px 10px}
@@ -259,9 +260,10 @@ tr.row-done td{transition:background .3s}
 @media(max-width:768px){
   body{font-size:12.5px}
   .hdr{padding:9px 13px 0}
-  .brand-logo{font-size:1.12rem;letter-spacing:-.3px}
-  .brand-sub{font-size:.66rem;margin-top:3px}
-  .brand-mark{width:34px;right:39px;top:38px}
+  /* 헤더: 제목·Goun로고·로그아웃을 한 줄에(제목 축소로 맞춤) */
+  .brand-logo{font-size:.74rem;letter-spacing:-.4px;white-space:nowrap}
+  .brand-sub{font-size:.64rem;margin-top:2px}
+  .brand-mark{width:26px;right:104px;top:8px}
   /* 상단 통합탭: 화면폭 꽉 채운 앱형 탭 */
   .super-tabs{margin-top:9px;gap:0}
   .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
@@ -272,13 +274,26 @@ tr.row-done td{transition:background .3s}
   .credit-subbar .upd-lbl{font-size:.66rem}
   .main{padding:10px 10px 44px}
   .form-row{grid-template-columns:1fr}
-  /* 신용등급 표: 폰트/여백 축소 + 가로 스크롤(터치) */
-  .tbl-wrap{-webkit-overflow-scrolling:touch}
+  /* 신용등급 표(모바일): 기관명(+최종등급 주황박스) + 3평가사만, 한 화면 폭에 맞춤(스크롤 없음) */
   table{font-size:.72rem}
-  thead th{padding:6px 6px!important;font-size:.67rem}
-  td{padding:6px 6px}
+  thead th{padding:6px 4px!important;font-size:.63rem}
+  td{padding:6px 4px}
   .card-head{flex-wrap:wrap;gap:6px;padding:10px 12px}
   .modal{width:96vw;padding:18px 16px}
+  .mo-final{display:inline-block;margin-top:6px;background:#FCEAD8;border:1px solid #F1C99E;color:#B5651D;
+            border-radius:14px;padding:3px 11px;font-size:.72rem;font-weight:800}
+  .main .tbl-wrap{overflow-x:hidden}
+  .main table{table-layout:fixed;width:100%}
+  .main colgroup col{min-width:0!important;width:auto!important}
+  .main colgroup col:nth-child(n+5){display:none}
+  th.th-final-r,td.td-final-r,th.th-basis,td.td-basis,
+  th.th-chg,td.td-chg,th.th-act,td.td-act{display:none}
+  th.th-name,td.td-name{width:31%;min-width:0}
+  th.th-agency,td.td-agency{width:23%;min-width:0}
+  th.th-agency br,th.th-agency span{display:none}   /* 서브라벨 숨겨 한 줄 헤더 */
+  td.td-agency .ag-type-badge{font-size:.54rem;padding:1px 4px}
+  td.td-agency .rbadge{font-size:.64rem;padding:2px 5px;min-width:0}
+  td.td-agency .ag-date{font-size:.56rem}
 }
 </style>
 </head>
@@ -419,6 +434,7 @@ tr.row-done td{transition:background .3s}
                     {{ sc if '실패' not in sc else '재조회필요' }}
                   </span>
                 {% endif %}
+                {% if row.final %}<div class="mo-final">최종 : {{ row.final }}</div>{% endif %}
               </td>
 
               <!-- 나이스 -->
