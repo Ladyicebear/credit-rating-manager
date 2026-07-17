@@ -141,6 +141,19 @@
   .hist-tag{font-size:11px;font-weight:700;color:var(--navy);background:var(--navy-l);padding:3px 9px;border-radius:6px}
   .foot{color:var(--muted);font-size:11px;text-align:center;padding:16px}
   .foot b{color:#4B5563}
+  /* ---------- 기타 탭: 특수상품 표(금리연동형 / 기간식) ---------- */
+  .special-view{padding:14px 16px;overflow-x:auto}
+  .etc-sec{margin-bottom:20px}
+  .etc-sec:last-child{margin-bottom:2px}
+  .etc-title{font-size:13px;font-weight:800;color:var(--ink);margin:2px 2px 8px}
+  .etc-tbl{border-collapse:collapse;font-size:12px;width:100%}
+  .etc-tbl.wide{min-width:560px}
+  .etc-tbl th,.etc-tbl td{border:1px solid var(--line);padding:8px 10px;text-align:center;white-space:nowrap}
+  .etc-tbl thead th{background:#F1F3F5;color:#374151;font-weight:700}
+  .etc-tbl td.l{text-align:left}
+  .etc-tbl tbody tr:hover td{background:#FFF9F3}
+  .etc-tbl .etc-none{color:#9CA3AF;padding:22px;text-align:center}
+  .etc-note{font-size:12px;color:#B8500F;margin-top:4px}
 
   /* ══════════ 휴대폰(앱형) 반응형 : 데스크톱은 그대로, 모바일만 재구성 ══════════ */
   @media(max-width:640px){
@@ -258,6 +271,7 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
+    <div id="specialView" class="special-view" style="display:none"></div>
   </div>
 
   <div class="foot">
@@ -282,6 +296,7 @@ let DB = load();            // { "YYYY-MM": { rows:[...], fileName, uploadedAt }
 let curMonth = null;
 let curRows = [];
 let filterSec = 'ALL';
+let curSpecial = {rateLinked:[], period:[]};   // 기타 탭: 금리연동형 / 기간식 특수상품
 let viewMode = 'all';
 let searchTxt = '';
 let cpiData = null;        // 소비자물가지수 최신월 상승률(/api/cpi)
@@ -336,6 +351,35 @@ function rateList(v,n){
   return Array(n).fill(parseRate(s));
 }
 
+/* ── 특수상품(금리연동형 / 기간식·만기지정·일단위) 판별 & 추출 ── */
+function isRateLinkedProd(prod){ return /금리연동형/.test(String(prod||'')); }
+function isRangeMat(mat){ return (typeof mat==='string') && /(~|미만|이상|초과)/.test(mat); }
+function firstRate(a,b,c){ const v=parseRate(a); if(v!=null) return v; const w=parseRate(b); if(w!=null) return w; return parseRate(c); }
+function splitVals(v,n){
+  if(v===null||v===undefined) return Array(n).fill(null);
+  const s=String(v);
+  if(s.indexOf('/')>=0){ const t=s.split('/').map(parseRate); while(t.length<n) t.push(null); return t; }
+  return Array(n).fill(parseRate(s));
+}
+/* raw → { rateLinked:[{sector,org,fam,rate}], period:[{sector,org,fam,mat,db,dc,irp}] } (구간마다 1행) */
+function extractSpecial(raw){
+  const rateLinked=[], period=[];
+  for(const r of (raw||[])){
+    if(!r.org) continue;
+    const prod=String(r.prod||'');
+    if(isRateLinkedProd(prod)){
+      rateLinked.push({sector:r.sector, org:String(r.org).trim(), fam:normFamily(prod), rate:firstRate(r.db,r.dc,r.irp)});
+    } else if(isRangeMat(r.mat)){
+      const mats=String(r.mat).split('/').map(s=>s.trim());
+      const dbs=splitVals(r.db,mats.length), dcs=splitVals(r.dc,mats.length), irs=splitVals(r.irp,mats.length);
+      for(let i=0;i<mats.length;i++){
+        period.push({sector:r.sector, org:String(r.org).trim(), fam:normFamily(prod), mat:mats[i], db:dbs[i], dc:dcs[i], irp:irs[i]});
+      }
+    }
+  }
+  return {rateLinked, period};
+}
+
 /* ---------- core: rows -> grouped management rows ---------- */
 function buildGroups(raw){
   // raw: array of {sector,org,prod,mat,db,dc,irp}
@@ -343,6 +387,8 @@ function buildGroups(raw){
   for(const r of raw){
     if(!r.org) continue;
     const prod = r.prod ? String(r.prod) : '';
+    if(isRateLinkedProd(prod) || isRangeMat(r.mat)) continue;   // 특수상품은 메인 그리드 제외(→ 기타 탭에서 표시)
+    const sec = r.sector==='기타' ? '은행' : r.sector;            // 기타 업권 → 은행으로 이동
     const isDefault = prod.indexOf('디폴트옵션')>=0;
 
     /* ── 정기예금 표기 규칙 ──
@@ -351,7 +397,7 @@ function buildGroups(raw){
        그 외(기본 org/정기예금, 만기분할, 우체국·카카오 등 서술형)는 '정기예금'으로 통합. */
     let fam, monthsOverride=null;
     const isDeposit = prod.indexOf('정기예금')>=0 && !isDefault
-                      && r.sector!=='증권' && prod.indexOf('발행어음')<0;
+                      && sec!=='증권' && prod.indexOf('발행어음')<0;
     if(isDeposit){
       const rest = prod.split('/').slice(1).join('/');   // 기관명 제거 후
       if(/일단위|월단위/.test(rest)){
@@ -365,9 +411,9 @@ function buildGroups(raw){
       fam = normFamily(prod);
     }
 
-    const key=[r.sector,r.org,fam].join('||');
+    const key=[sec,r.org,fam].join('||');
     let g=groups.get(key);
-    if(!g){ g={sector:r.sector,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[]}; groups.set(key,g); }
+    if(!g){ g={sector:sec,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[]}; groups.set(key,g); }
     g.srcCount++; if(prod) g.names.push(prod);
     let months, n, dbR, dcR, irpR;
     if(monthsOverride){
@@ -504,6 +550,8 @@ function loadMonth(m){
   // 정기예금을 기관별 1행으로 병합 + 코호트(월/일단위) 제외 → 예전 저장분도 새로고침만으로 정정.
   const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
   curRows = normalizeDepositRows(base).filter(r=>!isExcludedProduct(r));
+  curSpecial = (rec && rec.raw) ? extractSpecial(rec.raw)
+             : {rateLinked:[], period:[], noRaw: !!(rec && !rec.raw)};   // 옛 저장분은 원본없음
   $('savedInfo').textContent = rec ? `기준년월 ${m.replace('-','.')} · ${rec.fileName||'파일'} · 업로드 ${rec.uploadedAt}` : '해당 월 데이터 없음';
   render();
 }
@@ -574,17 +622,50 @@ function render(){
 
   // sector chips — 데이터 유무와 무관하게 전체 업권 고정 표시(없으면 0)
   const counts={}; curRows.forEach(r=>counts[r.sector]=(counts[r.sector]||0)+1);
+  counts['기타'] = curSpecial.rateLinked.length + curSpecial.period.length;   // 기타=특수상품(금리연동형+기간식)
   const secs=SECTOR_ORDER;   // 은행·저축은행·생명보험·손해보험·증권·기타 항상 표시
   $('secChips').innerHTML =
     `<button class="chip ${filterSec==='ALL'?'on':''}" data-sec="ALL">전체<span class="n">${curRows.length}</span></button>`+
     secs.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${counts[s]||0}</span></button>`).join('');
   $('secChips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{filterSec=c.dataset.sec;render();});
 
+  // 기타 탭: 기본 그리드 대신 특수상품 두 표(금리연동형 / 기간식) 표시
+  const isEtc = filterSec==='기타';
+  $('hscrollTop').style.display  = isEtc ? 'none':'';
+  $('tableScroll').style.display = isEtc ? 'none':'';
+  $('specialView').style.display = isEtc ? '':'none';
+  if(isEtc){ renderSpecial(); return; }
+
   renderHead();
   renderBody();
   syncStickyHeader();
   fitTable();
   syncHScroll();
+}
+
+/* 기타 탭: 금리연동형 표 + 기간식(만기지정·일단위) 표 렌더 */
+function renderSpecial(){
+  const q=searchTxt.trim().toLowerCase();
+  const so=r=>{ const i=SECTOR_ORDER.indexOf(r.sector); return i<0?99:i; };
+  const bySec=(a,b)=> so(a)-so(b) || String(a.org).localeCompare(b.org,'ko');
+  const match=r=> !q || ((String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0);
+  let rl=curSpecial.rateLinked.filter(match).slice().sort(bySec);
+  let pd=curSpecial.period.filter(match).slice().sort(bySec);
+  const rt=v=> (v===null||v===undefined) ? `<span class="rate empty">-</span>`
+             : `<span class="rate${v>=4?' hi':''}">${v.toFixed(2)}</span>`;
+  let h='';
+  h+=`<div class="etc-sec"><div class="etc-title">· 금리연동형</div>`
+   + `<table class="etc-tbl"><thead><tr><th>업권</th><th>상품제공기관</th><th>상품구분</th><th>금리</th></tr></thead><tbody>`;
+  if(!rl.length) h+=`<tr><td colspan="4" class="etc-none">해당 상품이 없습니다.</td></tr>`;
+  else rl.forEach(r=> h+=`<tr><td>${r.sector}</td><td class="l">${r.org}</td><td class="l">${r.fam}</td><td>${rt(r.rate)}</td></tr>`);
+  h+=`</tbody></table></div>`;
+  h+=`<div class="etc-sec"><div class="etc-title">· 기타 (만기지정식·일단위지정)</div>`
+   + `<table class="etc-tbl wide"><thead><tr><th>업권</th><th>상품제공기관</th><th>상품구분</th><th>만기(개월)</th><th>DB</th><th>DC</th><th>IRP</th></tr></thead><tbody>`;
+  if(!pd.length) h+=`<tr><td colspan="7" class="etc-none">해당 상품이 없습니다.</td></tr>`;
+  else pd.forEach(r=> h+=`<tr><td>${r.sector}</td><td class="l">${r.org}</td><td class="l">${r.fam}</td><td>${r.mat}</td><td>${rt(r.db)}</td><td>${rt(r.dc)}</td><td>${rt(r.irp)}</td></tr>`);
+  h+=`</tbody></table></div>`;
+  if(curSpecial.noRaw) h+=`<div class="etc-note">※ 이 달 데이터는 이전 형식으로 저장되어 특수상품 원본이 없습니다. 엑셀을 다시 업로드하면 표시됩니다.</div>`;
+  $('specialView').innerHTML=h;
 }
 
 /* 2줄 헤더: 아래 행(월)의 sticky top을 실제 그룹헤더 행 높이에 맞춤(헤더 사이 흰 틈 제거) */
@@ -837,7 +918,7 @@ $('btnCompare').onclick=async()=>{
 
 /* ---------- events ---------- */
 $('monthSel').onchange=e=>loadMonth(e.target.value);
-$('search').oninput=e=>{searchTxt=e.target.value;renderBody();};
+$('search').oninput=e=>{searchTxt=e.target.value; if(filterSec==='기타') renderSpecial(); else renderBody();};
 $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   viewMode=b.dataset.v; $('viewTabs').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); render();
 });
