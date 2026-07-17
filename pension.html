@@ -47,6 +47,11 @@
   .btn.primary:hover{background:var(--orange-l)}
   .btn.navy{background:var(--navy);color:#fff;border-color:var(--navy)}
   .btn.navy:hover{background:var(--navy-d)}
+  .btn.navy2{background:#2E6FB0;color:#fff;border-color:#2E6FB0}
+  .btn.navy2:hover{background:#255d96}
+  /* 당월/전체 금리 다운로드: 흰 배경·얇은 테두리·네이비 글자, 얇고 작게 */
+  .btn.btn-export{background:#fff;color:#1F5AA6;border:1px solid #C3D0E2;height:28px;padding:0 11px;font-size:12px;font-weight:700}
+  .btn.btn-export:hover{background:#EEF3FA;border-color:#9DB4D6}
   .btn.ghost{background:#fff}
   .btn.danger{background:#fff;color:#E06A4A;border-color:#F0B4A4}
   .btn.danger:hover{background:#FDF1EE}
@@ -64,6 +69,22 @@
   .cpi-diff{font-size:12px;font-weight:700;color:#374151;white-space:nowrap}
   .cpi-src{font-size:10px;color:#9CA3AF;white-space:nowrap}
   .cpi-rate{font-size:19px;font-weight:800;color:#BE8639;letter-spacing:-.5px;text-align:center;margin-top:2px;line-height:1.1}
+  /* 물가상승률 박스 버튼(그래프보기 / 과거 물가상승률 다운로드) */
+  .cpi-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:3px}
+  .cpi-actions .cpi-rate{margin-top:0;flex:0 0 auto}
+  .cpi-btn{border:none;border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;flex:0 0 auto}
+  .cpi-btn-graph{background:#FCEAD8;color:#C77B2E}
+  .cpi-btn-graph:hover{background:#F7DCBE}
+  .cpi-btn-dl{background:var(--navy);color:#fff}
+  .cpi-btn-dl:hover{background:var(--navy-d)}
+  /* 물가상승률 그래프 팝업 */
+  .cpi-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:20px}
+  .cpi-modal.open{display:flex}
+  .cpi-modal-card{background:#fff;border-radius:14px;box-shadow:0 12px 48px rgba(0,0,0,.3);width:840px;max-width:96vw;max-height:92vh;overflow:auto;padding:6px 16px 16px}
+  .cpi-modal-head{display:flex;align-items:center;justify-content:flex-end;padding:6px 0 0}
+  .cpi-modal-x{border:none;background:#F1F3F5;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;color:#6B7280;font-family:inherit}
+  .cpi-modal-x:hover{background:#E5E7EB}
+  .cpi-modal-body{padding:2px}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
   .sv-tbl{width:100%;border-collapse:collapse;font-size:11px}
   .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:left;border-bottom:1px solid var(--line)}
@@ -248,6 +269,8 @@
     <div class="chips" id="secChips"></div>
     <input type="text" id="search" placeholder="🔍 기관·상품명 검색" style="min-width:220px">
     <div class="spacer"></div>
+    <button class="btn btn-export" id="btnMonthExport" title="당월 금리표를 엑셀로 다운로드">당월 금리 다운로드</button>
+    <button class="btn btn-export" id="btnAllExport" title="등록된 모든 월을 시트별로 다운로드">전체 금리 다운로드</button>
     <span class="tb-label">제도 보기</span>
     <div class="view-tabs" id="viewTabs">
       <button data-v="all" class="on">전체</button>
@@ -283,6 +306,14 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- 물가상승률 그래프 팝업 -->
+<div id="cpiModal" class="cpi-modal" onclick="if(event.target===this)closeCpiGraph()">
+  <div class="cpi-modal-card">
+    <div class="cpi-modal-head"><button class="cpi-modal-x" onclick="closeCpiGraph()" title="닫기">✕</button></div>
+    <div id="cpiModalBody" class="cpi-modal-body"></div>
+  </div>
+</div>
 
 <script>
 /* ============================================================
@@ -594,16 +625,22 @@ function renderSummary(){
   const defTbl=`<table class="sv-tbl">${head}<tbody>${row(defTop,'3년')}</tbody></table>`;
   // 물가상승률(소비자물가지수) 박스
   const c=cpiData;
+  const cpiActs = `<div class="cpi-actions">`+
+      `<button class="cpi-btn cpi-btn-graph" onclick="showCpiGraph()">그래프보기</button>`+
+      (c&&c.ok ? `<div class="cpi-rate">${c.rate.toFixed(2)}%</div>` : `<div class="cpi-rate" style="color:#C9CED6">–</div>`)+
+      `<button class="cpi-btn cpi-btn-dl" onclick="downloadCpiHistory()">과거 물가상승률 다운로드</button>`+
+    `</div>`;
   const cpiBox = c && c.ok
     ? `<div class="sv-box cpi-box">`+
         `<div class="cpi-top"><div class="sv-title" style="color:var(--navy);margin:0">물가상승률</div>`+
           `<div class="cpi-diff">전월대비 ${c.diff>=0?'+':''}${Math.abs(c.diff).toFixed(2)}% ${c.diff>0?'▲':(c.diff<0?'▼':'')}</div></div>`+
         `<div class="cpi-mid"><div class="cpi-when">${c.year}년 ${c.month}월</div>`+
           `<div class="cpi-src">e-나라지표 소비자물가지수</div></div>`+
-        `<div class="cpi-rate">${c.rate.toFixed(2)}%</div>`+
+        cpiActs+
       `</div>`
-    : `<div class="sv-box cpi-box"><div class="sv-title" style="color:var(--navy)">물가상승률</div>`+
-      `<div class="cpi-when" style="color:#9CA3AF">소비자물가지수 불러오는 중…</div></div>`;
+    : `<div class="sv-box cpi-box"><div class="cpi-top"><div class="sv-title" style="color:var(--navy);margin:0">물가상승률</div></div>`+
+      `<div class="cpi-when" style="color:#9CA3AF">소비자물가지수 불러오는 중…</div>`+
+      cpiActs+`</div>`;
   $('stats').innerHTML=
     `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DB제도 최고금리</div>${tbl('db')}</div>`+
     `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DC/IRP제도 최고금리</div>${tbl('dc')}</div>`+
@@ -705,6 +742,7 @@ function syncHScroll(){
 
 function showDB(){ return viewMode==='all'||viewMode==='db'; }
 function showDC(){ return viewMode==='all'||viewMode==='dc'; }
+function showDef(){ return viewMode!=='db'; }   // DB 보기에서는 디폴트옵션용 열 숨김
 
 function renderHead(){
   const dbSpan=showDB()?MONTHS.length:0, dcSpan=showDC()?MONTHS.length:0;
@@ -714,7 +752,8 @@ function renderHead(){
     <th class="c-prod" rowspan="2">상품구분</th>`;
   if(dbSpan) r1+=`<th class="grp-db ${showDB()?'divL':''}" colspan="${dbSpan}">DB</th>`;
   if(dcSpan) r1+=`<th class="grp-dc divL" colspan="${dcSpan}">DC / IRP</th>`;
-  r1+=`<th class="grp-def divL" rowspan="2">디폴트<br>옵션용<br><span style="font-weight:400">3년</span></th></tr>`;
+  if(showDef()) r1+=`<th class="grp-def divL" rowspan="2">디폴트<br>옵션용<br><span style="font-weight:400">3년</span></th>`;
+  r1+=`</tr>`;
   let r2='<tr>';
   if(dbSpan) MONTHS.forEach((m,i)=>r2+=`<th class="grp-db ${i===0?'divL':''}" style="font-weight:600">${MONTH_LABEL[m]}</th>`);
   if(dcSpan) MONTHS.forEach((m,i)=>r2+=`<th class="grp-dc ${i===0?'divL':''}" style="font-weight:600">${MONTH_LABEL[m]}</th>`);
@@ -747,7 +786,7 @@ function renderBody(){
       <td class="c-prod" title="${r.names.join('\n')}">${r.fam}</td>`;
     if(showDB()) MONTHS.forEach((m,i)=>html+=cell(r.db[m]??null,'sec-db'+(i===0?' divL':'')));
     if(showDC()) MONTHS.forEach((m,i)=>html+=cell(r.dc[m]??null,'sec-dc'+(i===0?' divL':'')));
-    html+=cell(r.def??null,'sec-def divL');
+    if(showDef()) html+=cell(r.def??null,'sec-def divL');
     html+='</tr>';
   }
   tb.innerHTML=html;
@@ -918,6 +957,92 @@ $('btnCompare').onclick=async()=>{
     toast('금리 비교 그래프 엑셀을 다운로드했습니다');
   }catch(err){ console.error(err); toast('생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
+};
+
+/* ---------- 물가상승률: 과거 파일 다운로드 + 그래프 팝업 ---------- */
+function downloadCpiHistory(){
+  fetch('/download/cpi_history').then(r=>{ if(!r.ok) throw new Error('서버 오류 '+r.status); return r.blob(); }).then(b=>{
+    const url=URL.createObjectURL(b); const a=document.createElement('a'); a.href=url; a.download='과거 물가상승률.xlsx';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('과거 물가상승률 파일을 다운로드했습니다');
+  }).catch(err=>{ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); });
+}
+function closeCpiGraph(){ document.getElementById('cpiModal').classList.remove('open'); }
+function showCpiGraph(){
+  const body=document.getElementById('cpiModalBody');
+  body.innerHTML='<div style="padding:44px;text-align:center;color:#9CA3AF">그래프 불러오는 중…</div>';
+  document.getElementById('cpiModal').classList.add('open');
+  fetch('/api/cpi_history').then(r=>r.json()).then(d=>{
+    if(!d.points||!d.points.length){ body.innerHTML='<div style="padding:44px;text-align:center;color:#9CA3AF">데이터가 없습니다.</div>'; return; }
+    body.innerHTML=buildCpiSvg(d.points, d.label||'소비자물가상승률(%)');
+  }).catch(err=>{ console.error(err); body.innerHTML='<div style="padding:44px;text-align:center;color:#B91C1C">그래프 데이터를 불러오지 못했습니다. (통합 서버에서만 동작)</div>'; });
+}
+function buildCpiSvg(pts,label){
+  const W=780,H=340,mL=46,mR=22,mT=42,mB=52;
+  const pw=W-mL-mR, ph=H-mT-mB, n=pts.length;
+  const ymax=Math.max(6, Math.ceil(Math.max.apply(null,pts.map(p=>p.y))));
+  const X=i=> mL + (n<=1?pw/2 : pw*i/(n-1));
+  const Y=v=> mT + ph*(1 - v/ymax);
+  let grid='',ylab='';
+  for(let g=0;g<=ymax;g++){ const yy=Y(g);
+    grid+=`<line x1="${mL}" y1="${yy}" x2="${W-mR}" y2="${yy}" stroke="#EBEEF2" stroke-width="1"/>`;
+    ylab+=`<text x="${mL-7}" y="${yy+3.5}" text-anchor="end" font-size="10" fill="#9CA3AF">${g.toFixed(1)}</text>`;
+  }
+  let xlab='';
+  pts.forEach((p,i)=>{ xlab+=`<text x="${X(i)}" y="${H-mB+16}" text-anchor="middle" font-size="10" fill="#6B7280">${p.x}</text>`; });
+  const poly=pts.map((p,i)=>`${X(i).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+  let marks='',dlab='';
+  pts.forEach((p,i)=>{
+    marks+=`<circle cx="${X(i)}" cy="${Y(p.y)}" r="3.4" fill="#fff" stroke="#5AB0E0" stroke-width="2"/>`;
+    dlab+=`<text x="${X(i)}" y="${Y(p.y)-8}" text-anchor="middle" font-size="10" fill="#4B5563" font-weight="700">${p.y.toFixed(1)}</text>`;
+  });
+  const lx=W/2-58;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" xmlns="http://www.w3.org/2000/svg" style="display:block">`+
+    `<text x="${W/2}" y="20" text-anchor="middle" font-size="14" font-weight="800" fill="#374151">소비자물가상승률</text>`+
+    `<text x="${mL-34}" y="${mT-8}" font-size="10" fill="#9CA3AF">(%)</text>`+
+    grid+ylab+xlab+
+    `<polyline points="${poly}" fill="none" stroke="#5AB0E0" stroke-width="2"/>`+
+    marks+dlab+
+    `<line x1="${lx}" y1="${H-13}" x2="${lx+22}" y2="${H-13}" stroke="#5AB0E0" stroke-width="2"/>`+
+    `<circle cx="${lx+11}" cy="${H-13}" r="3" fill="#fff" stroke="#5AB0E0" stroke-width="2"/>`+
+    `<text x="${lx+30}" y="${H-10}" font-size="10.5" fill="#6B7280">${label}</text>`+
+  `</svg>`;
+}
+
+/* ---------- 당월/전체 금리표 다운로드(화면 형식, 서버 스타일링) ---------- */
+function monthLabelKR(m){ const p=String(m).split('-'); return p.length>1?`${p[0]}년 ${parseInt(p[1],10)}월`:m; }
+function exportPayloadForMonth(m){
+  const rec=DB[m]; if(!rec) return null;
+  const base = rec.raw ? buildGroups(rec.raw) : (rec.rows||[]);
+  const rows = normalizeDepositRows(base).filter(r=>!isExcludedProduct(r))
+    .map(r=>({sector:r.sector, org:r.org, fam:r.fam, db:r.db, dc:r.dc, def:r.def}));
+  const special = rec.raw ? extractSpecial(rec.raw) : {rateLinked:[],period:[]};
+  return {month:m, rows, special};
+}
+async function postExport(payload, filename, btn){
+  const orig=btn?btn.innerHTML:''; if(btn){btn.disabled=true;}
+  toast('금리표 생성 중…');
+  try{
+    const res=await fetch('/api/pension_export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!res.ok) throw new Error('서버 오류 '+res.status);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('금리표를 다운로드했습니다');
+  }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
+  finally{ if(btn){btn.disabled=false; btn.innerHTML=orig;} }
+}
+$('btnMonthExport').onclick=function(){
+  if(!curMonth||!DB[curMonth]){ toast('당월 데이터가 없습니다',true); return; }
+  const p=exportPayloadForMonth(curMonth);
+  const fn=`퇴직연금 금리현황_${monthLabelKR(curMonth)}.xlsx`;
+  postExport({filename:fn, months:[p]}, fn, this);
+};
+$('btnAllExport').onclick=function(){
+  const ms=Object.keys(DB).filter(m=>DB[m]).sort();
+  if(!ms.length){ toast('등록된 데이터가 없습니다',true); return; }
+  const months=ms.map(exportPayloadForMonth).filter(Boolean);
+  postExport({filename:'퇴직연금 금리현황_전체.xlsx', months}, '퇴직연금 금리현황_전체.xlsx', this);
 };
 
 /* ---------- events ---------- */

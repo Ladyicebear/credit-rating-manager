@@ -428,9 +428,13 @@ def download_rate_compare():
        완성본 Sheet2 사용(Sheet1은 #DIV/0! 다수로 값 누락). 컬럼: 1 DATE,
        2 증권평균, 3 은행평균, 4 생보평균, 5 손보평균, 6 저축평균, 7 원리금보장DB, 8 기준금리."""
     import openpyxl
+    from collections import defaultdict
     from openpyxl.chart import LineChart, Reference
     from openpyxl.chart.axis import ChartLines
     from openpyxl.chart.text import RichText
+    from openpyxl.chart.marker import Marker
+    from openpyxl.chart.shapes import GraphicalProperties
+    from openpyxl.drawing.line import LineProperties
     from openpyxl.drawing.text import (Paragraph, ParagraphProperties,
                                        CharacterProperties, RichTextProperties)
     if not os.path.exists(_RATE_HISTORY_JSON):
@@ -468,10 +472,28 @@ def download_rate_compare():
             bodyPr=RichTextProperties(rot=-5400000, vert='horz'),
             p=[Paragraph(pPr=ParagraphProperties(defRPr=CharacterProperties(sz=700)))])
 
-    def make_chart(title, cols, legend):
+    # 다중 라인 색상 순서: 주황 → 네이비 → 하늘색 → 짙은 검정 (그 뒤 회색·진주황)
+    LINE_COLORS = ['F68121', '123E7C', '5AB0E0', '1A1A1A', '9AA3AE', 'C77B2E']
+
+    def style_series(ch, marker_size):
+        """색상순서 라인. marker_size>0이면 원형 마커(흰 채움·색 테두리), 0이면 마커 없음(깔끔한 꺾은선)."""
+        for i, s in enumerate(ch.series):
+            col = LINE_COLORS[i % len(LINE_COLORS)]
+            gp = GraphicalProperties()
+            gp.line = LineProperties(solidFill=col, w=25400)   # 2pt
+            s.graphicalProperties = gp
+            if marker_size and marker_size > 0:
+                mk = Marker(symbol='circle', size=marker_size)
+                mgp = GraphicalProperties(solidFill='FFFFFF')
+                mgp.line = LineProperties(solidFill=col)
+                mk.graphicalProperties = mgp
+                s.marker = mk
+            else:
+                s.marker = Marker(symbol='none')   # ①~⑤: 동그라미 제거
+            s.smooth = False
+
+    def make_chart(ws, cats_ref, last_row, title, cols, legend, marker_size, xrot):
         ch = LineChart()
-        # 다중 시리즈: 상단 범례·제목없음(참조①) / 단일 시리즈: 제목표시·범례없음(참조 원리금보장)
-        #  단일 라인차트는 엑셀 특성상 범례에 날짜(카테고리)가 나열되므로 범례를 끄고 제목으로 구분
         if title:
             ch.title = title
         ch.type = 'line'
@@ -480,25 +502,23 @@ def download_rate_compare():
         ch.width = 30
         ch.y_axis.delete = False
         ch.x_axis.delete = False
-        ch.y_axis.numFmt = '0.00'          # 금리 소수점 둘째자리
+        ch.y_axis.numFmt = '0.00'
         ch.y_axis.majorGridlines = ChartLines()
-        ch.x_axis.txPr = x_label_style()    # 날짜 라벨 세로 회전
+        if xrot:
+            ch.x_axis.txPr = x_label_style()    # 반월 시계열: 날짜 라벨 세로 회전
         ch.x_axis.tickLblPos = 'low'
         for c in cols:
-            ref = Reference(wsd, min_col=c, min_row=1, max_row=last)
+            ref = Reference(ws, min_col=c, min_row=1, max_row=last_row)
             ch.add_data(ref, titles_from_data=True)
-        ch.set_categories(cats)
-        for s in ch.series:
-            s.smooth = False
+        ch.set_categories(cats_ref)
+        style_series(ch, marker_size)
         if legend:
-            ch.legend.position = legend     # 't'=상단, 'b'=하단
+            ch.legend.position = legend
         else:
-            ch.legend = None                # 단일 시리즈는 범례 숨김
+            ch.legend = None
         return ch
 
-    # (제목, 시트명, 데이터 열[1-based], 범례위치)
-    #  다중 시리즈(①④⑤): 제목없음(None)+상단범례('t')
-    #  단일 시리즈(②③): 제목표시+범례없음(None) → 상단 날짜 나열 제거
+    # 반월 시계열 5종 (마커 작게, 상단범례/단일=제목)
     specs = [
         (None, '①업권평균비교', [2, 3, 4, 5, 6, 7], 't'),
         ('증권사 ELB', '②증권ELB', [2], None),
@@ -508,7 +528,35 @@ def download_rate_compare():
     ]
     for title, sheet_name, cols, legend in specs:
         wsc = wb.create_sheet(title=sheet_name)
-        wsc.add_chart(make_chart(title, cols, legend), 'B2')
+        wsc.add_chart(make_chart(wsd, cats, last, title, cols, legend, 0, True), 'B2')
+
+    # ⑥ 원리금보장 평균금리 vs 소비자물가상승률 (연도별 2015~, 첨부 그래프 형식)
+    ann = defaultdict(list)
+    for r in rows:
+        y = str(r[0])[:4]
+        v = num(r[6])   # 원리금보장상품금리 평균(1년, DB)
+        if v is not None and y.isdigit():
+            ann[y].append(v)
+    rate_annual = {y: round(sum(vs) / len(vs), 2) for y, vs in ann.items()}
+    cpi_annual = {}
+    cd = _cpi_history_load()
+    if cd:
+        cpi_annual.update(cd.get('annual', {}))
+        monthly = cd.get('monthly', {})
+        if monthly:
+            cy = sorted(set(k[:4] for k in monthly))[-1]
+            vals = [v for k, v in monthly.items() if k[:4] == cy]
+            cpi_annual[cy] = round(sum(vals) / len(vals), 2)
+    wsd2 = wb.create_sheet(title='데이터_연도별')
+    wsd2.append(['연도', '원리금보장상품 평균금리', '소비자물가상승률'])
+    for y in range(2015, 2027):
+        ys = str(y)
+        wsd2.append([ys, rate_annual.get(ys), cpi_annual.get(ys)])
+    last2 = wsd2.max_row
+    cats2 = Reference(wsd2, min_col=1, min_row=2, max_row=last2)
+    wsc6 = wb.create_sheet(title='⑥원리금보장vs물가상승률')
+    #  범례는 상단('t') — 하단이면 연도 라벨과 겹침(참조 이미지=상단)
+    wsc6.add_chart(make_chart(wsd2, cats2, last2, None, [2, 3], 't', 7, False), 'B2')
 
     bio = io.BytesIO()
     wb.save(bio)
@@ -521,6 +569,49 @@ def download_rate_compare():
 _CPI_CACHE = {'ts': 0, 'data': None}
 _CPI_URL = ('https://www.index.go.kr/unity/potal/eNara/sub/showStblGams3.do'
             '?stts_cd=106001&idx_cd=1060&freq=M&period=N')
+
+# ── 과거 물가상승률(내부 보관: 연도별 + 올해 월별 누적) ──
+_CPI_HISTORY_JSON = os.path.join(BASE_DIR, 'data', 'cpi_history.json')
+
+
+def _cpi_history_load():
+    if not os.path.exists(_CPI_HISTORY_JSON):
+        return None
+    with open(_CPI_HISTORY_JSON, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def _cpi_history_save(d):
+    with open(_CPI_HISTORY_JSON, 'w', encoding='utf-8') as f:
+        json.dump(d, f, ensure_ascii=False, indent=1)
+
+
+def _cpi_upsert_month(year, month, rate):
+    """최신월 물가상승률을 과거 물가상승률 테이블(월별)에 누적 저장(매월 자동)."""
+    try:
+        d = _cpi_history_load()
+        if not d:
+            return
+        key = '%s-%02d' % (str(year), int(month))
+        d.setdefault('monthly', {})
+        if d['monthly'].get(key) != rate:
+            d['monthly'][key] = rate
+            _cpi_history_save(d)
+    except Exception:  # noqa
+        logger.exception('물가상승률 월별 누적 저장 실패')
+
+
+def _cpi_graph_points(d):
+    """연도별(과거) + 올해(1월~최신월 평균) 그래프 포인트."""
+    annual = d.get('annual', {})
+    monthly = d.get('monthly', {})
+    pts = [{'x': y, 'y': annual[y]} for y in sorted(annual)]
+    if monthly:
+        cy = sorted(set(k[:4] for k in monthly))[-1]     # 올해(월별 최신 연도)
+        vals = [v for k, v in monthly.items() if k[:4] == cy]
+        pts.append({'x': cy, 'y': round(sum(vals) / len(vals), 2),
+                    'avg': True, 'months': len(vals)})
+    return pts
 
 
 @app.route('/api/cpi')
@@ -551,6 +642,7 @@ def cpi_rate():
         data = {'ok': True, 'year': months[-1][1][:4], 'month': months[-1][1][4:6],
                 'rate': rate, 'prev': prev, 'diff': round(rate - prev, 2),
                 'source': 'e-나라지표 소비자물가지수'}
+        _cpi_upsert_month(data['year'], data['month'], data['rate'])   # 매월 자동 누적
         _CPI_CACHE['ts'] = now
         _CPI_CACHE['data'] = data
         return jsonify(data)
@@ -559,6 +651,208 @@ def cpi_rate():
         if _CPI_CACHE['data']:
             return jsonify(_CPI_CACHE['data'])
         return jsonify({'ok': False, 'message': str(e)})
+
+
+@app.route('/api/cpi_history')
+def api_cpi_history():
+    """과거 물가상승률 그래프 데이터(연도별 + 올해 월평균)."""
+    d = _cpi_history_load()
+    if not d:
+        return jsonify({'error': 'cpi_history not found'}), 404
+    return jsonify({'label': d.get('label', '소비자물가상승률(%)'),
+                    'points': _cpi_graph_points(d),
+                    'annual': d.get('annual', {}), 'monthly': d.get('monthly', {})})
+
+
+@app.route('/download/cpi_history')
+def download_cpi_history():
+    """'과거 물가상승률 다운로드' → 누적된 과거 물가상승률 엑셀 생성(연도별 + 올해 월별)."""
+    import openpyxl
+    d = _cpi_history_load()
+    if not d:
+        return jsonify({'error': 'cpi_history not found'}), 404
+    annual = d.get('annual', {})
+    monthly = d.get('monthly', {})
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = '소비자물가상승률'
+    hdr = ['']
+    vals = [d.get('label', '소비자물가상승률(%)')]
+    for y in sorted(annual):
+        hdr.append(y)
+        vals.append(annual[y])
+    for k in sorted(monthly):
+        y, m = k.split('-')
+        hdr.append('%s년 %d월' % (y, int(m)))
+        vals.append(monthly[k])
+    ws.append(hdr)
+    ws.append(vals)
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return send_file(bio, as_attachment=True, download_name='과거 물가상승률.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.route('/api/pension_export', methods=['POST'])
+def pension_export():
+    """당월/전체 금리표(화면 형식) 엑셀 생성. 월별 1시트 + 금리연동형/기타 섹션 포함.
+       payload: {filename, months:[{month:'YYYY-MM', rows:[{sector,org,fam,db,dc,def}], special:{rateLinked,period}}]}"""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    payload = request.get_json(force=True, silent=True) or {}
+    months = payload.get('months', [])
+    if not months:
+        return jsonify({'error': 'no data'}), 400
+    MO = _PENSION_MONTHS                      # [3,6,12,18,24,30,36,48,60]
+    MLABEL = {3: '3개월', 6: '6개월', 12: '1년', 18: '18개월', 24: '2년',
+              30: '30개월', 36: '3년', 48: '4년', 60: '5년'}
+    NC = 3 + len(MO) * 2 + 1                  # 22열 (업권·기관·상품 + DB9 + DC9 + 디폴트)
+
+    thin = Side(style='thin', color='D0D5DD')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hdr_fill = PatternFill('solid', fgColor='F1F3F5')
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left = Alignment(horizontal='left', vertical='center')
+
+    def num(v):
+        try:
+            if v is None or v == '' or v == '-':
+                return None
+            return round(float(v), 2)
+        except (TypeError, ValueError):
+            return None
+
+    def style_row(ws, r, ncol, leftcols):
+        for cc in range(1, ncol + 1):
+            c = ws.cell(row=r, column=cc)
+            c.border = border
+            c.font = Font(size=9)
+            c.alignment = left if cc in leftcols else center
+
+    def section_header(ws, r, headers):
+        for j, h in enumerate(headers):
+            c = ws.cell(row=r, column=1 + j, value=h)
+            c.fill = hdr_fill
+            c.font = Font(bold=True, size=9, color='374151')
+            c.alignment = center
+            c.border = border
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    for entry in months:
+        m = str(entry.get('month', ''))
+        rows = entry.get('rows', []) or []
+        special = entry.get('special', {}) or {}
+        try:
+            y, mo = m.split('-')
+            label = '%s년 %d월' % (y, int(mo))
+        except Exception:
+            label = m or '금리현황'
+        ws = wb.create_sheet(title=(label or '금리현황')[:31])
+
+        # 제목
+        tc = ws.cell(row=1, column=1, value='■ %s 퇴직연금 원리금보장상품 금리 현황' % label)
+        tc.font = Font(bold=True, size=13)
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=NC)
+
+        # 헤더(3~4행): 값 기입 → 스타일 → 병합
+        hr1, hr2 = 3, 4
+        ws.cell(row=hr1, column=1, value='업권')
+        ws.cell(row=hr1, column=2, value='상품제공기관')
+        ws.cell(row=hr1, column=3, value='상품구분')
+        ws.cell(row=hr1, column=4, value='DB')
+        ws.cell(row=hr1, column=4 + len(MO), value='DC / IRP')
+        ws.cell(row=hr1, column=NC, value='디폴트\n옵션용 3년')
+        for i, mm in enumerate(MO):
+            ws.cell(row=hr2, column=4 + i, value=MLABEL[mm])
+            ws.cell(row=hr2, column=4 + len(MO) + i, value=MLABEL[mm])
+        for rr in (hr1, hr2):
+            for cc in range(1, NC + 1):
+                c = ws.cell(row=rr, column=cc)
+                c.fill = hdr_fill
+                c.font = Font(bold=True, size=9, color='374151')
+                c.alignment = center
+                c.border = border
+        ws.merge_cells(start_row=hr1, start_column=1, end_row=hr2, end_column=1)
+        ws.merge_cells(start_row=hr1, start_column=2, end_row=hr2, end_column=2)
+        ws.merge_cells(start_row=hr1, start_column=3, end_row=hr2, end_column=3)
+        ws.merge_cells(start_row=hr1, start_column=4, end_row=hr1, end_column=3 + len(MO))
+        ws.merge_cells(start_row=hr1, start_column=4 + len(MO), end_row=hr1, end_column=3 + len(MO) * 2)
+        ws.merge_cells(start_row=hr1, start_column=NC, end_row=hr2, end_column=NC)
+
+        # 데이터
+        dr = hr2 + 1
+        for r in rows:
+            db = r.get('db', {}) or {}
+            dc = r.get('dc', {}) or {}
+            ws.cell(row=dr, column=1, value=r.get('sector', ''))
+            ws.cell(row=dr, column=2, value=r.get('org', ''))
+            ws.cell(row=dr, column=3, value=r.get('fam', ''))
+            for i, mm in enumerate(MO):
+                ws.cell(row=dr, column=4 + i, value=num(db.get(str(mm), db.get(mm))))
+                ws.cell(row=dr, column=4 + len(MO) + i, value=num(dc.get(str(mm), dc.get(mm))))
+            ws.cell(row=dr, column=NC, value=num(r.get('def')))
+            style_row(ws, dr, NC, (2, 3))
+            for cc in range(4, NC + 1):
+                ws.cell(row=dr, column=cc).number_format = '0.00'
+            dr += 1
+
+        # 금리연동형
+        rl = special.get('rateLinked', []) or []
+        if rl:
+            dr += 1
+            ws.cell(row=dr, column=1, value='· 금리연동형').font = Font(bold=True, size=10)
+            dr += 1
+            section_header(ws, dr, ['업권', '상품제공기관', '상품구분', '금리'])
+            dr += 1
+            for r in rl:
+                ws.cell(row=dr, column=1, value=r.get('sector', ''))
+                ws.cell(row=dr, column=2, value=r.get('org', ''))
+                ws.cell(row=dr, column=3, value=r.get('fam', ''))
+                ws.cell(row=dr, column=4, value=num(r.get('rate')))
+                style_row(ws, dr, 4, (2, 3))
+                ws.cell(row=dr, column=4).number_format = '0.00'
+                dr += 1
+
+        # 기타(만기지정식·일단위지정)
+        pd = special.get('period', []) or []
+        if pd:
+            dr += 1
+            ws.cell(row=dr, column=1, value='· 기타 (만기지정식·일단위지정)').font = Font(bold=True, size=10)
+            dr += 1
+            section_header(ws, dr, ['업권', '상품제공기관', '상품구분', '만기(개월)', 'DB', 'DC', 'IRP'])
+            dr += 1
+            for r in pd:
+                ws.cell(row=dr, column=1, value=r.get('sector', ''))
+                ws.cell(row=dr, column=2, value=r.get('org', ''))
+                ws.cell(row=dr, column=3, value=r.get('fam', ''))
+                ws.cell(row=dr, column=4, value=r.get('mat', ''))
+                for k, key in enumerate(('db', 'dc', 'irp')):
+                    ws.cell(row=dr, column=5 + k, value=num(r.get(key)))
+                style_row(ws, dr, 7, (2, 3))
+                for cc in range(5, 8):
+                    ws.cell(row=dr, column=cc).number_format = '0.00'
+                dr += 1
+
+        # 열 너비
+        ws.column_dimensions['A'].width = 10
+        ws.column_dimensions['B'].width = 22
+        ws.column_dimensions['C'].width = 22
+        for i in range(len(MO) * 2):
+            ws.column_dimensions[get_column_letter(4 + i)].width = 8
+        ws.column_dimensions[get_column_letter(NC)].width = 10
+
+    if not wb.sheetnames:
+        wb.create_sheet(title='금리현황')
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    fname = payload.get('filename') or '퇴직연금 금리현황.xlsx'
+    return send_file(bio, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 # ── 원리금보장 금리현황 레포트: 양식(pension_report_template.xlsx)에 현재 화면 금리 채워 반환 ──
