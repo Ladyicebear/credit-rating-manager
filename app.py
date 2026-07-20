@@ -166,6 +166,9 @@ RATING_SCALE = [
 INSURANCE_CATEGORIES = {'손해보험', '생명보험'}
 AGENCIES = ['nice', 'kr', 'kis']
 AGENCY_LABELS = {'nice': '나이스신용평가', 'kr': '한국기업평가', 'kis': '한국신용평가'}
+# 기존 등급을 지우기 전에 요구하는 '연속 빈값' 횟수. 1회 빈값은 일시적 스크래핑 실패로 보고
+# 값을 유지한다(카운터는 ratings.json의 '{평가사}_miss'에 저장).
+MISS_LIMIT = 2
 
 
 # ── Rating helpers ────────────────────────────────────────────────────
@@ -1274,6 +1277,7 @@ def _apply_scrape_results(scrape_result: dict, update_meta: bool = True,
             entry.setdefault(f'{_ag}_type', '')
             entry.setdefault(f'{_ag}_prev', '')
             entry.setdefault(f'{_ag}_changed', False)
+            entry.setdefault(f'{_ag}_miss', 0)
         any_ag_updated = False
         for ag in AGENCIES:
             old_rating = prev_entry.get(ag, '')
@@ -1307,12 +1311,26 @@ def _apply_scrape_results(scrape_result: dict, update_meta: bool = True,
         # 이번 실행에서 다른 기관들엔 정상 응답했는데 이 기관에서만 빈값이면 → 과거 오파싱으로
         # 남은 값(예: KB손해보험 KIS 'AAA')을 제거한다. 평가사 전면 장애(agency_alive=False)나
         # 기관 전체 실패(any_ag_updated=False) 시에는 보존한다.
+        #
+        # 단, 빈값 1회로 바로 지우면 일시적 스크래핑 실패(NICE 타임아웃 등)에 멀쩡한 등급이
+        # 날아간다(2026-07-21 삼성증권 AA+·NH투자증권 AA+·기업은행 AAA 사례).
+        # → 연속 MISS_LIMIT회 빈값일 때만 삭제하고, 그 전까지는 값을 유지한다.
         if any_ag_updated:
             for ag in AGENCIES:
-                if not new_data.get(ag, '') and agency_alive[ag] and entry.get(ag, ''):
-                    entry[ag] = ''
-                    entry[f'{ag}_eval_date'] = ''
-                    entry[f'{ag}_type'] = ''
+                if new_data.get(ag, ''):
+                    entry[f'{ag}_miss'] = 0                     # 값이 오면 카운터 리셋
+                elif agency_alive[ag] and entry.get(ag, ''):
+                    misses = int(prev_entry.get(f'{ag}_miss', 0) or 0) + 1
+                    if misses >= MISS_LIMIT:
+                        entry[ag] = ''
+                        entry[f'{ag}_eval_date'] = ''
+                        entry[f'{ag}_type'] = ''
+                        entry[f'{ag}_miss'] = 0
+                        logger.info('[%s] %s 연속 %d회 빈값 → 등급 삭제', name, AGENCY_LABELS[ag], misses)
+                    else:
+                        entry[f'{ag}_miss'] = misses            # 값 보존, 다음 조회에서 재판단
+                        logger.info('[%s] %s 빈값 %d/%d회 — 기존 등급 유지',
+                                    name, AGENCY_LABELS[ag], misses, MISS_LIMIT)
         old_final = prev_entry.get('final', '')
         new_finals = [entry.get(ag, '') for ag in AGENCIES]
         new_final  = get_lowest_rating(new_finals)

@@ -116,6 +116,25 @@
   .prod-sel{height:36px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;color:var(--ink);font-size:12.5px;font-weight:700;padding:0 8px;cursor:pointer}
   .prod-sel:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
   .filters #btnSort{display:none}   /* 정렬버튼은 앱(모바일)에서만 */
+  /* 홈페이지(데스크톱): 업권 칩 ~ 제도보기 탭까지 한 행에.
+     한 줄에 넣으려고 '업권' 라벨을 숨기고 칩·버튼·탭을 조금씩 축소한다.
+     모바일(≤640px)은 아래 반응형 블록 그대로. */
+  @media(min-width:1280px){
+    .filters{flex-wrap:nowrap;gap:10px}
+    .filters > .tb-label{display:none}                 /* '업권' 라벨: 칩만으로 충분 */
+    .filters .chips{flex-wrap:nowrap;flex:0 0 auto;gap:5px}
+    .filters .chip{flex:0 0 auto;white-space:nowrap;padding:5px 10px;font-size:11.5px}
+    /* 검색창은 줄어들되, 묶음이 내용(검색 90 + 돋보기 38 + 상품구분 119 + 간격)보다
+       작아지면 상품구분이 다운로드 버튼에 가려지므로 하한을 둔다 */
+    .filters .search-wrap{flex:0 1 auto;min-width:255px;gap:5px}
+    .filters .search-wrap input{flex:1 1 auto;min-width:90px}
+    .filters .prod-sel{flex:0 0 auto;height:30px;font-size:11.5px}
+    .filters .sch-btn{width:32px}
+    .filters .spacer{flex:1 1 auto}                    /* 다운로드 버튼을 오른쪽 끝으로 */
+    .filters .btn-export{height:26px;padding:0 8px;font-size:11px}
+    .filters .view-tabs button{padding:6px 11px;font-size:11.5px}
+    .filters .view-tabs,.filters .btn-export,.filters .sch-btn{flex:0 0 auto}
+  }
   /* ---------- table ---------- */
   .tablecard{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
   .hscroll-top{overflow-x:auto;overflow-y:hidden;height:15px;background:#F7F8FA;border-bottom:1px solid var(--line)}
@@ -169,7 +188,8 @@
   #toast.err{background:#B91C1C}
   .muted-note{font-size:11px;color:var(--muted);margin-left:auto}
   .hist-tag{font-size:11px;font-weight:700;color:var(--navy);background:var(--navy-l);padding:3px 9px;border-radius:6px}
-  .foot{color:var(--muted);font-size:11px;text-align:center;padding:16px}
+  /* 하단 안내문구: 홈페이지(데스크톱)에서는 숨김, 모바일은 종전대로 노출 */
+  .foot{display:none;color:var(--muted);font-size:11px;text-align:center;padding:16px}
   .foot b{color:#4B5563}
   /* ---------- 기타 탭: 특수상품 표(금리연동형 / 기간식) ---------- */
   .special-view{padding:14px 16px;overflow-x:auto}
@@ -242,7 +262,8 @@
     .filters{padding:10px 12px;gap:8px}
     .search-wrap{flex:1 1 100%}
     .search-wrap input{flex:1;min-width:0}
-    .filters .spacer,.filters .lbl-view{display:none}
+    .filters .spacer{display:none}
+    .foot{display:block}                 /* 하단 안내문구는 모바일에서 종전대로 노출 */
     /* 당월·전체: 글씨 작게 균등 한 줄 / 정렬: 흰색·더 작게 */
     .filters #btnMonthExport,.filters #btnAllExport{flex:1 1 0;height:34px;font-size:11.5px;padding:0 6px;justify-content:center;text-align:center}
     .filters #btnSort{display:inline-flex;flex:0 0 auto;height:30px;font-size:10px;padding:0 9px;background:#fff;color:#1F5AA6;border:1px solid #C3D0E2}
@@ -334,7 +355,6 @@
     <button class="btn btn-export" id="btnMonthExport" title="당월 금리표를 엑셀로 다운로드">당월 금리 다운로드</button>
     <button class="btn btn-export" id="btnAllExport" title="등록된 모든 월을 시트별로 다운로드">전체 금리 다운로드</button>
     <button class="btn btn-export" id="btnSort" title="금리 정렬" onclick="toggleSort()">금리정렬</button>
-    <span class="tb-label lbl-view">제도 보기</span>
     <div class="view-tabs" id="viewTabs">
       <button data-v="all" class="on">전체</button>
       <button data-v="db">DB</button>
@@ -367,6 +387,7 @@
     만기 매핑: <b>12개월=1년, 24=2년, 36=3년, 48=4년, 60=5년</b> (고정 컬럼: 3·6·12·18·24·30·36·48·60개월) &nbsp;·&nbsp;
     데이터는 이 브라우저(localStorage)에 저장됩니다
   </div>
+
 </div>
 
 <div id="toast"></div>

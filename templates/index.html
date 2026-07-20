@@ -198,6 +198,9 @@ td.td-act   {padding:6px 7px}
 .spill-manual{background:#FCE9DA;color:#B8500F}
 .spill-fail  {background:#F1F3F5;color:#aaa}
 .spill-ifs   {background:#FCE9DA;color:#B8500F}
+/* '전체' 탭에서 각 행이 어느 분류인지 표시 */
+.cat-tag{display:inline-block;padding:1px 6px;border-radius:7px;background:#EEF1F5;color:#6b7280;
+         font-size:.63rem;font-weight:700;margin-right:5px;vertical-align:middle}
 .spill-sb    {background:#E1EAF6;color:#16335B}
 
 /* ── Bell / alert ── */
@@ -368,9 +371,14 @@ tr.row-done td{transition:background .3s}
     <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
   </div>
 
+  {# '전체' 탭: 모든 분류의 행을 합친 목록. 탭·패널 모두 이 묶음으로 렌더한다. #}
+  {% set ns = namespace(all=[]) %}
+  {% for _cat, _rows in data.items() %}{% set ns.all = ns.all + _rows %}{% endfor %}
+  {% set panel_groups = [('전체', ns.all)] + (data.items() | list) %}
+
   <!-- Tabs -->
   <div class="tabs">
-    {% for category, rows in data.items() %}
+    {% for category, rows in panel_groups %}
     {% set n_chg = rows | selectattr('any_changed') | list | length %}
     <button class="tab-btn {% if loop.first %}active{% endif %}"
             data-tab="{{ category }}" onclick="switchTab('{{ category }}')">
@@ -384,14 +392,14 @@ tr.row-done td{transition:background .3s}
   </div>
 
   <!-- Panels -->
-  {% for category, rows in data.items() %}
+  {% for category, rows in panel_groups %}
   <div class="panel {% if loop.first %}active{% endif %}" id="panel-{{ category }}">
     <div class="card">
       <div class="card-head">
         <span class="card-title">{{ category }}</span>
         <div class="card-head-right">
           <span class="card-note">
-            {% if category in ['손해보험','생명보험'] %}보험지급능력등급(IFSR) 기준{% else %}기업신용등급(ICR) 우선 · 1순위 기업신용등급 2순위 회사채 선순위 적용{% endif %}
+            {% if category == '전체' %}분류별 기준 적용(보험=IFSR · 그 외=ICR 우선){% elif category in ['손해보험','생명보험'] %}보험지급능력등급(IFSR) 기준{% else %}기업신용등급(ICR) 우선 · 1순위 기업신용등급 2순위 회사채 선순위 적용{% endif %}
             &nbsp;|&nbsp; 최종적용 = 3사 중 최저등급
           </span>
           <a class="btn btn-navy btn-sm" href="/api/export.xlsx" download>⬇ 엑셀 다운로드</a>
@@ -429,6 +437,7 @@ tr.row-done td{transition:background .3s}
 
               <!-- 기관명 -->
               <td class="td-name">
+                {% if category == '전체' %}<span class="cat-tag">{{ row.category }}</span>{% endif %}
                 {{ row.name }}
                 {% if row.any_changed %}<span class="bell" title="확인" onclick="acknowledge('{{ row.name }}')">🔔</span>{% endif %}
                 {% if row.scrape_status %}
@@ -836,9 +845,12 @@ function _pollStatus(total){
     .catch(()=>{});
 }
 
+/* 같은 기관 행이 '전체' 탭과 분류 탭에 각각 있으므로 모두 갱신한다 */
 function _updateRow(name,data){
-  const tr=document.querySelector(`tr[data-name="${CSS.escape(name)}"]`);
-  if(!tr)return;
+  document.querySelectorAll(`tr[data-name="${CSS.escape(name)}"]`)
+          .forEach(tr=>_updateRowEl(tr,data));
+}
+function _updateRowEl(tr,data){
   tr.classList.remove('row-loading');
   tr.classList.add('row-done');
 
@@ -890,7 +902,9 @@ function _resetRefresh(){
 /* ── 변경 기관으로 이동 ── */
 function jumpTo(cat,name){
   switchTab(cat);
-  const tr=document.querySelector(`tr[data-name="${CSS.escape(name)}"]`);
+  // 이름이 같은 행이 여러 패널에 있으므로 이동한 탭 안에서 찾는다
+  const panel=document.getElementById(`panel-${cat}`);
+  const tr=(panel||document).querySelector(`tr[data-name="${CSS.escape(name)}"]`);
   if(tr){
     tr.scrollIntoView({behavior:'smooth',block:'center'});
     const prev=tr.style.background;
