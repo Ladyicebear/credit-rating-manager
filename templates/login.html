@@ -26,6 +26,30 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:8px;
      padding:9px 12px;font-size:.76rem;margin-bottom:14px;text-align:center}
 .foot{text-align:center;margin-top:18px;font-size:.66rem;color:#bbb}
+/* 비밀번호 변경(로그인 화면에서 바로) */
+.pw-link{display:block;width:100%;margin-top:14px;background:none;border:none;font-family:inherit;
+         font-size:.72rem;font-weight:700;color:#8a92a0;cursor:pointer;text-decoration:underline}
+.pw-link:hover{color:#F68121}
+.pw-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;
+       align-items:center;justify-content:center;padding:20px}
+.pw-ov.open{display:flex}
+.pw-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.3);
+         width:360px;max-width:100%;padding:26px 30px 22px}
+.pw-card h2{font-size:1rem;font-weight:800;color:#16335B;margin-bottom:18px;text-align:center}
+.pw-hint{font-size:.68rem;color:#8a92a0;margin-top:2px}
+.pw-msg{display:none;margin-top:12px;padding:9px 12px;border-radius:8px;font-size:.72rem;
+        font-weight:600;text-align:center}
+.pw-msg.show{display:block}
+.pw-msg.err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b}
+.pw-msg.ok{background:#eaf6ee;border:1px solid #bfe0cb;color:#1c6b3a}
+.pw-foot{display:flex;gap:8px;margin-top:16px}
+.pw-foot button{flex:1;padding:10px;border:none;border-radius:8px;font-family:inherit;
+                font-size:.82rem;font-weight:800;cursor:pointer}
+.pw-cancel{background:#eee;color:#555}
+.pw-cancel:hover{background:#e2e2e2}
+.pw-save{background:#F68121;color:#fff}
+.pw-save:hover{background:#d65f0f}
+.pw-save:disabled{background:#f0b988;cursor:default}
 </style>
 </head>
 <body>
@@ -47,8 +71,84 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       <input type="password" id="password" name="password" autocomplete="current-password" required/>
     </div>
     <button type="submit" class="btn-login">로그인</button>
+    <button type="button" class="pw-link" onclick="openPw()">비밀번호 변경</button>
 
     <div class="foot">admin.Goun</div>
   </form>
+
+  <!-- 비밀번호 변경(로그인 전에도 가능 — 아이디+현재 비밀번호를 알아야 통과) -->
+  <div class="pw-ov" id="pw-ov" onclick="if(event.target===this)closePw()">
+    <div class="pw-card">
+      <h2>🔑 비밀번호 변경</h2>
+      <div class="fg">
+        <label for="pw-user">아이디</label>
+        <input type="text" id="pw-user" autocomplete="username"/>
+      </div>
+      <div class="fg">
+        <label for="pw-cur">현재 비밀번호</label>
+        <input type="password" id="pw-cur" autocomplete="current-password"/>
+      </div>
+      <div class="fg">
+        <label for="pw-new">새 비밀번호</label>
+        <input type="password" id="pw-new" autocomplete="new-password"/>
+        <div class="pw-hint">8자 이상으로 설정하세요.</div>
+      </div>
+      <div class="fg">
+        <label for="pw-confirm">새 비밀번호 확인</label>
+        <input type="password" id="pw-confirm" autocomplete="new-password"/>
+      </div>
+      <div class="pw-msg" id="pw-msg"></div>
+      <div class="pw-foot">
+        <button type="button" class="pw-cancel" onclick="closePw()">취소</button>
+        <button type="button" class="pw-save" id="pw-save" onclick="submitPw()">변경</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $=id=>document.getElementById(id);
+function openPw(){
+  ['pw-user','pw-cur','pw-new','pw-confirm'].forEach(id=>$(id).value='');
+  $('pw-user').value=$('username').value.trim();   // 위에 입력한 아이디가 있으면 가져옴
+  pwMsg('');
+  $('pw-ov').classList.add('open');
+  ($('pw-user').value ? $('pw-cur') : $('pw-user')).focus();
+}
+function closePw(){ $('pw-ov').classList.remove('open'); }
+function pwMsg(text,type){
+  const el=$('pw-msg');
+  el.textContent=text||'';
+  el.className='pw-msg'+(text?` show ${type||'err'}`:'');
+}
+async function submitPw(){
+  const user=$('pw-user').value.trim(), cur=$('pw-cur').value,
+        nw=$('pw-new').value, cf=$('pw-confirm').value;
+  if(!user||!cur||!nw||!cf){ pwMsg('모든 항목을 입력하세요.'); return; }
+  const btn=$('pw-save');
+  btn.disabled=true; pwMsg('');
+  try{
+    const res=await fetch('/api/change_password',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:user,current:cur,new:nw,confirm:cf})
+    });
+    const d=await res.json();
+    if(d.success){
+      pwMsg('비밀번호가 변경되었습니다. 새 비밀번호로 로그인하세요.','ok');
+      setTimeout(()=>{ closePw(); $('password').value=''; $('password').focus(); },1400);
+    }else{
+      pwMsg(d.message||'변경에 실패했습니다.');
+    }
+  }catch(e){
+    pwMsg('서버와 통신하지 못했습니다.');
+  }finally{
+    btn.disabled=false;
+  }
+}
+/* 모달 안에서 Enter=제출, ESC=닫기 */
+$('pw-ov').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){ e.preventDefault(); submitPw(); }
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePw(); });
+</script>
 </body>
 </html>

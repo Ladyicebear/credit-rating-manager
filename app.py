@@ -36,7 +36,9 @@ AUTH_FILE = os.path.join(DATA_DIR, 'auth.json')
 MIN_PASSWORD_LEN = 8
 
 # 로그인 없이 접근 허용할 엔드포인트
-_PUBLIC_ENDPOINTS = {'login', 'static'}
+# api_change_password: 로그인 화면에서 비밀번호를 바꿀 수 있게 공개. 대신 아이디+현재 비밀번호를
+# 모두 맞게 입력해야만 통과하므로 로그인 자체와 같은 수준의 검증을 거친다.
+_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password'}
 
 
 def _load_auth() -> dict:
@@ -105,11 +107,18 @@ def logout():
 
 @app.route('/api/change_password', methods=['POST'])
 def api_change_password():
-    """로그인한 사용자의 비밀번호 변경. 해시만 저장하며 평문은 기록하지 않는다."""
+    """비밀번호 변경. 해시만 저장하며 평문은 기록하지 않는다.
+
+    로그인 화면(비로그인 상태)에서도 호출되므로, 세션이 없으면 아이디까지 확인한다.
+    """
     d = request.get_json(silent=True) or {}
     cur = d.get('current') or ''
     new = d.get('new') or ''
     confirm = d.get('confirm') or ''
+
+    if not session.get('logged_in'):
+        if (d.get('username') or '').strip() != APP_USER:
+            return jsonify({'success': False, 'message': '아이디 또는 현재 비밀번호가 올바르지 않습니다.'}), 400
 
     if not verify_password(cur):
         return jsonify({'success': False, 'message': '현재 비밀번호가 올바르지 않습니다.'}), 400
