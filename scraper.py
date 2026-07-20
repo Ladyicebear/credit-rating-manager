@@ -13,12 +13,16 @@ import datetime
 import urllib.parse
 import requests as _requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
 from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 
 TIMEOUT_MS        = 20_000   # Playwright 타임아웃 (ms) — KIS 등
 NICE_TIMEOUT_MS   = 50_000   # NICE 서버 응답이 느려 별도 타임아웃 (17s+)
+# 평가사 1곳당 하드 타임아웃(초). Playwright 타임아웃이 안 걸리는 지점에서 멈춰도
+# 이 시간이 지나면 포기하고 다음으로 넘어간다. NICE 재시도(검색어 변형)를 고려해 넉넉히.
+AGENCY_TIMEOUT_SEC = 180
 TIMEOUT_S    = 30       # requests 타임아웃 (s)
 INSURANCE_CATEGORIES = {'손해보험', '생명보험'}
 SAVING_BANK_CATEGORIES = {'저축은행'}
@@ -870,14 +874,38 @@ def _apply_2y_filter(r: str, d: str, t: str) -> tuple[str, str, str]:
 # ─── 기관 1개 병렬 조회 ──────────────────────────────────────────────
 
 def _scrape_one(name: str, is_insurance: bool, is_savings: bool = False) -> dict:
-    """3사를 동시에 조회"""
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        f_nice = pool.submit(scrape_nice, name, is_insurance)
-        f_kr   = pool.submit(scrape_kr,   name, is_insurance)
-        f_kis  = pool.submit(scrape_kis,  name, is_insurance)
-        nice_r, nice_d, nice_t = f_nice.result()
-        kr_r,   kr_d,   kr_t   = f_kr.result()
-        kis_r,  kis_d,  kis_t  = f_kis.result()
+    """3사를 동시에 조회.
+
+    각 평가사에 하드 타임아웃을 건다. Playwright 내부 타임아웃이 걸리지 않는 지점
+    (브라우저 실행·페이지 종료 등)에서 멈추면 .result()가 무한 대기해 전체 조회가
+    영영 끝나지 않았다(2026-07-21 손해보험 첫 기관에서 멈춘 사례).
+    멈춘 평가사는 빈값으로 넘기고 다음 기관으로 진행한다. 빈값이 기존 등급을
+    지우지는 않는다(app.py MISS_LIMIT: 연속 2회 빈값부터 삭제).
+    """
+    pool = ThreadPoolExecutor(max_workers=3)
+    try:
+        futures = {
+            'nice': pool.submit(scrape_nice, name, is_insurance),
+            'kr':   pool.submit(scrape_kr,   name, is_insurance),
+            'kis':  pool.submit(scrape_kis,  name, is_insurance),
+        }
+        out = {}
+        for ag, fut in futures.items():
+            try:
+                out[ag] = fut.result(timeout=AGENCY_TIMEOUT_SEC)
+            except FuturesTimeout:
+                logger.warning('조회 시간초과 [%s] %s — %d초 초과, 빈값 처리',
+                               name, ag.upper(), AGENCY_TIMEOUT_SEC)
+                out[ag] = ('', '', '')
+            except Exception as e:
+                logger.warning('조회 오류 [%s] %s: %s', name, ag.upper(), e)
+                out[ag] = ('', '', '')
+        nice_r, nice_d, nice_t = out['nice']
+        kr_r,   kr_d,   kr_t   = out['kr']
+        kis_r,  kis_d,  kis_t  = out['kis']
+    finally:
+        # 멈춘 스레드가 남아 있어도 기다리지 않는다(wait=True면 여기서 다시 무한 대기).
+        pool.shutdown(wait=False)
 
     # 2년 룰(전 기관): 평정일이 오늘 기준 2년 초과면 미공시 처리
     # (2026-07-10 사용자 지시 [10] — 기존 저축은행 한정에서 전 카테고리로 확장)
