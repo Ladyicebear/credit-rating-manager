@@ -797,19 +797,47 @@ function doRefresh(){
     .then(r=>r.json())
     .then(d=>{
       if(!d.success){
-        _resetRefresh();
-        showToast('오류: '+d.message,'err');
+        // 이미 다른 조회가 돌고 있으면(409) 그 진행에 붙어서 따라간다.
+        // 예전엔 여기서 토스트만 띄우고 끝나 모든 행이 '조회중' 상태로 멈춰 보였다.
+        _attachToRunning(d.message||'조회를 시작하지 못했습니다');
         return;
       }
-      const total=d.total;
-      document.getElementById('prog-wrap').classList.add('visible');
-      document.getElementById('prog-total').textContent=total;
-      document.getElementById('prog-done').textContent='0';
-      document.getElementById('prog-fill').style.width='0%';
-      btn.innerHTML='<span class="spin"></span> 조회 중…';
-      _pollTimer=setInterval(()=>_pollStatus(total),1500);
+      _startProgress(d.total);
     })
-    .catch(()=>{_resetRefresh();showToast('네트워크 오류','err')});
+    .catch(()=>{_clearLoading();_resetRefresh();showToast('네트워크 오류','err')});
+}
+
+/* 진행률 UI 시작 + 폴링 */
+function _startProgress(total){
+  document.getElementById('ref-btn').innerHTML='<span class="spin"></span> 조회 중…';
+  document.getElementById('prog-wrap').classList.add('visible');
+  document.getElementById('prog-total').textContent=total;
+  document.getElementById('prog-done').textContent='0';
+  document.getElementById('prog-fill').style.width='0%';
+  if(_pollTimer) clearInterval(_pollTimer);
+  _pollTimer=setInterval(()=>_pollStatus(total),1500);
+}
+
+/* 행에서 '조회중' 표시 제거 */
+function _clearLoading(){
+  document.querySelectorAll('tr[data-name]').forEach(tr=>tr.classList.remove('row-loading'));
+}
+
+/* 조회 시작 실패 시: 서버가 실제로 조회 중이면 그 진행에 합류, 아니면 상태만 되돌린다 */
+function _attachToRunning(msg){
+  fetch('/api/refresh_status')
+    .then(r=>r.json())
+    .then(state=>{
+      if(state && state.running){
+        showToast('이미 조회가 진행 중입니다 — 진행 상황을 표시합니다','ok');
+        _startProgress(state.total||0);
+      }else{
+        _clearLoading();
+        _resetRefresh();
+        showToast('오류: '+msg,'err');
+      }
+    })
+    .catch(()=>{_clearLoading();_resetRefresh();showToast('오류: '+msg,'err')});
 }
 
 function _pollStatus(total){
@@ -832,6 +860,7 @@ function _pollStatus(total){
       if(!state.running){
         clearInterval(_pollTimer);_pollTimer=null;
         _resetRefresh();
+        _clearLoading();          // 결과가 안 온 행(실패 등)의 '조회중' 표시도 정리
         document.getElementById('prog-wrap').classList.remove('visible');
         if(state.error){
           showToast('오류: '+state.error,'err');

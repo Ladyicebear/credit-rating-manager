@@ -2,6 +2,7 @@ import os
 import io
 import re
 import json
+import time
 import logging
 import threading
 from collections import Counter
@@ -142,7 +143,11 @@ _refresh_lock = threading.Lock()
 _refresh_state: dict = {
     'running': False, 'total': 0, 'completed': 0,
     'results': {}, 'summary': '', 'updated_at': '', 'error': '',
+    'started_at': 0.0,       # time.time() — 멈춘 조회 판단용
 }
+# 조회 스레드가 멈추면(크롬 응답없음 등) running 플래그가 영원히 True로 남아
+# 이후 모든 조회가 '이미 조회 중'으로 막힌다. 이 시간이 지나면 죽은 것으로 보고 새 조회를 허용한다.
+STALE_REFRESH_SEC = 30 * 60
 
 RATINGS_FILE = os.path.join(DATA_DIR, 'ratings.json')
 INSTITUTIONS_FILE = os.path.join(DATA_DIR, 'institutions.json')
@@ -1368,7 +1373,12 @@ def api_refresh():
     global _refresh_state
     with _refresh_lock:
         if _refresh_state['running']:
-            return jsonify({'success': False, 'message': '이미 조회 중입니다'}), 409
+            elapsed = time.time() - (_refresh_state.get('started_at') or 0)
+            if elapsed < STALE_REFRESH_SEC:
+                return jsonify({'success': False, 'message': '이미 조회 중입니다'}), 409
+            # 여기 도달 = 시작한 지 오래됐는데 끝나지 않음 → 죽은 조회로 보고 새로 시작
+            logger.warning('이전 조회가 %.0f분째 진행 중 — 멈춘 것으로 보고 새 조회를 시작합니다',
+                           elapsed / 60)
 
     institutions = load_institutions()
     total = sum(len(items) for items in institutions.values())
@@ -1377,6 +1387,7 @@ def api_refresh():
         _refresh_state = {
             'running': True, 'total': total, 'completed': 0,
             'results': {}, 'summary': '', 'updated_at': '', 'error': '',
+            'started_at': time.time(),
         }
 
     def _run():
