@@ -9,6 +9,7 @@ from datetime import datetime
 from markupsafe import Markup
 from flask import (Flask, render_template, jsonify, request, send_file,
                    redirect, url_for, session)
+from werkzeug.security import generate_password_hash, check_password_hash
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -18,6 +19,9 @@ app = Flask(__name__)
 # (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+
 # ── 접근 제한 (로그인) ─────────────────────────────────────────────────
 # 아이디/비밀번호는 환경변수로 주입. 미설정 시 로컬 개발용 기본값(배포 시 반드시 변경).
 APP_USER = os.environ.get('APP_USER', 'admin')
@@ -25,8 +29,40 @@ APP_PASSWORD = os.environ.get('APP_PASSWORD', 'goun')
 if not (os.environ.get('APP_USER') and os.environ.get('APP_PASSWORD')):
     logger.warning('기본 로그인 계정(admin) 사용 중 — 배포 시 APP_USER/APP_PASSWORD 환경변수를 반드시 설정하세요.')
 
+# 화면에서 비밀번호를 변경하면 해시가 여기 저장되고, 이후 로그인은 이 값이 기준이 된다.
+# (data/는 배포 시 GCS 버킷 마운트라 재시작·재배포해도 유지됨. 초기화하려면 이 파일 삭제 →
+#  다시 APP_PASSWORD 환경변수 값으로 로그인.)
+AUTH_FILE = os.path.join(DATA_DIR, 'auth.json')
+MIN_PASSWORD_LEN = 8
+
 # 로그인 없이 접근 허용할 엔드포인트
 _PUBLIC_ENDPOINTS = {'login', 'static'}
+
+
+def _load_auth() -> dict:
+    if not os.path.exists(AUTH_FILE):
+        return {}
+    try:
+        with open(AUTH_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        # 파일이 깨져도 로그인 자체는 막지 않는다(환경변수 비밀번호로 대체).
+        logger.exception('auth.json 읽기 실패 — APP_PASSWORD로 대체합니다')
+        return {}
+
+
+def _save_auth(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(AUTH_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def verify_password(pw: str) -> bool:
+    """저장된 해시가 있으면 그것으로, 없으면 APP_PASSWORD로 검증."""
+    stored = _load_auth().get('password_hash')
+    if stored:
+        return check_password_hash(stored, pw)
+    return pw == APP_PASSWORD
 
 
 @app.before_request
@@ -48,7 +84,7 @@ def login():
     if request.method == 'POST':
         u = request.form.get('username', '').strip()
         p = request.form.get('password', '')
-        if u == APP_USER and p == APP_PASSWORD:
+        if u == APP_USER and verify_password(p):
             session['logged_in'] = True
             session['user'] = u
             nxt = request.args.get('next') or '/'
@@ -66,6 +102,32 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+
+@app.route('/api/change_password', methods=['POST'])
+def api_change_password():
+    """로그인한 사용자의 비밀번호 변경. 해시만 저장하며 평문은 기록하지 않는다."""
+    d = request.get_json(silent=True) or {}
+    cur = d.get('current') or ''
+    new = d.get('new') or ''
+    confirm = d.get('confirm') or ''
+
+    if not verify_password(cur):
+        return jsonify({'success': False, 'message': '현재 비밀번호가 올바르지 않습니다.'}), 400
+    if len(new) < MIN_PASSWORD_LEN:
+        return jsonify({'success': False,
+                        'message': f'새 비밀번호는 {MIN_PASSWORD_LEN}자 이상이어야 합니다.'}), 400
+    if new != confirm:
+        return jsonify({'success': False, 'message': '새 비밀번호가 서로 일치하지 않습니다.'}), 400
+    if new == cur:
+        return jsonify({'success': False, 'message': '현재 비밀번호와 다른 비밀번호를 입력하세요.'}), 400
+
+    auth = _load_auth()
+    auth['password_hash'] = generate_password_hash(new)
+    auth['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _save_auth(auth)
+    logger.info('비밀번호 변경 완료 (사용자=%s)', session.get('user', ''))
+    return jsonify({'success': True, 'message': '비밀번호가 변경되었습니다.'})
+
 # ── 백그라운드 조회 상태 ───────────────────────────────────────────────
 _refresh_lock = threading.Lock()
 _refresh_state: dict = {
@@ -73,8 +135,6 @@ _refresh_state: dict = {
     'results': {}, 'summary': '', 'updated_at': '', 'error': '',
 }
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
 RATINGS_FILE = os.path.join(DATA_DIR, 'ratings.json')
 INSTITUTIONS_FILE = os.path.join(DATA_DIR, 'institutions.json')
 EXPORT_TEMPLATE = os.path.join(BASE_DIR, 'export_template.xlsx')
@@ -954,6 +1014,23 @@ def _pen_match_product(rp, g):
         b, num = _pen_iyul(fam)
         return (b is False) and (num == want)
     return bool(rp) and rp in text
+
+
+@app.route('/api/pension_ratings')
+def api_pension_ratings():
+    """상품제공기관 정규화키 -> 최종 신용등급 맵.
+
+    모바일 금리표 상세 팝업에서 기관의 신용등급을 표시할 때 사용한다.
+    키는 _pen_core()로 정규화한 기관명(주식회사/보험류 접미 제거)이며,
+    pension.html의 penCore()와 동일 규칙이어야 한다(변경 시 양쪽 같이 수정).
+    """
+    data = build_response_data(load_institutions(), load_ratings())
+    out = {}
+    for rows in data.values():
+        for row in rows:
+            if row.get('final'):
+                out[_pen_core(row['name'])] = row['final']
+    return jsonify(out)
 
 
 @app.route('/api/pension_report', methods=['POST'])
