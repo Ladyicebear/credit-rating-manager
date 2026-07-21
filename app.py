@@ -211,9 +211,32 @@ def get_rating_type_label(agency_type: str) -> str:
 
 # ── Data I/O ──────────────────────────────────────────────────────────
 
+# 과거 데이터 파일 호환용 카테고리 키 정규화표(옛 키 → 현재 키).
+# institutions.json은 런타임에 기록되므로, 마이그레이션(증권사→증권) 이전에 만들어진
+# 서버 사본에는 옛 키가 그대로 남아 있을 수 있다. 그 경우 코드는 '증권'을 쓰는데 데이터는
+# '증권사' 키라 렌더 시 증권사 목록이 통째로 비고(get('증권')=[]), 기관추가도
+# '증권'이 institutions에 없어 '올바르지 않은 카테고리'로 거부된다. 로드 시 흡수해 치유한다.
+CATEGORY_ALIASES = {'증권사': '증권'}
+
+
+def _normalize_categories(institutions: dict) -> dict:
+    """옛 카테고리 키를 현재 키로 바꿔 반환한다(원래 순서 유지, 새 키와 겹치면 병합)."""
+    if not any(k in institutions for k in CATEGORY_ALIASES):
+        return institutions
+    normalized: dict = {}
+    for key, items in institutions.items():
+        new_key = CATEGORY_ALIASES.get(key, key)
+        if new_key in normalized:
+            existing = {i.get('name') for i in normalized[new_key]}
+            normalized[new_key].extend(i for i in items if i.get('name') not in existing)
+        else:
+            normalized[new_key] = items
+    return normalized
+
+
 def load_institutions() -> dict:
     with open(INSTITUTIONS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        return _normalize_categories(json.load(f))
 
 
 def load_ratings() -> dict:
