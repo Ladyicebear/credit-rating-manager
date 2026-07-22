@@ -41,6 +41,11 @@ meritz_*.txt
 
 # 로그인 비밀번호 해시 (커밋 금지)
 data/auth.json
+data/auth.json.*
+
+# 상품제안관리 런타임 데이터(기기/서버별로 관리, 배포 시 서버 것 유지)
+data/proposals.json
+data/proposal_meta.json
 
 # 로컬 백업/임시/도구 파일
 data/ratings.backup_*.json
