@@ -92,8 +92,10 @@
   .sv-tbl th.sv-per,.sv-tbl td.sv-per{text-align:center;white-space:nowrap;color:#4B5563;font-weight:700}
   .sv-tbl tr:last-child td{border-bottom:none}
   .sv-tbl td:last-child{text-align:right}   /* 금리 데이터는 우측, 헤더는 중앙 */
-  .sv-tbl th,.sv-tbl td{border-right:none}  /* 전역 th,td 세로 테두리 제거 — 가로 구분선만 유지 */
+  .sv-tbl th,.sv-tbl td{border:1px solid var(--line)}   /* 금리표처럼 격자 셀 테두리 */
   .sv-tbl b{color:#111;font-weight:700}
+  /* 요약표를 감싸는 둥근 테두리 박스(금리표 스타일) */
+  .sv-scroll{border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .sv-rate{color:var(--orange-d);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .sv-none{color:#C9CED6}
   .dot{width:8px;height:8px;border-radius:50%}
@@ -806,10 +808,10 @@ function renderSummary(){
     ? `<tr><td><b>${t.org}</b></td><td>${t.fam}</td><td class="sv-per">${per}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td></tr>`
     : `<tr><td class="sv-none">-</td><td></td><td></td><td></td></tr>`;
   const head=`<thead><tr><th>상품제공기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>`;
-  const tbl=field=>`<table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo), MONTH_LABEL[mo]||'')).join('')+`</tbody></table>`;
+  const tbl=field=>`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo), MONTH_LABEL[mo]||'')).join('')+`</tbody></table></div>`;
   // 디폴트옵션: 전체 최고금리 1건만(3년)
   const defTop=top(r=>r.def!=null,'def');
-  const defTbl=`<table class="sv-tbl">${head}<tbody>${row(defTop,'3년')}</tbody></table>`;
+  const defTbl=`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>${row(defTop,'3년')}</tbody></table></div>`;
   // 물가상승률(소비자물가지수) 박스
   const c=cpiData;
   const cpiActs = `<div class="cpi-actions">`+
