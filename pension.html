@@ -1055,8 +1055,8 @@ function renderProposalMobile(){
   rows.sort((a,b)=>{ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra; });
   proposalRows=rows;
 
-  // 표는 항상 5행 고정 — 결과가 5개 미만이면 빈 행으로 채우고, 초과면 스크롤
-  const N=5;
+  // 표는 항상 6행 고정 — 결과가 6개 미만이면 빈 행으로 채우고, 초과면 스크롤
+  const N=6;
   const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);
   // 셀 구조는 DB제도 최고금리 표(renderSummary)와 동일: <b>기관 / 상품구분 / sv-per기간 / sv-rate금리
   // &nbsp;로 빈 행도 데이터 행과 같은 높이를 유지(내용 없다고 줄어들지 않게)
@@ -1078,14 +1078,14 @@ function renderProposalMobile(){
   $('propBody').innerHTML=body;
   fitPropTable();
 }
-/* 표는 항상 헤더+5행 높이로 '고정'(height) — 5행 초과는 스크롤, 미만은 빈 행으로 이미 5행.
+/* 표는 항상 헤더+6행 높이로 '고정'(height) — 6행 초과는 스크롤, 미만은 빈 행으로 이미 6행.
    검색·필터로 내용이 바뀌어도 이 높이는 변하지 않는다. */
 function fitPropTable(){
   const sc=$('propScroll'); if(!sc) return;
   const thead=sc.querySelector('thead'), fr=sc.querySelector('tbody tr');
   if(!thead||!fr){ sc.style.height=''; return; }
   const th=thead.getBoundingClientRect().height, rh=fr.getBoundingClientRect().height;
-  sc.style.height=Math.round(th+rh*5+1)+'px';   // maxHeight가 아닌 height로 고정
+  sc.style.height=Math.round(th+rh*6+1)+'px';   // maxHeight가 아닌 height로 고정
 }
 function openPropDetail(i){
   const r=proposalRows[i]; if(!r) return;
