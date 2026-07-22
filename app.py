@@ -498,6 +498,82 @@ def pension_store_post():
     return jsonify({'ok': True, 'months': sorted(data.keys())})
 
 
+# ── 상품제안관리 ───────────────────────────────────────────────────────
+#   proposals.json      : 기준월 -> '이달의 제안상품' 목록(등록된 것)
+#   proposal_meta.json  : 상품키 -> {universe:'Y'|'N', sellable:bool}
+#     (유니버스·판매가능여부는 원리금 데이터에 없어 이 화면에서 관리한다)
+#   상품키 = "sector|org|fam|months" (proposal.html의 rowKey()와 동일 규칙)
+_PROPOSALS_FILE = os.path.join(BASE_DIR, 'data', 'proposals.json')
+_PROPOSAL_META_FILE = os.path.join(BASE_DIR, 'data', 'proposal_meta.json')
+
+
+def _load_json_file(path: str) -> dict:
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        logger.exception('%s 읽기 실패', os.path.basename(path))
+        return {}
+
+
+def _save_json_file(path: str, data: dict):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+@app.route('/proposal')
+def proposal():
+    """상품제안관리 화면(통합 탭). 순수 HTML 서빙(Jinja 미처리)."""
+    return send_file(os.path.join(BASE_DIR, 'proposal.html'))
+
+
+@app.route('/api/proposals', methods=['GET'])
+def proposals_get():
+    """기준월별 '이달의 제안상품' 목록 전체 반환."""
+    return jsonify(_load_json_file(_PROPOSALS_FILE))
+
+
+@app.route('/api/proposals', methods=['POST'])
+def proposals_post():
+    """특정 기준월의 제안상품 목록 저장(등록/수정). payload: {month, items:[...]}"""
+    d = request.get_json(force=True, silent=True) or {}
+    month = (d.get('month') or '').strip()
+    items = d.get('items')
+    if not month or not isinstance(items, list):
+        return jsonify({'success': False, 'message': 'month/items 형식 오류'}), 400
+    store = _load_json_file(_PROPOSALS_FILE)
+    store[month] = items
+    _save_json_file(_PROPOSALS_FILE, store)
+    return jsonify({'success': True, 'month': month, 'count': len(items)})
+
+
+@app.route('/api/proposal_meta', methods=['GET'])
+def proposal_meta_get():
+    """상품키별 유니버스/판매가능 메타 반환."""
+    return jsonify(_load_json_file(_PROPOSAL_META_FILE))
+
+
+@app.route('/api/proposal_meta', methods=['POST'])
+def proposal_meta_post():
+    """상품키별 메타 저장. payload: {key, universe:'Y'|'N', sellable:bool}"""
+    d = request.get_json(force=True, silent=True) or {}
+    key = (d.get('key') or '').strip()
+    if not key:
+        return jsonify({'success': False, 'message': 'key 없음'}), 400
+    meta = _load_json_file(_PROPOSAL_META_FILE)
+    entry = meta.get(key, {})
+    if 'universe' in d:
+        entry['universe'] = 'N' if d['universe'] == 'N' else 'Y'
+    if 'sellable' in d:
+        entry['sellable'] = bool(d['sellable'])
+    meta[key] = entry
+    _save_json_file(_PROPOSAL_META_FILE, meta)
+    return jsonify({'success': True})
+
+
 # ── 과거 금리 추이(내부 보관 데이터) ──
 #   data/rate_history.xlsx : 원본 엑셀 바이트 그대로 보관(다운로드용)
 #   data/rate_history.json : 구조화 테이블(향후 개발에서 재사용)

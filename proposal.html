@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>상품제안관리</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--orange:#F68121;--orange-d:#d65f0f;--orange-l:rgba(246,129,33,.15);
+      --navy:#16335B;--ink:#1F2937;--muted:#8a92a0;--line:#E5E7EB;--white:#fff}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
+     background:#F4F6F8;color:var(--ink);padding:14px}
+.wrap{max-width:1600px;margin:0 auto}
+
+/* 상단 바: 기준월 + 필터 */
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.tb-label{font-size:11px;color:var(--muted);font-weight:700}
+.msel{height:32px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;color:var(--ink);
+      font-size:12.5px;font-weight:700;padding:0 8px;cursor:pointer}
+.msel:focus{outline:none;border-color:var(--orange)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid #D5D9E0;background:#fff;border-radius:20px;padding:5px 12px;font-size:11.5px;
+      font-weight:600;color:#4B5563;cursor:pointer;white-space:nowrap}
+.chip:hover{border-color:var(--orange)}
+.chip.on{background:#FCEAD8;color:#C77B2E;border-color:#F1C99E}
+.chip .n{opacity:.7;font-weight:700;margin-left:3px;font-size:10.5px}
+.search-wrap{display:flex;align-items:center;gap:6px}
+.search-wrap input{height:32px;min-width:200px;border:1px solid #D5D9E0;border-radius:8px;
+                   padding:0 10px;font-size:12.5px}
+.search-wrap input:focus{outline:none;border-color:var(--orange)}
+.prod-sel{height:32px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;color:var(--ink);
+          font-size:12px;font-weight:700;padding:0 8px;cursor:pointer}
+.prod-sel:focus{outline:none;border-color:var(--orange)}
+
+/* 2단 레이아웃: 왼쪽 표 + 화살표 + 오른쪽 제안 */
+.panes{display:grid;grid-template-columns:1fr 56px 0.8fr;gap:10px;align-items:stretch}
+.pane{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.pane-head{display:flex;align-items:center;justify-content:space-between;
+           padding:10px 14px;border-bottom:1px solid var(--line)}
+.pane-title{font-size:13px;font-weight:800;color:var(--navy)}
+.pane-sub{font-size:11px;color:var(--muted);font-weight:600}
+.tbl-scroll{overflow:auto;max-height:62vh}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{position:sticky;top:0;background:#F1F3F5;color:#374151;font-weight:700;
+         padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+tbody td{padding:8px;border-bottom:1px solid #F0F1F3;text-align:center;white-space:nowrap}
+tbody tr:hover{background:#FFF9F2}
+td.l{text-align:left}
+td.org{font-weight:700;color:var(--ink)}
+td.rate{font-weight:800;color:var(--orange-d);font-variant-numeric:tabular-nums}
+.badge-sec{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:700;white-space:nowrap}
+.s-은행{background:#E7F0FF;color:#1D4ED8}.s-저축은행{background:#EAF7EE;color:#1c7a3f}
+.s-생명보험{background:#FDECEC;color:#c0392b}.s-손해보험{background:#FCE9DA;color:#B8500F}
+.s-증권{background:#EDE9FE;color:#6D28D9}.s-기타{background:#F1F3F5;color:#6B7280}
+.none-row td{padding:32px;color:#9CA3AF;text-align:center}
+
+/* 유니버스/판매가능 토글 */
+.tgl{border:1px solid #D5D9E0;background:#fff;border-radius:6px;padding:2px 9px;font-size:11px;
+     font-weight:700;cursor:pointer;font-family:inherit;min-width:34px}
+.tgl.y{background:#EAF7EE;border-color:#bfe0cb;color:#1c7a3f}
+.tgl.n{background:#F1F3F5;border-color:#d5d9e0;color:#9CA3AF}
+.tgl.sell{background:#E7F0FF;border-color:#c5d8f5;color:#1D4ED8}
+.tgl.nosell{background:#FDECEC;border-color:#f2c9c9;color:#c0392b}
+
+/* 화살표 */
+.arrow-col{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.arrow-btn{width:46px;height:46px;border:none;border-radius:12px;background:var(--navy);color:#fff;
+           font-size:20px;cursor:pointer;box-shadow:0 4px 12px rgba(22,51,91,.25)}
+.arrow-btn:hover{background:#1f4576}
+.arrow-btn:disabled{background:#c5cad3;cursor:default;box-shadow:none}
+.arrow-hint{font-size:10px;color:var(--muted);text-align:center;line-height:1.4}
+
+/* 오른쪽 제안 목록 */
+td.del{cursor:pointer;color:#c0392b;font-weight:800}
+.foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
+.btn{border:none;border-radius:8px;padding:8px 18px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-navy{background:var(--navy);color:#fff}.btn-navy:hover{background:#1f4576}
+.btn-ghost{background:#fff;color:#4b5563;border:1px solid #d5d9e0}.btn-ghost:hover{background:#f4f6f8}
+.chk{width:16px;height:16px;cursor:pointer;accent-color:var(--orange)}
+
+/* 토스트 */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);opacity:0;
+       background:#16335B;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;
+       box-shadow:0 8px 24px rgba(0,0,0,.25);transition:.25s;z-index:100;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:#B91C1C}
+
+@media(max-width:900px){
+  .panes{grid-template-columns:1fr;gap:8px}
+  .arrow-col{flex-direction:row;padding:4px 0}
+  .arrow-btn{transform:rotate(90deg)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 상단: 기준월 + 필터 -->
+  <div class="topbar">
+    <span class="tb-label">기준월</span>
+    <select id="monthSel" class="msel"></select>
+    <span class="tb-label" style="margin-left:6px">업권</span>
+    <div class="chips" id="secChips"></div>
+    <div class="search-wrap" style="margin-left:auto">
+      <input type="text" id="search" placeholder="기관·상품명 검색">
+      <select id="prodSel" class="prod-sel" title="상품구분으로 검색">
+        <option value="ALL">상품구분 ▾</option>
+        <option value="정기예금">정기예금</option>
+        <option value="ELB/DLB">ELB/DLB</option>
+        <option value="이율보증형보험">이율보증형보험</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 2단 레이아웃 -->
+  <div class="panes">
+    <!-- 왼쪽: DB제도 상품 목록 -->
+    <div class="pane">
+      <div class="pane-head">
+        <span class="pane-title">DB제도 상품</span>
+        <span class="pane-sub" id="leftSub">0건</span>
+      </div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th style="width:38px"><input type="checkbox" class="chk" id="chkAll" title="전체 선택"></th>
+            <th>업권</th><th>상품제공기관</th><th>상품구분</th>
+            <th>유니버스<br>(Y/N)</th><th>판매가능여부</th><th>기간</th><th>금리</th>
+          </tr></thead>
+          <tbody id="leftBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 화살표 -->
+    <div class="arrow-col">
+      <button class="arrow-btn" id="addBtn" title="선택 상품을 제안 목록으로" onclick="addSelected()">▶</button>
+      <div class="arrow-hint">선택 →<br>제안</div>
+    </div>
+
+    <!-- 오른쪽: 이달의 제안상품 -->
+    <div class="pane">
+      <div class="pane-head">
+        <span class="pane-title">이달의 제안상품</span>
+        <span class="pane-sub" id="rightSub">0건</span>
+      </div>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr>
+            <th>상품제공기관</th><th>상품구분</th><th>기간</th><th>금리</th><th style="width:38px"></th>
+          </tr></thead>
+          <tbody id="rightBody"></tbody>
+        </table>
+      </div>
+      <div class="foot">
+        <button class="btn btn-ghost" onclick="reloadProposals()" title="저장된 제안 목록 다시 불러오기">수정</button>
+        <button class="btn btn-navy" onclick="registerProposals()" title="현재 제안 목록을 이 기준월로 저장">등록</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const MONTHS=[3,6,12,18,24,30,36,48,60];
+const MONTH_LABEL={3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
+const SECTOR_ORDER=['은행','저축은행','생명보험','손해보험','증권','기타'];
+
+let STORE={};          // pension_store 전체 {month:{rows,...}}
+let META={};           // 상품키 -> {universe,sellable}
+let PROPOSALS={};      // 기준월 -> [items]
+let curMonth='';       // 선택 기준월
+let dbRows=[];         // 현재 월의 DB제도 상품(평탄화)
+let filterSec='ALL';
+let prodFilter='ALL';
+let searchTxt='';
+let selected=[];       // 오른쪽 제안 목록(작업 중)
+
+function htmlEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function toast(m,t){const el=$('toast');el.textContent=m;el.className='show'+(t?' '+t:'');clearTimeout(el._t);el._t=setTimeout(()=>el.className='',2600);}
+function fmtRate(v){return (typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);}
+
+/* app.py 주석의 상품키 규칙과 동일해야 함: sector|org|fam|months */
+function rowKey(r){return [r.sector,r.org,r.fam,r.months].join('|');}
+
+/* ---------- 초기 로드 ---------- */
+async function boot(){
+  try{
+    const [ps,mt,pr]=await Promise.all([
+      fetch('/api/pension_store').then(r=>r.json()),
+      fetch('/api/proposal_meta').then(r=>r.json()),
+      fetch('/api/proposals').then(r=>r.json()),
+    ]);
+    STORE=ps||{}; META=mt||{}; PROPOSALS=pr||{};
+  }catch(e){ toast('데이터를 불러오지 못했습니다','err'); return; }
+
+  const months=Object.keys(STORE).sort();
+  if(!months.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="8">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>'; return; }
+  $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  curMonth=months[months.length-1];
+  $('monthSel').value=curMonth;
+  $('monthSel').onchange=()=>{ curMonth=$('monthSel').value; buildDbRows(); loadProposalsForMonth(); render(); };
+
+  buildDbRows();
+  loadProposalsForMonth();
+  renderSecChips();
+  bindFilters();
+  render();
+}
+
+/* ---------- DB제도 상품 평탄화(만기별 1행) ---------- */
+function buildDbRows(){
+  dbRows=[];
+  const e=STORE[curMonth]; if(!e||!Array.isArray(e.rows)) return;
+  for(const r of e.rows){
+    const db=r.db||{};
+    for(const m of MONTHS){
+      const v=db[m]; if(v==null) continue;
+      dbRows.push({sector:r.sector,org:r.org,fam:r.fam,months:m,period:MONTH_LABEL[m],rate:v});
+    }
+  }
+  dbRows.sort((a,b)=>{
+    const s=SECTOR_ORDER.indexOf(a.sector)-SECTOR_ORDER.indexOf(b.sector);
+    if(s!==0) return s;
+    const o=String(a.org).localeCompare(b.org,'ko'); if(o!==0) return o;
+    return a.months-b.months;
+  });
+}
+
+/* ---------- 필터 ---------- */
+function prodMatch(fam){
+  if(prodFilter==='ALL') return true;
+  const f=String(fam||'');
+  if(prodFilter==='정기예금') return /정기예금/.test(f);
+  if(prodFilter==='ELB/DLB') return /ELB|DLB/.test(f);
+  if(prodFilter==='이율보증형보험') return /이율보증형/.test(f);
+  return true;
+}
+function filteredRows(){
+  const q=searchTxt.trim().toLowerCase();
+  return dbRows.filter(r=>{
+    if(filterSec!=='ALL' && r.sector!==filterSec) return false;
+    if(!prodMatch(r.fam)) return false;
+    if(q && (String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+function renderSecChips(){
+  const cnt={}; SECTOR_ORDER.forEach(s=>cnt[s]=0);
+  dbRows.forEach(r=>{ if(cnt[r.sector]!=null) cnt[r.sector]++; });
+  let h=`<button class="chip ${filterSec==='ALL'?'on':''}" data-sec="ALL">전체<span class="n">${dbRows.length}</span></button>`;
+  h+=SECTOR_ORDER.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${cnt[s]||0}</span></button>`).join('');
+  $('secChips').innerHTML=h;
+  $('secChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ filterSec=b.dataset.sec; renderSecChips(); render(); });
+}
+function bindFilters(){
+  $('search').addEventListener('input',()=>{ searchTxt=$('search').value; render(); });
+  $('prodSel').onchange=()=>{ prodFilter=$('prodSel').value; render(); };
+  $('chkAll').onchange=()=>{ const on=$('chkAll').checked;
+    document.querySelectorAll('#leftBody .row-chk').forEach(c=>c.checked=on); };
+}
+
+/* ---------- 메타(유니버스/판매가능) ---------- */
+function metaOf(r){ const m=META[rowKey(r)]||{}; return {universe:m.universe==='N'?'N':'Y', sellable:m.sellable!==false}; }
+function saveMeta(r,patch){
+  const key=rowKey(r);
+  const cur=metaOf(r);
+  const next=Object.assign({},cur,patch);
+  META[key]=next;
+  fetch('/api/proposal_meta',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({key},patch))}).catch(()=>toast('메타 저장 실패','err'));
+}
+function toggleUniverse(i){ const r=filteredRows()[i]; const m=metaOf(r); saveMeta(r,{universe:m.universe==='Y'?'N':'Y'}); render(); }
+function toggleSellable(i){ const r=filteredRows()[i]; const m=metaOf(r); saveMeta(r,{sellable:!m.sellable}); render(); }
+
+/* ---------- 렌더 ---------- */
+function render(){ renderLeft(); renderRight(); }
+function renderLeft(){
+  const rows=filteredRows();
+  $('leftSub').textContent=rows.length+'건';
+  if(!rows.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="8">조건에 맞는 상품이 없습니다.</td></tr>'; $('chkAll').checked=false; return; }
+  $('leftBody').innerHTML=rows.map((r,i)=>{
+    const m=metaOf(r);
+    const uCls=m.universe==='Y'?'y':'n';
+    const sCls=m.sellable?'sell':'nosell';
+    const sTxt=m.sellable?'판매가능':'판매불가';
+    return `<tr>
+      <td><input type="checkbox" class="chk row-chk" data-i="${i}"></td>
+      <td><span class="badge-sec s-${r.sector}">${r.sector}</span></td>
+      <td class="l org" title="${htmlEsc(r.org)}">${htmlEsc(r.org)}</td>
+      <td class="l" title="${htmlEsc(r.fam)}">${htmlEsc(r.fam)}</td>
+      <td><button class="tgl ${uCls}" onclick="toggleUniverse(${i})">${m.universe}</button></td>
+      <td><button class="tgl ${sCls}" onclick="toggleSellable(${i})">${sTxt}</button></td>
+      <td>${htmlEsc(r.period)}</td>
+      <td class="rate">${fmtRate(r.rate)}</td>
+    </tr>`;
+  }).join('');
+  $('chkAll').checked=false;
+}
+function renderRight(){
+  $('rightSub').textContent=selected.length+'건';
+  if(!selected.length){ $('rightBody').innerHTML='<tr class="none-row"><td colspan="5">왼쪽에서 상품을 선택하고 ▶ 를 누르세요.</td></tr>'; return; }
+  $('rightBody').innerHTML=selected.map((r,i)=>`<tr>
+    <td class="l org">${htmlEsc(r.org)}</td>
+    <td class="l">${htmlEsc(r.fam)}</td>
+    <td>${htmlEsc(r.period)}</td>
+    <td class="rate">${fmtRate(r.rate)}</td>
+    <td class="del" title="제거" onclick="removeSelected(${i})">✕</td>
+  </tr>`).join('');
+}
+
+/* ---------- 선택 → 제안 이동 ---------- */
+function addSelected(){
+  const rows=filteredRows();
+  const picks=[...document.querySelectorAll('#leftBody .row-chk:checked')].map(c=>rows[+c.dataset.i]);
+  if(!picks.length){ toast('먼저 상품을 선택하세요'); return; }
+  let added=0;
+  picks.forEach(r=>{
+    const key=rowKey(r);
+    if(selected.some(s=>rowKey(s)===key)) return;   // 중복 방지
+    selected.push({sector:r.sector,org:r.org,fam:r.fam,months:r.months,period:r.period,rate:r.rate});
+    added++;
+  });
+  render();
+  toast(added?`${added}건을 제안 목록에 추가했습니다`:'이미 추가된 상품입니다');
+}
+function removeSelected(i){ selected.splice(i,1); render(); }
+
+/* ---------- 등록 / 수정 ---------- */
+function loadProposalsForMonth(){ selected=(PROPOSALS[curMonth]||[]).map(x=>Object.assign({},x)); }
+function reloadProposals(){ loadProposalsForMonth(); render(); toast('저장된 제안 목록을 불러왔습니다'); }
+async function registerProposals(){
+  try{
+    const res=await fetch('/api/proposals',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:curMonth,items:selected})});
+    const d=await res.json();
+    if(d.success){ PROPOSALS[curMonth]=selected.map(x=>Object.assign({},x)); toast(`${curMonth} 제안상품 ${d.count}건을 등록했습니다`); }
+    else toast(d.message||'등록 실패','err');
+  }catch(e){ toast('서버와 통신하지 못했습니다','err'); }
+}
+
+boot();
+</script>
+</body>
+</html>

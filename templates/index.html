@@ -318,12 +318,18 @@ tr.row-done td{transition:background .3s}
   <div class="super-tabs">
     <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')">원리금보장상품 금리</button>
     <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')">신용등급관리</button>
+    <button id="stab-proposal" class="super-tab"       onclick="switchSuper('proposal')">상품제안관리</button>
   </div>
 </header>
 
 <!-- ═══ [통합탭1] 원리금보장상품 금리 ═══ -->
 <div id="super-pension" class="super-panel">
   <iframe id="pension-frame" class="pension-frame" src="/pension" title="원리금보장상품 금리관리"></iframe>
+</div>
+
+<!-- ═══ [통합탭3] 상품제안관리 ═══ -->
+<div id="super-proposal" class="super-panel" style="display:none">
+  <iframe id="proposal-frame" class="pension-frame" src="/proposal" title="상품제안관리"></iframe>
 </div>
 
 <!-- ═══ [통합탭2] 신용등급관리 ═══ -->
@@ -703,10 +709,12 @@ tr.row-done td{transition:background .3s}
 /* pension iframe 높이를 헤더 실제높이에 맞춰 동적 계산(데스크톱/모바일 모두 정확) */
 function fitPensionFrame(){
   const hdr = document.querySelector('.hdr');
-  const fr  = document.getElementById('pension-frame');
-  if(hdr && fr){
-    fr.style.height = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height)) + 'px';
-  }
+  if(!hdr) return;
+  const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height)) + 'px';
+  ['pension-frame','proposal-frame'].forEach(id=>{
+    const fr = document.getElementById(id);
+    if(fr) fr.style.height = h;
+  });
 }
 window.addEventListener('resize', fitPensionFrame);
 window.addEventListener('orientationchange', fitPensionFrame);
@@ -720,12 +728,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
 function switchSuper(which){
   const pen = which==='pension';
-  document.getElementById('super-pension').style.display = pen ? 'block' : 'none';
-  document.getElementById('credit-subbar').style.display = pen ? 'none' : 'flex';
-  document.querySelector('.main').style.display          = pen ? 'none' : 'block';
+  const prop = which==='proposal';
+  const credit = which==='credit';
+  document.getElementById('super-pension').style.display  = pen  ? 'block' : 'none';
+  document.getElementById('super-proposal').style.display = prop ? 'block' : 'none';
+  document.getElementById('credit-subbar').style.display  = credit ? 'flex' : 'none';
+  document.querySelector('.main').style.display           = credit ? 'block' : 'none';
   document.getElementById('stab-pension').classList.toggle('active', pen);
-  document.getElementById('stab-credit').classList.toggle('active', !pen);
-  if(pen) fitPensionFrame();
+  document.getElementById('stab-credit').classList.toggle('active', credit);
+  document.getElementById('stab-proposal').classList.toggle('active', prop);
+  if(pen || prop) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
 (function initSuper(){
