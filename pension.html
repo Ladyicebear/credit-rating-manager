@@ -87,11 +87,11 @@
   .cpi-modal-body{padding:2px}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
   .sv-tbl{width:100%;border-collapse:collapse;font-size:11px}
-  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:left;border-bottom:1px solid var(--line)}
+  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:center;border-bottom:1px solid var(--line)}  /* 헤더 구분값 중앙정렬 */
   .sv-tbl td{padding:5px 5px;border-bottom:1px solid var(--line-2);vertical-align:middle}
   .sv-tbl th.sv-per,.sv-tbl td.sv-per{text-align:center;white-space:nowrap;color:#4B5563;font-weight:700}
   .sv-tbl tr:last-child td{border-bottom:none}
-  .sv-tbl th:last-child,.sv-tbl td:last-child{text-align:right}
+  .sv-tbl td:last-child{text-align:right}   /* 금리 데이터는 우측, 헤더는 중앙 */
   .sv-tbl b{color:#111;font-weight:700}
   .sv-rate{color:var(--orange-d);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .sv-none{color:#C9CED6}
@@ -246,7 +246,7 @@
   .prop-card{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;
     box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
   .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
-  .prop-head .prop-title{font-size:14px;font-weight:800;color:var(--orange-d);letter-spacing:-.3px}
+  .prop-head .prop-title{font-size:12.5px;font-weight:800;color:var(--orange-d);letter-spacing:-.3px}  /* DB제도 최고금리(.sv-title)와 동일 크기 */
   .prop-head .prop-hint{font-size:10.5px;color:var(--muted);font-weight:600;margin-left:auto}
   .prop-controls{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line)}
   .prop-controls input{flex:1;min-width:0;height:32px;border:1px solid #D5D9E0;border-radius:8px;
@@ -259,16 +259,22 @@
     color:var(--ink);font-size:11.5px;font-weight:700;padding:0 6px;cursor:pointer;font-family:inherit;max-width:118px}
   .prop-controls select:focus{outline:none;border-color:var(--orange)}
   .prop-scroll{overflow-y:auto}
-  .prop-tbl{width:100%;border-collapse:collapse;font-size:12px}
-  .prop-tbl thead th{position:sticky;top:0;background:#F1F3F5;color:#374151;font-weight:700;
-    padding:9px 6px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
-  .prop-tbl td{padding:10px 6px;border-bottom:1px solid #F0F1F3;text-align:center;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
-  .prop-tbl td.l{text-align:left;font-weight:700;color:var(--ink)}
-  .prop-tbl td.rt{font-weight:800;color:var(--orange-d);font-variant-numeric:tabular-nums}
+  /* DB제도 최고금리 표(.sv-tbl)와 동일한 크기·형태 */
+  .prop-tbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+  .prop-tbl thead th{position:sticky;top:0;background:#F4F6F8;color:#4B5563;font-weight:700;
+    padding:5px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+  .prop-tbl td{padding:6px 5px;border-bottom:1px solid var(--line-2);vertical-align:middle;
+    text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prop-tbl td.l{text-align:left}
+  .prop-tbl td.l b{color:#111;font-weight:700}
+  .prop-tbl td.per{color:#4B5563;font-weight:700}
+  .prop-tbl td.rt{text-align:right;color:var(--orange-d);font-weight:800;font-variant-numeric:tabular-nums}
   .prop-tbl tbody tr{cursor:pointer}
   .prop-tbl tbody tr:active td{background:#FFF4E8}
-  .prop-none td{padding:22px;color:#9CA3AF;text-align:center}
+  /* 5행 고정용 빈 행 — 클릭 불가·투명 */
+  .prop-tbl tr.filler td{cursor:default}
+  .prop-tbl tr.filler:active td{background:transparent}
+  .prop-tbl tr.prop-nomatch td{color:#9CA3AF;text-align:center;cursor:default}
 
   /* ══════════ 휴대폰(앱형) 반응형 : 데스크톱은 그대로, 모바일만 재구성 ══════════ */
   @media(max-width:640px){
@@ -1053,24 +1059,34 @@ function renderProposalMobile(){
   rows.sort((a,b)=>{ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra; });
   proposalRows=rows;
 
-  if(!rows.length){ $('propBody').innerHTML='<tr class="prop-none"><td colspan="4">조건에 맞는 상품이 없습니다.</td></tr>'; $('propScroll').style.maxHeight=''; return; }
+  // 표는 항상 5행 고정 — 결과가 5개 미만이면 빈 행으로 채우고, 초과면 스크롤
+  const N=5;
   const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);
-  $('propBody').innerHTML=rows.map((r,i)=>
-    `<tr ondblclick="openPropDetail(${i})">`+
-      `<td class="l" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</td>`+
-      `<td title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td>`+
-      `<td>${htmlEsc(r.period)}</td>`+
-      `<td class="rt">${fmt(r.rate)}</td>`+
-    `</tr>`).join('');
+  const filler=`<tr class="filler"><td class="l">&nbsp;</td><td></td><td></td><td></td></tr>`;
+  let body;
+  if(!rows.length){
+    body=`<tr class="filler prop-nomatch"><td colspan="4">조건에 맞는 상품이 없습니다.</td></tr>`;
+    for(let k=1;k<N;k++) body+=filler;
+  }else{
+    body=rows.map((r,i)=>
+      `<tr ondblclick="openPropDetail(${i})">`+
+        `<td class="l" title="${htmlAttr(r.org)}"><b>${htmlEsc(r.org)}</b></td>`+
+        `<td title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td>`+
+        `<td class="per">${htmlEsc(r.period)}</td>`+
+        `<td class="rt">${fmt(r.rate)}</td>`+
+      `</tr>`).join('');
+    for(let k=rows.length;k<N;k++) body+=filler;   // 5행 미만이면 빈 행 채움
+  }
+  $('propBody').innerHTML=body;
   fitPropTable();
 }
-/* 헤더 + 7행까지만 보이고 그 이상은 스크롤 */
+/* 표는 항상 5행 높이로 고정 — 5행 초과는 스크롤, 미만은 빈 행으로 이미 5행 */
 function fitPropTable(){
   const sc=$('propScroll'); if(!sc) return;
   const thead=sc.querySelector('thead'), fr=sc.querySelector('tbody tr');
   if(!thead||!fr){ sc.style.maxHeight=''; return; }
   const th=thead.getBoundingClientRect().height, rh=fr.getBoundingClientRect().height;
-  sc.style.maxHeight=Math.round(th+rh*7+2)+'px';
+  sc.style.maxHeight=Math.round(th+rh*5+1)+'px';
 }
 function openPropDetail(i){
   const r=proposalRows[i]; if(!r) return;
