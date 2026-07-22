@@ -125,7 +125,7 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
           <thead><tr>
             <th style="width:38px"><input type="checkbox" class="chk" id="chkAll" title="전체 선택"></th>
             <th>업권</th><th>상품제공기관</th><th>상품구분</th>
-            <th>유니버스<br>(Y/N)</th><th>판매가능여부</th><th>기간</th><th>금리</th>
+            <th>유니버스<br>(Y/N)</th><th>연컨사전확인<br>(Y/N)</th><th>판매가능여부</th><th>기간</th><th>금리</th>
           </tr></thead>
           <tbody id="leftBody"></tbody>
         </table>
@@ -197,7 +197,7 @@ async function boot(){
   }catch(e){ toast('데이터를 불러오지 못했습니다','err'); return; }
 
   const months=Object.keys(STORE).sort();
-  if(!months.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="8">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>'; return; }
+  if(!months.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="9">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>'; return; }
   $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${m}</option>`).join('');
   curMonth=months[months.length-1];
   $('monthSel').value=curMonth;
@@ -263,7 +263,7 @@ function bindFilters(){
 }
 
 /* ---------- 메타(유니버스/판매가능) ---------- */
-function metaOf(r){ const m=META[rowKey(r)]||{}; return {universe:m.universe==='N'?'N':'Y', sellable:m.sellable!==false}; }
+function metaOf(r){ const m=META[rowKey(r)]||{}; return {universe:m.universe==='N'?'N':'Y', precheck:m.precheck==='Y'?'Y':'N', sellable:m.sellable!==false}; }
 function saveMeta(r,patch){
   const key=rowKey(r);
   const cur=metaOf(r);
@@ -273,6 +273,7 @@ function saveMeta(r,patch){
     body:JSON.stringify(Object.assign({key},patch))}).catch(()=>toast('메타 저장 실패','err'));
 }
 function toggleUniverse(i){ const r=filteredRows()[i]; const m=metaOf(r); saveMeta(r,{universe:m.universe==='Y'?'N':'Y'}); render(); }
+function togglePrecheck(i){ const r=filteredRows()[i]; const m=metaOf(r); saveMeta(r,{precheck:m.precheck==='Y'?'N':'Y'}); render(); }
 function toggleSellable(i){ const r=filteredRows()[i]; const m=metaOf(r); saveMeta(r,{sellable:!m.sellable}); render(); }
 
 /* ---------- 렌더 ---------- */
@@ -280,10 +281,11 @@ function render(){ renderLeft(); renderRight(); }
 function renderLeft(){
   const rows=filteredRows();
   $('leftSub').textContent=rows.length+'건';
-  if(!rows.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="8">조건에 맞는 상품이 없습니다.</td></tr>'; $('chkAll').checked=false; return; }
+  if(!rows.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="9">조건에 맞는 상품이 없습니다.</td></tr>'; $('chkAll').checked=false; return; }
   $('leftBody').innerHTML=rows.map((r,i)=>{
     const m=metaOf(r);
     const uCls=m.universe==='Y'?'y':'n';
+    const pCls=m.precheck==='Y'?'y':'n';
     const sCls=m.sellable?'sell':'nosell';
     const sTxt=m.sellable?'판매가능':'판매불가';
     return `<tr>
@@ -292,6 +294,7 @@ function renderLeft(){
       <td class="l org" title="${htmlEsc(r.org)}">${htmlEsc(r.org)}</td>
       <td class="l" title="${htmlEsc(r.fam)}">${htmlEsc(r.fam)}</td>
       <td><button class="tgl ${uCls}" onclick="toggleUniverse(${i})">${m.universe}</button></td>
+      <td><button class="tgl ${pCls}" onclick="togglePrecheck(${i})">${m.precheck}</button></td>
       <td><button class="tgl ${sCls}" onclick="toggleSellable(${i})">${sTxt}</button></td>
       <td>${htmlEsc(r.period)}</td>
       <td class="rate">${fmtRate(r.rate)}</td>

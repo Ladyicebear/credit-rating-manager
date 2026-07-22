@@ -558,7 +558,7 @@ def proposal_meta_get():
 
 @app.route('/api/proposal_meta', methods=['POST'])
 def proposal_meta_post():
-    """상품키별 메타 저장. payload: {key, universe:'Y'|'N', sellable:bool}"""
+    """상품키별 메타 저장. payload: {key, universe:'Y'|'N', precheck:'Y'|'N', sellable:bool}"""
     d = request.get_json(force=True, silent=True) or {}
     key = (d.get('key') or '').strip()
     if not key:
@@ -567,6 +567,8 @@ def proposal_meta_post():
     entry = meta.get(key, {})
     if 'universe' in d:
         entry['universe'] = 'N' if d['universe'] == 'N' else 'Y'
+    if 'precheck' in d:                       # 연컨사전확인 Y/N
+        entry['precheck'] = 'Y' if d['precheck'] == 'Y' else 'N'
     if 'sellable' in d:
         entry['sellable'] = bool(d['sellable'])
     meta[key] = entry
