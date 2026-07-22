@@ -248,6 +248,16 @@
   .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
   .prop-head .prop-title{font-size:14px;font-weight:800;color:var(--orange-d);letter-spacing:-.3px}
   .prop-head .prop-hint{font-size:10.5px;color:var(--muted);font-weight:600;margin-left:auto}
+  .prop-controls{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line)}
+  .prop-controls input{flex:1;min-width:0;height:32px;border:1px solid #D5D9E0;border-radius:8px;
+    padding:0 10px;font-size:12px;font-family:inherit}
+  .prop-controls input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
+  .prop-controls .prop-sch{flex:0 0 auto;width:34px;height:32px;border:1px solid #D5D9E0;background:#fff;
+    border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6B7280}
+  .prop-controls .prop-sch svg{width:15px;height:15px}
+  .prop-controls select{flex:0 0 auto;height:32px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;
+    color:var(--ink);font-size:11.5px;font-weight:700;padding:0 6px;cursor:pointer;font-family:inherit;max-width:118px}
+  .prop-controls select:focus{outline:none;border-color:var(--orange)}
   .prop-scroll{overflow-y:auto}
   .prop-tbl{width:100%;border-collapse:collapse;font-size:12px}
   .prop-tbl thead th{position:sticky;top:0;background:#F1F3F5;color:#374151;font-weight:700;
@@ -353,8 +363,20 @@
   <!-- 이달의 제안 가능 상품(모바일 전용) — 상품제안관리에서 등록한 목록 -->
   <div class="prop-card" id="proposalMobile">
     <div class="prop-head">
-      <span class="prop-title">이달의 제안 가능 상품</span>
-      <span class="prop-hint">행을 더블탭하면 상세</span>
+      <span class="prop-title">이달의 제안 가능상품</span>
+      <span class="prop-hint">더블탭 상세</span>
+    </div>
+    <div class="prop-controls">
+      <input type="text" id="propSearch" placeholder="기관·상품·기간 검색" oninput="onPropSearch(this.value)">
+      <button class="prop-sch" id="propSearchBtn" title="검색" onclick="renderProposalMobile()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <select id="propProdSel" onchange="onPropProd(this.value)" title="상품구분">
+        <option value="ALL">상품구분 ▾</option>
+        <option value="정기예금">정기예금</option>
+        <option value="ELB/DLB">ELB/DLB</option>
+        <option value="이율보증형보험">이율보증형보험</option>
+      </select>
     </div>
     <div class="prop-scroll" id="propScroll">
       <table class="prop-tbl">
@@ -977,7 +999,19 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePenDetail(); 
    ============================================================ */
 let proposalsAll=null;    // {month:[items]}  (1회 조회 후 캐시)
 let proposalMeta=null;    // 상품키 -> {universe,precheck,sellable}
-let proposalRows=[];      // 현재 화면(기준월)의 제안 목록 — 팝업이 참조
+let proposalRows=[];      // 화면에 보이는(필터·정렬 후) 제안 목록 — 팝업이 참조
+let propSearchTxt='';     // 제안 검색어(기관·상품구분·기간)
+let propProdFilter='ALL'; // 제안 상품구분 필터
+function onPropSearch(v){ propSearchTxt=v; renderProposalMobile(); }
+function onPropProd(v){ propProdFilter=v; renderProposalMobile(); }
+function propProdMatch(fam){
+  if(propProdFilter==='ALL') return true;
+  const f=String(fam||'');
+  if(propProdFilter==='정기예금') return /정기예금/.test(f);
+  if(propProdFilter==='ELB/DLB') return /ELB|DLB/.test(f);
+  if(propProdFilter==='이율보증형보험') return /이율보증형/.test(f);
+  return true;
+}
 /* proposal.html rowKey()·app.py _pen_core 주석과 동일: sector|org|fam|months */
 function propKey(r){ return [r.sector,r.org,r.fam,r.months].join('|'); }
 /* 이율보증형보험(생보·손보)만 연복리 → 단리환산 대상 */
@@ -1007,11 +1041,21 @@ function renderProposalMobile(){
     loadProposalData().then(()=>renderProposalMobile());
     return;
   }
-  proposalRows=(proposalsAll[curMonth]||[]).slice();
-  if(!proposalRows.length){ card.style.display='none'; return; }
+  const all=(proposalsAll[curMonth]||[]);
+  if(!all.length){ card.style.display='none'; return; }   // 등록된 제안이 없으면 카드 숨김
   card.style.display='block';   /* CSS 기본이 none이라 ''로 두면 다시 숨겨짐 → block 명시 */
+
+  // 검색(기관·상품구분·기간) + 상품구분 필터
+  const q=propSearchTxt.trim().toLowerCase();
+  let rows=all.filter(r=>propProdMatch(r.fam) &&
+    (!q || (String(r.org)+' '+String(r.fam)+' '+String(r.period)).toLowerCase().indexOf(q)>=0));
+  // 기본 정렬: 금리 높은순
+  rows.sort((a,b)=>{ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra; });
+  proposalRows=rows;
+
+  if(!rows.length){ $('propBody').innerHTML='<tr class="prop-none"><td colspan="4">조건에 맞는 상품이 없습니다.</td></tr>'; $('propScroll').style.maxHeight=''; return; }
   const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);
-  $('propBody').innerHTML=proposalRows.map((r,i)=>
+  $('propBody').innerHTML=rows.map((r,i)=>
     `<tr ondblclick="openPropDetail(${i})">`+
       `<td class="l" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</td>`+
       `<td title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td>`+
