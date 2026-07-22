@@ -259,8 +259,12 @@
     color:var(--ink);font-size:11.5px;font-weight:700;padding:0 6px;cursor:pointer;font-family:inherit;max-width:118px}
   .prop-controls select:focus{outline:none;border-color:var(--orange)}
   .prop-scroll{overflow-y:auto}
-  /* 제안 표 = DB제도 최고금리 표와 완전히 동일하게 → .sv-tbl을 그대로 쓰고
-     스크롤용 헤더 고정·클릭 동작만 덧붙인다(크기·정렬은 .sv-tbl이 그대로 결정) */
+  /* 제안 표 = DB제도 최고금리 표와 동일한 셀 스타일(.sv-tbl) + 검색/필터에도 크기 고정.
+     - table-layout:fixed + colgroup → 내용이 바뀌어도 열 너비 불변
+     - td nowrap/ellipsis → 긴 이름이 줄바꿈해 행 높이가 커지지 않음
+     - 빈 행(filler)은 &nbsp;로 데이터 행과 같은 높이 유지(줄어들지 않음) */
+  .prop-tbl{table-layout:fixed}
+  .prop-tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .prop-tbl thead th{position:sticky;top:0;z-index:2}
   .prop-tbl tbody tr{cursor:pointer}
   .prop-tbl tbody tr:active td{background:#FFF4E8}
@@ -377,6 +381,7 @@
     </div>
     <div class="prop-scroll" id="propScroll">
       <table class="sv-tbl prop-tbl">
+        <colgroup><col style="width:38%"><col style="width:33%"><col style="width:13%"><col style="width:16%"></colgroup>
         <thead><tr><th>상품제공기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>
         <tbody id="propBody"></tbody>
       </table>
@@ -1054,7 +1059,8 @@ function renderProposalMobile(){
   const N=5;
   const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);
   // 셀 구조는 DB제도 최고금리 표(renderSummary)와 동일: <b>기관 / 상품구분 / sv-per기간 / sv-rate금리
-  const filler=`<tr class="filler"><td></td><td></td><td class="sv-per"></td><td class="sv-rate"></td></tr>`;
+  // &nbsp;로 빈 행도 데이터 행과 같은 높이를 유지(내용 없다고 줄어들지 않게)
+  const filler=`<tr class="filler"><td>&nbsp;</td><td>&nbsp;</td><td class="sv-per">&nbsp;</td><td class="sv-rate">&nbsp;</td></tr>`;
   let body;
   if(!rows.length){
     body=`<tr class="filler prop-nomatch"><td colspan="4">조건에 맞는 상품이 없습니다.</td></tr>`;
@@ -1072,13 +1078,14 @@ function renderProposalMobile(){
   $('propBody').innerHTML=body;
   fitPropTable();
 }
-/* 표는 항상 5행 높이로 고정 — 5행 초과는 스크롤, 미만은 빈 행으로 이미 5행 */
+/* 표는 항상 헤더+5행 높이로 '고정'(height) — 5행 초과는 스크롤, 미만은 빈 행으로 이미 5행.
+   검색·필터로 내용이 바뀌어도 이 높이는 변하지 않는다. */
 function fitPropTable(){
   const sc=$('propScroll'); if(!sc) return;
   const thead=sc.querySelector('thead'), fr=sc.querySelector('tbody tr');
-  if(!thead||!fr){ sc.style.maxHeight=''; return; }
+  if(!thead||!fr){ sc.style.height=''; return; }
   const th=thead.getBoundingClientRect().height, rh=fr.getBoundingClientRect().height;
-  sc.style.maxHeight=Math.round(th+rh*5+1)+'px';
+  sc.style.height=Math.round(th+rh*5+1)+'px';   // maxHeight가 아닌 height로 고정
 }
 function openPropDetail(i){
   const r=proposalRows[i]; if(!r) return;
