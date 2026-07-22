@@ -92,6 +92,7 @@
   .sv-tbl th.sv-per,.sv-tbl td.sv-per{text-align:center;white-space:nowrap;color:#4B5563;font-weight:700}
   .sv-tbl tr:last-child td{border-bottom:none}
   .sv-tbl td:last-child{text-align:right}   /* 금리 데이터는 우측, 헤더는 중앙 */
+  .sv-tbl th,.sv-tbl td{border-right:none}  /* 전역 th,td 세로 테두리 제거 — 가로 구분선만 유지 */
   .sv-tbl b{color:#111;font-weight:700}
   .sv-rate{color:var(--orange-d);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .sv-none{color:#C9CED6}
@@ -258,13 +259,14 @@
   .prop-controls select{flex:0 0 auto;height:32px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;
     color:var(--ink);font-size:11.5px;font-weight:700;padding:0 6px;cursor:pointer;font-family:inherit;max-width:118px}
   .prop-controls select:focus{outline:none;border-color:var(--orange)}
-  .prop-scroll{overflow-y:auto}
-  /* 제안 표 = DB제도 최고금리 표와 동일한 셀 스타일(.sv-tbl) + 검색/필터에도 크기 고정.
+  /* 제안 표 = 금리표(.mtbl)의 둥근 테두리 박스 + 격자 셀 테두리 + 여백.
+     - .prop-scroll: 1px 테두리 + border-radius(둥근 끝) + margin(여백)
+     - 셀: 격자 테두리(border 4면)
      - table-layout:fixed + colgroup → 내용이 바뀌어도 열 너비 불변
-     - td nowrap/ellipsis → 긴 이름이 줄바꿈해 행 높이가 커지지 않음
-     - 빈 행(filler)은 &nbsp;로 데이터 행과 같은 높이 유지(줄어들지 않음) */
+     - td nowrap/ellipsis + 빈 행 &nbsp; → 검색·필터에도 행/열 크기 고정 */
+  .prop-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:8px;margin:10px 12px 12px}
   .prop-tbl{table-layout:fixed}
-  .prop-tbl td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prop-tbl th,.prop-tbl td{border:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .prop-tbl thead th{position:sticky;top:0;z-index:2}
   .prop-tbl tbody tr{cursor:pointer}
   .prop-tbl tbody tr:active td{background:#FFF4E8}
