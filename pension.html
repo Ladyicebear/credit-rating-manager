@@ -240,6 +240,25 @@
   .pd-tbl td .rbadge-lite{display:inline-block;padding:2px 9px;border-radius:6px;font-size:12px;font-weight:800;
     background:#E7F0FF;color:#1D4ED8}
   .pd-tbl td .pd-na{color:#9CA3AF;font-weight:400}
+  .pd-tbl td .pd-simple{display:block;font-size:11px;color:#6B7280;font-weight:600;margin-top:2px}
+
+  /* ---------- 이달의 제안 가능 상품(모바일) ---------- */
+  .prop-card{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+  .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .prop-head .prop-title{font-size:14px;font-weight:800;color:var(--orange-d);letter-spacing:-.3px}
+  .prop-head .prop-hint{font-size:10.5px;color:var(--muted);font-weight:600;margin-left:auto}
+  .prop-scroll{overflow-y:auto}
+  .prop-tbl{width:100%;border-collapse:collapse;font-size:12px}
+  .prop-tbl thead th{position:sticky;top:0;background:#F1F3F5;color:#374151;font-weight:700;
+    padding:9px 6px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
+  .prop-tbl td{padding:10px 6px;border-bottom:1px solid #F0F1F3;text-align:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+  .prop-tbl td.l{text-align:left;font-weight:700;color:var(--ink)}
+  .prop-tbl td.rt{font-weight:800;color:var(--orange-d);font-variant-numeric:tabular-nums}
+  .prop-tbl tbody tr{cursor:pointer}
+  .prop-tbl tbody tr:active td{background:#FFF4E8}
+  .prop-none td{padding:22px;color:#9CA3AF;text-align:center}
 
   /* ══════════ 휴대폰(앱형) 반응형 : 데스크톱은 그대로, 모바일만 재구성 ══════════ */
   @media(max-width:640px){
@@ -331,6 +350,20 @@
     </button>
   </div>
 
+  <!-- 이달의 제안 가능 상품(모바일 전용) — 상품제안관리에서 등록한 목록 -->
+  <div class="prop-card" id="proposalMobile">
+    <div class="prop-head">
+      <span class="prop-title">이달의 제안 가능 상품</span>
+      <span class="prop-hint">행을 더블탭하면 상세</span>
+    </div>
+    <div class="prop-scroll" id="propScroll">
+      <table class="prop-tbl">
+        <thead><tr><th>상품제공기관</th><th>상품구분</th><th>기간</th><th>금리</th></tr></thead>
+        <tbody id="propBody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- 제도별 최고금리 요약 (JS로 렌더) -->
   <div class="stats" id="stats" style="display:none"></div>
 
@@ -409,6 +442,18 @@
       <button class="pd-x" onclick="closePenDetail()" title="닫기">✕</button>
     </div>
     <div id="penDetailBody"></div>
+  </div>
+</div>
+
+<!-- 이달의 제안상품 행 더블클릭 → 제안상세 팝업 -->
+<div id="propDetailModal" class="pd-modal" onclick="if(event.target===this)closePropDetail()">
+  <div class="pd-card">
+    <div class="pd-head">
+      <span class="pd-title">제안상세</span>
+      <span class="spacer"></span>
+      <button class="pd-x" onclick="closePropDetail()" title="닫기">✕</button>
+    </div>
+    <div id="propDetailBody"></div>
   </div>
 </div>
 
@@ -787,6 +832,9 @@ function render(){
   $('secChips').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{filterSec=c.dataset.sec;render();});
   { const _sb=$('btnSort'); if(_sb) _sb.textContent=sortLabel(); }   // 정렬버튼 라벨 갱신
 
+  // 이달의 제안 가능 상품(모바일 전용) — 데스크톱에선 숨김
+  renderProposalMobile();
+
   // 앱(모바일): 넓은 그리드 대신 5열 압축표(업권·상품제공기관·상품구분·기간·금리)
   if(isMobileView()){
     $('hscrollTop').style.display='none';
@@ -923,6 +971,95 @@ function openPenDetail(i){
 }
 function closePenDetail(){ $('penDetailModal').classList.remove('open'); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePenDetail(); });
+
+/* ============================================================
+   이달의 제안 가능 상품(모바일) — 상품제안관리에서 등록한 목록
+   ============================================================ */
+let proposalsAll=null;    // {month:[items]}  (1회 조회 후 캐시)
+let proposalMeta=null;    // 상품키 -> {universe,precheck,sellable}
+let proposalRows=[];      // 현재 화면(기준월)의 제안 목록 — 팝업이 참조
+/* proposal.html rowKey()·app.py _pen_core 주석과 동일: sector|org|fam|months */
+function propKey(r){ return [r.sector,r.org,r.fam,r.months].join('|'); }
+/* 이율보증형보험(생보·손보)만 연복리 → 단리환산 대상 */
+function isBoseungCompound(sector,fam){
+  return (sector==='생명보험'||sector==='손해보험') && /이율보증형/.test(String(fam||''));
+}
+/* 단리환산: ((1+금리/100)^년-1)/년*100. 년=만기개월/12. 대상 아니면 null */
+function simpleConv(rate,months){
+  const y=(+months)/12;
+  if(!(y>0) || typeof rate!=='number') return null;
+  return (Math.pow(1+rate/100,y)-1)/y*100;
+}
+async function loadProposalData(){
+  if(proposalsAll && proposalMeta) return;
+  try{
+    const [pr,mt]=await Promise.all([
+      fetch('/api/proposals').then(r=>r.ok?r.json():{}),
+      fetch('/api/proposal_meta').then(r=>r.ok?r.json():{}),
+    ]);
+    proposalsAll=pr||{}; proposalMeta=mt||{};
+  }catch(e){ proposalsAll={}; proposalMeta={}; }
+}
+function renderProposalMobile(){
+  const card=$('proposalMobile');
+  if(!isMobileView()){ card.style.display='none'; return; }
+  if(!proposalsAll){                       // 아직 미조회 → 로드 후 재렌더
+    loadProposalData().then(()=>renderProposalMobile());
+    return;
+  }
+  proposalRows=(proposalsAll[curMonth]||[]).slice();
+  if(!proposalRows.length){ card.style.display='none'; return; }
+  card.style.display='block';   /* CSS 기본이 none이라 ''로 두면 다시 숨겨짐 → block 명시 */
+  const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);
+  $('propBody').innerHTML=proposalRows.map((r,i)=>
+    `<tr ondblclick="openPropDetail(${i})">`+
+      `<td class="l" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</td>`+
+      `<td title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td>`+
+      `<td>${htmlEsc(r.period)}</td>`+
+      `<td class="rt">${fmt(r.rate)}</td>`+
+    `</tr>`).join('');
+  fitPropTable();
+}
+/* 헤더 + 7행까지만 보이고 그 이상은 스크롤 */
+function fitPropTable(){
+  const sc=$('propScroll'); if(!sc) return;
+  const thead=sc.querySelector('thead'), fr=sc.querySelector('tbody tr');
+  if(!thead||!fr){ sc.style.maxHeight=''; return; }
+  const th=thead.getBoundingClientRect().height, rh=fr.getBoundingClientRect().height;
+  sc.style.maxHeight=Math.round(th+rh*7+2)+'px';
+}
+function openPropDetail(i){
+  const r=proposalRows[i]; if(!r) return;
+  const rate=(typeof r.rate==='number')?r.rate:null;
+  const row=(label,val,cls)=>`<tr><th>${label}</th><td class="${cls||''}">${val}</td></tr>`;
+  // 금리(+단리환산: 이율보증형보험만)
+  let rateHtml=(rate==null?'-':rate+'%');
+  if(isBoseungCompound(r.sector,r.fam)){
+    const s=simpleConv(rate,r.months);
+    if(s!=null) rateHtml+=`<span class="pd-simple">(단리환산 : ${s.toFixed(2)}%)</span>`;
+  }
+  // 연컨사전확인
+  const meta=(proposalMeta&&proposalMeta[propKey(r)])||{};
+  const precheck=meta.precheck==='Y'?'Y':'N';
+  $('propDetailBody').innerHTML=
+    `<table class="pd-tbl">`+
+      row('상품제공기관', htmlEsc(r.org))+
+      row('상품구분', htmlEsc(r.fam))+
+      row('기간', htmlEsc(r.period))+
+      row('금리', rateHtml, 'pd-rate')+
+      row('신용등급', `<span id="propRating" class="pd-na">조회중…</span>`)+
+      row('연컨사전확인', precheck)+
+    `</table>`;
+  $('propDetailModal').classList.add('open');
+  loadPenRatings().then(map=>{
+    const el=$('propRating'); if(!el) return;
+    const g=map[penCore(r.org)];
+    if(g){ el.className='rbadge-lite'; el.textContent=g; }
+    else { el.className='pd-na'; el.textContent='-'; }
+  });
+}
+function closePropDetail(){ $('propDetailModal').classList.remove('open'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePropDetail(); });
 
 /* 헤더 고정 + 15행 박스(그 이상은 박스 안에서 스크롤) */
 function fitMobileTable(){
