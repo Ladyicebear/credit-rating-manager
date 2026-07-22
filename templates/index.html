@@ -271,6 +271,8 @@ tr.row-done td{transition:background .3s}
   /* 상단 통합탭: 화면폭 꽉 채운 앱형 탭 */
   .super-tabs{margin-top:9px;gap:0}
   .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
+  /* 상품제안관리는 관리자용 데스크톱 화면 → 모바일에서는 탭 숨김 */
+  #stab-proposal{display:none}
   /* 신용등급 서브바: 긴 설명은 숨기고 컨트롤만 */
   .credit-subbar{padding:8px 13px;gap:8px}
   .credit-subbar .hdr-sub{display:none}
@@ -717,6 +719,10 @@ function fitPensionFrame(){
   });
 }
 window.addEventListener('resize', fitPensionFrame);
+// 데스크톱→좁은 화면 전환 시 상품제안관리 패널이 남지 않도록 재확인
+window.addEventListener('resize', function(){
+  if(isProposalHidden() && document.getElementById('super-proposal').style.display!=='none') switchSuper('pension');
+});
 window.addEventListener('orientationchange', fitPensionFrame);
 window.addEventListener('load', fitPensionFrame);
 document.addEventListener('DOMContentLoaded', function(){
@@ -726,7 +732,11 @@ document.addEventListener('DOMContentLoaded', function(){
   setTimeout(fitPensionFrame, 300);   // 레이아웃 안정 후 재보정
 });
 
+/* 상품제안관리 탭 숨김 기준(CSS @media max-width:768px)과 동일하게 맞춤 */
+function isProposalHidden(){ try{ return window.matchMedia('(max-width:768px)').matches; }catch(e){ return window.innerWidth<=768; } }
 function switchSuper(which){
+  // 상품제안관리는 모바일/좁은 화면에서 숨김 → 이 탭이 지정되면 원리금으로 대체
+  if(which==='proposal' && isProposalHidden()) which='pension';
   const pen = which==='pension';
   const prop = which==='proposal';
   const credit = which==='credit';
