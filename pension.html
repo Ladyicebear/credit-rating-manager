@@ -369,7 +369,7 @@
   <div class="prop-card" id="proposalMobile">
     <div class="prop-head">
       <span class="prop-title">이달의 제안 가능 상품</span>
-      <span class="prop-hint">더블탭 상세</span>
+      <span class="prop-hint">탭하면 상세</span>
     </div>
     <div class="prop-controls">
       <input type="text" id="propSearch" placeholder="기관·상품·기간 검색" oninput="onPropSearch(this.value)">
@@ -1071,7 +1071,7 @@ function renderProposalMobile(){
     for(let k=1;k<N;k++) body+=filler;
   }else{
     body=rows.map((r,i)=>
-      `<tr ondblclick="openPropDetail(${i})">`+
+      `<tr onclick="openPropDetail(${i})">`+
         `<td><b>${htmlEsc(r.org)}</b></td>`+
         `<td>${htmlEsc(r.fam)}</td>`+
         `<td class="sv-per">${htmlEsc(r.period)}</td>`+
