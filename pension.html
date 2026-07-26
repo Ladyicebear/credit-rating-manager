@@ -216,7 +216,7 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mtbl tbody tr{cursor:pointer}
   .mtbl tbody tr:active td{background:#FFF4E8}
-  .mtbl thead th{background:#F1F3F5;color:#374151;font-weight:700;position:sticky;top:0;z-index:2}
+  .mtbl thead th{background:#F1F3F5;color:#374151;font-weight:700;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;-webkit-user-select:none}
   .mtbl th:nth-child(1),.mtbl td:nth-child(1){width:15%}
   .mtbl th:nth-child(2),.mtbl td:nth-child(2){width:28%}
   .mtbl th:nth-child(3),.mtbl td:nth-child(3){width:26%}
@@ -914,7 +914,17 @@ function periodMonths(p){
   m=s.match(/(\d+)\s*개월/); if(m) return parseInt(m[1],10);
   return 0;
 }
-function toggleSort(){ sortMode = (sortMode==='desc') ? 'asc' : 'desc'; render(); }
+function toggleSort(){ mSortKey=null; sortMode = (sortMode==='desc') ? 'asc' : 'desc'; render(); }
+/* 모바일 금리표 컬럼 헤더 정렬 (모바일 전용) — 헤더 탭 시 오름/내림 토글 */
+let mSortKey=null;   // sector|org|fam|period|rate — null이면 미적용(기존 sortMode 사용)
+let mSortDir=1;      // 1=오름/짧은순/낮은순, -1=내림/긴순/높은순
+const M_SORT_FIRST={sector:1,org:1,fam:1,period:1,rate:-1};  // 첫 클릭 방향(금리는 높은순부터)
+function mSortBy(key){
+  if(mSortKey===key) mSortDir=-mSortDir;
+  else { mSortKey=key; mSortDir=M_SORT_FIRST[key]||1; }
+  renderMobileTable();
+}
+function mSortArrow(key){ return mSortKey===key ? (mSortDir===1?' ▲':' ▼') : ' ▼'; }
 function sortLabel(){ return sortMode==='asc'?'금리낮은순 ▲': sortMode==='desc'?'금리높은순 ▼':'금리정렬'; }
 function mobileFlatRows(){
   const q=searchTxt.trim().toLowerCase();
@@ -933,7 +943,15 @@ function mobileFlatRows(){
   (curSpecial.period||[]).forEach(r=>{ if(filterSec!=='ALL'&&filterSec!=='기타') return; const v=(r.db??r.dc??r.irp); if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:r.mat,rate:v}); });
   let rows=out.filter(r=>prodMatch(r.fam, r.period));
   if(q) rows=rows.filter(r=>(String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0);
-  if(sortMode==='desc'||sortMode==='asc'){
+  if(mSortKey){
+    // 컬럼 헤더 정렬(모바일): 텍스트=가나다, 기간=개월수, 금리=값
+    const dir=mSortDir;
+    rows=rows.slice().sort((a,b)=>{
+      if(mSortKey==='rate'){ const ra=(typeof a.rate==='number'?a.rate:-Infinity), rb=(typeof b.rate==='number'?b.rate:-Infinity); return dir*(ra-rb); }
+      if(mSortKey==='period') return dir*(periodMonths(a.period)-periodMonths(b.period));
+      return dir*String(a[mSortKey]??'').localeCompare(String(b[mSortKey]??''),'ko');
+    });
+  } else if(sortMode==='desc'||sortMode==='asc'){
     const dir = sortMode==='desc' ? -1 : 1;
     rows=rows.slice().sort((a,b)=>{
       const ra=(typeof a.rate==='number'?a.rate:-999), rb=(typeof b.rate==='number'?b.rate:-999);
@@ -952,7 +970,13 @@ function renderMobileTable(){
   else rows.forEach((r,i)=>{ body+=`<tr onclick="openPenDetail(${i})"><td><span class="badge-sec s-${r.sector}">${r.sector}</span></td><td class="l" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</td><td class="l" title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td><td>${htmlEsc(r.period)}</td><td class="rt">${fmt(r.rate)}</td></tr>`; });
   $('mobileTable').innerHTML =
     `<div class="mtbl-scroll" id="mtblScroll"><table class="mtbl">`+
-      `<thead><tr><th>업권</th><th>상품제공기관</th><th>상품구분</th><th>기간</th><th>금리(%)</th></tr></thead>`+
+      `<thead><tr>`+
+        `<th onclick="mSortBy('sector')">업권${mSortArrow('sector')}</th>`+
+        `<th onclick="mSortBy('org')">상품제공기관${mSortArrow('org')}</th>`+
+        `<th onclick="mSortBy('fam')">상품구분${mSortArrow('fam')}</th>`+
+        `<th onclick="mSortBy('period')">기간${mSortArrow('period')}</th>`+
+        `<th onclick="mSortBy('rate')">금리(%)${mSortArrow('rate')}</th>`+
+      `</tr></thead>`+
       `<tbody>${body}</tbody></table></div>`;
   fitMobileTable();
 }
