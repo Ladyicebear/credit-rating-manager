@@ -22,6 +22,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .hdr-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
 /* Goun 로고(brand-mark)가 RM 비밀번호 버튼을 가리지 않게 로고 폭만큼 왼쪽으로 */
 .rmpw-btn{margin-right:62px}
+/* RM 비밀번호 만료 안내(연금컨설팅팀 전용): 평소 회색, 임박(3일 이하)·만료 시 주황 */
+.rm-expire{font-size:.72rem;font-weight:700;color:#8a92a0;white-space:nowrap}
+.rm-expire.soon{color:#F68121}
 .hdr-row1 .btn{background:#fff;color:#4b5563;border:1px solid #d5d9e0}
 .hdr-row1 .btn:hover{background:#f4f6f8}
 .brand-mark{position:absolute;right:126px;top:10px;width:46px;height:auto;
@@ -319,6 +322,9 @@ tr.row-done td{transition:background .3s}
     </div>
     <div class="hdr-actions">
       {% if role != 'rm' and rm_user %}
+      <span class="rm-expire {% if rm_days_left is not none and rm_days_left <= 3 %}soon{% endif %}">
+        {% if rm_days_left is not none and rm_days_left <= 0 %}RM 비밀번호 만료됨{% else %}RM 만료 {{ rm_days_left }}일 전{% endif %}
+      </span>
       <button class="btn btn-sm rmpw-btn" onclick="openRmPw()" title="RM 계정 비밀번호 변경">🔑 <span class="btn-label">RM 비밀번호 변경</span></button>
       {% endif %}
       <a class="btn btn-sm" href="/logout" title="로그아웃">🔓 <span class="btn-label">로그아웃</span></a>

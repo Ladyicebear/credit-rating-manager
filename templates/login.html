@@ -26,6 +26,16 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:8px;
      padding:9px 12px;font-size:.76rem;margin-bottom:14px;text-align:center}
 .foot{text-align:center;margin-top:18px;font-size:.66rem;color:#bbb}
+/* 비밀번호 만료 팝업 */
+.exp-ov{display:flex;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;
+        align-items:center;justify-content:center;padding:20px}
+.exp-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.35);
+          width:340px;max-width:100%;padding:28px 26px 22px;text-align:center}
+.exp-card .exp-ico{font-size:2rem}
+.exp-card .exp-msg{font-size:.9rem;font-weight:700;color:#16335B;line-height:1.5;margin:12px 0 20px}
+.exp-card .exp-ok{width:100%;padding:11px;border:none;border-radius:8px;background:#F68121;color:#fff;
+                  font-size:.9rem;font-weight:800;cursor:pointer;font-family:inherit}
+.exp-card .exp-ok:hover{background:#d65f0f}
 /* 비밀번호 변경(로그인 화면에서 바로) */
 .pw-link{display:block;width:100%;margin-top:14px;background:none;border:none;font-family:inherit;
          font-size:.72rem;font-weight:700;color:#8a92a0;cursor:pointer;text-decoration:underline}
@@ -75,6 +85,17 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 
     <div class="foot">admin.Goun</div>
   </form>
+
+  {% if rm_expired %}
+  <!-- RM 비밀번호 사용기간 만료 팝업 -->
+  <div class="exp-ov" id="exp-ov" onclick="if(event.target===this)this.remove()">
+    <div class="exp-card">
+      <div class="exp-ico">🔒</div>
+      <div class="exp-msg">비밀번호 사용 기간이 만료되었습니다.<br>연금컨설팅팀으로 문의바랍니다.</div>
+      <button type="button" class="exp-ok" onclick="document.getElementById('exp-ov').remove()">확인</button>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- 비밀번호 변경(로그인 전에도 가능 — 아이디+현재 비밀번호를 알아야 통과) -->
   <div class="pw-ov" id="pw-ov" onclick="if(event.target===this)closePw()">

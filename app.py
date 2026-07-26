@@ -151,6 +151,21 @@ def _rm_pw_expired() -> bool:
     return (datetime.now() - set_at).days >= RM_PW_MAX_AGE_DAYS
 
 
+def _rm_days_left():
+    """RM 비밀번호 만료까지 남은 일수(연금컨설팅팀 화면 표시용). RM 미설정 시 None.
+    시계 미시작(최초 로그인 전)이면 전체 기간으로 표시. 음수면 이미 만료."""
+    if not RM_USER:
+        return None
+    ts = _rm_pw_set_at()
+    if not ts:
+        return RM_PW_MAX_AGE_DAYS
+    try:
+        set_at = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+    except (ValueError, TypeError):
+        return RM_PW_MAX_AGE_DAYS
+    return RM_PW_MAX_AGE_DAYS - (datetime.now() - set_at).days
+
+
 @app.before_request
 def _require_login():
     if request.endpoint in _PUBLIC_ENDPOINTS:
@@ -177,20 +192,18 @@ def login():
         role = _role_for(u)
         if role and verify_password(u, p):
             if role == 'rm' and _rm_pw_expired():
-                # 2주 경과 → RM 로그인 차단, 연금컨설팅팀 재설정 필요
-                error = f'RM 비밀번호가 만료되었습니다({RM_PW_MAX_AGE_DAYS}일 경과). 연금컨설팅팀에 재설정을 요청하세요.'
-            else:
-                if role == 'rm' and not _rm_pw_set_at():
-                    _mark_rm_pw_set_at()   # 초기 비밀번호 최초 로그인 → 만료 시계 시작
-                session['logged_in'] = True
-                session['user'] = u
-                session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
-                nxt = request.args.get('next') or '/'
-                if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
-                    nxt = '/'
-                return redirect(nxt)
-        if not error:
-            error = '아이디 또는 비밀번호가 올바르지 않습니다.'
+                # 2주 경과 → RM 로그인 차단(팝업 안내), 연금컨설팅팀 재설정 필요
+                return render_template('login.html', error='', rm_expired=True)
+            if role == 'rm' and not _rm_pw_set_at():
+                _mark_rm_pw_set_at()   # 초기 비밀번호 최초 로그인 → 만료 시계 시작
+            session['logged_in'] = True
+            session['user'] = u
+            session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
+            nxt = request.args.get('next') or '/'
+            if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
+                nxt = '/'
+            return redirect(nxt)
+        error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
         return redirect(url_for('index'))
     return render_template('login.html', error=error)
@@ -1388,6 +1401,7 @@ def index():
         agency_labels=AGENCY_LABELS,
         role=session.get('role', ''),   # consulting=전체, rm=조회·다운로드만(화면 제어용)
         rm_user=RM_USER,                 # RM 비밀번호 변경 UI 표시/대상용(미설정 시 버튼 숨김)
+        rm_days_left=_rm_days_left(),    # RM 비밀번호 만료까지 남은 일수(표시용)
     )
 
 
