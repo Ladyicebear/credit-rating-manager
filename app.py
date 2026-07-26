@@ -30,6 +30,29 @@ APP_PASSWORD = os.environ.get('APP_PASSWORD', 'goun')
 if not (os.environ.get('APP_USER') and os.environ.get('APP_PASSWORD')):
     logger.warning('기본 로그인 계정(admin) 사용 중 — 배포 시 APP_USER/APP_PASSWORD 환경변수를 반드시 설정하세요.')
 
+# ── 소속(role)별 계정 ──
+#   연금컨설팅팀(=APP_USER) = role 'consulting' : 전체 관리
+#   RM(=RM_USER)            = role 'rm'         : 조회 + 다운로드만(업로드·등록·조회실행·기관관리·상품제안관리 불가)
+# RM_USER/RM_PASSWORD 미설정 시 RM 로그인 비활성(연금컨설팅팀 계정만 동작).
+RM_USER = os.environ.get('RM_USER', '')
+RM_PASSWORD = os.environ.get('RM_PASSWORD', '')
+
+
+def _role_for(username: str):
+    if username and username == APP_USER:
+        return 'consulting'
+    if RM_USER and username == RM_USER:
+        return 'rm'
+    return None
+
+
+def _env_password_for(username: str):
+    if username == APP_USER:
+        return APP_PASSWORD
+    if RM_USER and username == RM_USER:
+        return RM_PASSWORD
+    return None
+
 # 화면에서 비밀번호를 변경하면 해시가 여기 저장되고, 이후 로그인은 이 값이 기준이 된다.
 # (data/는 배포 시 GCS 버킷 마운트라 재시작·재배포해도 유지됨. 초기화하려면 이 파일 삭제 →
 #  다시 APP_PASSWORD 환경변수 값으로 로그인.)
@@ -40,6 +63,19 @@ MIN_PASSWORD_LEN = 8
 # api_change_password: 로그인 화면에서 비밀번호를 바꿀 수 있게 공개. 대신 아이디+현재 비밀번호를
 # 모두 맞게 입력해야만 통과하므로 로그인 자체와 같은 수준의 검증을 거친다.
 _PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password'}
+
+# RM(조회 전용)이 접근할 수 없는 쓰기/실행/관리 엔드포인트.
+# (다운로드·조회 GET은 여기 없음 → RM 허용). 서버측 최종 방어선이며 화면 숨김과 별개로 강제된다.
+_ADMIN_ONLY_ENDPOINTS = {
+    'pension_store_post',        # 원리금 금리 업로드 저장
+    'proposal',                  # 상품제안관리 화면
+    'proposals_post',            # 이달의 제안상품 등록
+    'proposal_meta_post',        # 유니버스/연컨사전확인/판매가능 저장
+    'api_refresh', 'api_refresh_one',   # 신용등급 지금 조회(스크래핑)
+    'api_update_rating',         # 신용등급 수정
+    'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
+    'api_add_institution', 'api_delete_institution',   # 기관 추가/삭제
+}
 
 
 def _load_auth() -> dict:
@@ -60,25 +96,40 @@ def _save_auth(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def verify_password(pw: str) -> bool:
-    """저장된 해시가 있으면 그것으로, 없으면 APP_PASSWORD로 검증."""
-    stored = _load_auth().get('password_hash')
+def _user_hash(username: str):
+    """사용자의 저장된 비밀번호 해시. 신형 auth.json={username:{password_hash}},
+    구형={password_hash}(APP_USER 것)도 호환."""
+    auth = _load_auth()
+    if 'password_hash' in auth and username == APP_USER:   # 구형 포맷
+        return auth.get('password_hash')
+    u = auth.get(username)
+    return u.get('password_hash') if isinstance(u, dict) else None
+
+
+def verify_password(username: str, pw: str) -> bool:
+    """저장된 해시가 있으면 그것으로, 없으면 해당 계정의 환경변수 비밀번호로 검증."""
+    stored = _user_hash(username)
     if stored:
         return check_password_hash(stored, pw)
-    return pw == APP_PASSWORD
+    envpw = _env_password_for(username)
+    return envpw is not None and pw == envpw
 
 
 @app.before_request
 def _require_login():
     if request.endpoint in _PUBLIC_ENDPOINTS:
         return
-    if session.get('logged_in'):
-        return
-    # API(fetch) 요청은 401 JSON, 일반 페이지는 로그인 화면으로 유도
-    if request.path.startswith('/api/'):
-        return jsonify({'success': False, 'message': '로그인이 필요합니다',
-                        'login_required': True}), 401
-    return redirect(url_for('login', next=request.path))
+    if not session.get('logged_in'):
+        # API(fetch) 요청은 401 JSON, 일반 페이지는 로그인 화면으로 유도
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'message': '로그인이 필요합니다',
+                            'login_required': True}), 401
+        return redirect(url_for('login', next=request.path))
+    # 로그인됨 — RM(조회 전용)은 관리 엔드포인트 차단(서버측 강제)
+    if session.get('role') == 'rm' and request.endpoint in _ADMIN_ONLY_ENDPOINTS:
+        if request.path.startswith('/api/'):
+            return jsonify({'success': False, 'message': '조회 전용 계정은 이 기능을 사용할 수 없습니다.'}), 403
+        return redirect(url_for('index'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -87,9 +138,11 @@ def login():
     if request.method == 'POST':
         u = request.form.get('username', '').strip()
         p = request.form.get('password', '')
-        if u == APP_USER and verify_password(p):
+        role = _role_for(u)
+        if role and verify_password(u, p):
             session['logged_in'] = True
             session['user'] = u
+            session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
             nxt = request.args.get('next') or '/'
             if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
                 nxt = '/'
@@ -117,11 +170,12 @@ def api_change_password():
     new = d.get('new') or ''
     confirm = d.get('confirm') or ''
 
-    if not session.get('logged_in'):
-        if (d.get('username') or '').strip() != APP_USER:
-            return jsonify({'success': False, 'message': '아이디 또는 현재 비밀번호가 올바르지 않습니다.'}), 400
+    # 대상 사용자: 로그인 상태면 세션 사용자, 아니면(로그인 화면) 폼의 아이디
+    username = session.get('user') if session.get('logged_in') else (d.get('username') or '').strip()
+    if not _role_for(username):   # 등록된 계정이 아님
+        return jsonify({'success': False, 'message': '아이디 또는 현재 비밀번호가 올바르지 않습니다.'}), 400
 
-    if not verify_password(cur):
+    if not verify_password(username, cur):
         return jsonify({'success': False, 'message': '현재 비밀번호가 올바르지 않습니다.'}), 400
     if len(new) < MIN_PASSWORD_LEN:
         return jsonify({'success': False,
@@ -132,10 +186,18 @@ def api_change_password():
         return jsonify({'success': False, 'message': '현재 비밀번호와 다른 비밀번호를 입력하세요.'}), 400
 
     auth = _load_auth()
-    auth['password_hash'] = generate_password_hash(new)
-    auth['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 구형(top-level password_hash)이 있으면 APP_USER 것으로 이관 후 신형 per-user로 저장
+    if 'password_hash' in auth:
+        migrated = {'password_hash': auth.pop('password_hash')}
+        if 'updated' in auth:
+            migrated['updated'] = auth.pop('updated')
+        auth[APP_USER] = migrated
+    entry = auth.get(username) if isinstance(auth.get(username), dict) else {}
+    entry['password_hash'] = generate_password_hash(new)
+    entry['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    auth[username] = entry
     _save_auth(auth)
-    logger.info('비밀번호 변경 완료 (사용자=%s)', session.get('user', ''))
+    logger.info('비밀번호 변경 완료 (사용자=%s)', username)
     return jsonify({'success': True, 'message': '비밀번호가 변경되었습니다.'})
 
 # ── 백그라운드 조회 상태 ───────────────────────────────────────────────
@@ -1258,7 +1320,14 @@ def index():
         rating_scale=RATING_SCALE,
         agencies=AGENCIES,
         agency_labels=AGENCY_LABELS,
+        role=session.get('role', ''),   # consulting=전체, rm=조회·다운로드만(화면 제어용)
     )
+
+
+@app.route('/api/me')
+def api_me():
+    """현재 로그인 사용자/소속(role). iframe(pension/proposal)에서 화면 제어용."""
+    return jsonify({'user': session.get('user', ''), 'role': session.get('role', '')})
 
 
 @app.route('/api/export.xlsx')

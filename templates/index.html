@@ -149,6 +149,8 @@ td.td-chg   {text-align:left;padding:7px 10px}
 .mismatch-msg{display:inline-block;font-weight:700;color:#B8500F;font-size:.7rem}
 .mismatch-agencies{margin-top:2px;font-size:.68rem;color:#B8500F;line-height:1.35}
 td.td-act   {padding:6px 7px}
+/* RM(조회 전용): 관리 열·확인 벨·변경 알림바 숨김(권한은 서버에서도 강제됨) */
+.main.role-rm .th-act,.main.role-rm .td-act,.main.role-rm .bell,.main.role-rm .alert-bar{display:none}
 
 /* ── Agency Cell ── */
 .ag-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -320,7 +322,9 @@ tr.row-done td{transition:background .3s}
   <div class="super-tabs">
     <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')">원리금보장상품 금리</button>
     <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')">신용등급관리</button>
+    {% if role != 'rm' %}
     <button id="stab-proposal" class="super-tab"       onclick="switchSuper('proposal')">상품제안관리</button>
+    {% endif %}
   </div>
 </header>
 
@@ -329,10 +333,12 @@ tr.row-done td{transition:background .3s}
   <iframe id="pension-frame" class="pension-frame" src="/pension" title="원리금보장상품 금리관리"></iframe>
 </div>
 
-<!-- ═══ [통합탭3] 상품제안관리 ═══ -->
+<!-- ═══ [통합탭3] 상품제안관리 ═══ (RM은 접근 불가 → 미렌더) -->
+{% if role != 'rm' %}
 <div id="super-proposal" class="super-panel" style="display:none">
   <iframe id="proposal-frame" class="pension-frame" src="/proposal" title="상품제안관리"></iframe>
 </div>
+{% endif %}
 
 <!-- ═══ [통합탭2] 신용등급관리 ═══ -->
 <!-- 신용등급 서브바(설명 + 조회 컨트롤) -->
@@ -340,16 +346,18 @@ tr.row-done td{transition:background .3s}
   <div class="hdr-sub">나이스신용평가 · 한국기업평가 · 한국신용평가 공시 기준 &nbsp;|&nbsp; 보험사: 보험지급능력등급(IFSR) &nbsp;|&nbsp; 1순위 기업신용등급 2순위 회사채 선순위 적용</div>
   <div class="hdr-right">
     <div class="upd-lbl">마지막 업데이트<br><strong id="hdr-upd">{{ last_updated }}</strong></div>
+    {% if role != 'rm' %}
     <button class="btn btn-ghost btn-sm" onclick="openAdd()">＋ 기관 추가</button>
     {% if total_changed > 0 %}
     <button class="btn btn-warn btn-sm" onclick="acknowledgeAll()">🔔 변경 전체 확인 ({{ total_changed }})</button>
     {% endif %}
     <button class="btn btn-navy" id="ref-btn" onclick="doRefresh()">🔄 지금 조회</button>
+    {% endif %}
   </div>
 </div>
 
 <!-- ═══ MAIN (신용등급관리 본문) ═══ -->
-<div class="main">
+<div class="main{% if role == 'rm' %} role-rm{% endif %}">
 
   <!-- Alert -->
   <div class="alert-bar {% if total_changed == 0 %}hidden{% endif %}" id="alert-bar">
