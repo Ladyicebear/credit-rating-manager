@@ -316,6 +316,9 @@ tr.row-done td{transition:background .3s}
       <div class="brand-sub">퇴직연금 상품제공기관 통합관리</div>
     </div>
     <div class="hdr-actions">
+      {% if role != 'rm' and rm_user %}
+      <button class="btn btn-sm" onclick="openRmPw()" title="RM 계정 비밀번호 변경">🔑 <span class="btn-label">RM 비밀번호 변경</span></button>
+      {% endif %}
       <a class="btn btn-sm" href="/logout" title="로그아웃">🔓 <span class="btn-label">로그아웃</span></a>
     </div>
   </div>
@@ -712,9 +715,48 @@ tr.row-done td{transition:background .3s}
   </div>
 </div>
 
+{% if role != 'rm' and rm_user %}
+<!-- ═══ RM 비밀번호 변경 MODAL (연금컨설팅팀 전용) ═══ -->
+<div class="overlay" id="rmpw-ov">
+  <div class="modal" style="width:360px">
+    <h3>🔑 RM 비밀번호 변경</h3>
+    <div class="fg" style="margin-bottom:11px">
+      <label>연금컨설팅팀(내) 비밀번호</label>
+      <input type="password" id="rmpw-cur" autocomplete="current-password" placeholder="본인 확인용"/>
+    </div>
+    <div class="fg" style="margin-bottom:11px">
+      <label>새 RM 비밀번호 <span style="font-weight:400;color:#8a92a0">(8자 이상)</span></label>
+      <input type="password" id="rmpw-new" autocomplete="new-password"/>
+    </div>
+    <div class="fg">
+      <label>새 RM 비밀번호 확인</label>
+      <input type="password" id="rmpw-confirm" autocomplete="new-password"/>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-sm" style="background:#eee;color:#444" onclick="closeModal('rmpw-ov')">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="submitRmPw()">변경</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div id="toast"></div>
 
 <script>
+{% if role != 'rm' and rm_user %}
+const RM_USER_ID = {{ rm_user | tojson }};
+function openRmPw(){ ['rmpw-cur','rmpw-new','rmpw-confirm'].forEach(i=>document.getElementById(i).value=''); document.getElementById('rmpw-ov').classList.add('open'); document.getElementById('rmpw-cur').focus(); }
+function submitRmPw(){
+  const cur=document.getElementById('rmpw-cur').value, nw=document.getElementById('rmpw-new').value, cf=document.getElementById('rmpw-confirm').value;
+  if(!cur||!nw||!cf){ showToast('모든 항목을 입력하세요','err'); return; }
+  fetch('/api/change_password',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({target:RM_USER_ID,current:cur,new:nw,confirm:cf})})
+    .then(r=>r.json()).then(d=>{
+      if(d.success){ closeModal('rmpw-ov'); showToast('RM 비밀번호가 변경되었습니다','ok'); }
+      else showToast(d.message||'변경 실패','err');
+    }).catch(()=>showToast('서버와 통신하지 못했습니다','err'));
+}
+{% endif %}
 /* ── 상위 통합 탭 (원리금보장상품 금리 / 신용등급관리) ── */
 /* pension iframe 높이를 헤더 실제높이에 맞춰 동적 계산(데스크톱/모바일 모두 정확) */
 function fitPensionFrame(){

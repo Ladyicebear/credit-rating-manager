@@ -163,26 +163,47 @@ def logout():
 def api_change_password():
     """비밀번호 변경. 해시만 저장하며 평문은 기록하지 않는다.
 
-    로그인 화면(비로그인 상태)에서도 호출되므로, 세션이 없으면 아이디까지 확인한다.
+    규칙:
+    - 연금컨설팅팀(consulting): 로그인 화면/로그인 상태에서 본인 비밀번호 변경(현재 비밀번호 확인).
+      또한 로그인 상태에서 target=RM 지정 시 RM 비밀번호를 재설정(연금컨설팅팀 본인 비밀번호로 확인).
+    - RM: 자기 비밀번호도 변경할 수 없다(연금컨설팅팀만 가능).
     """
     d = request.get_json(silent=True) or {}
     cur = d.get('current') or ''
     new = d.get('new') or ''
     confirm = d.get('confirm') or ''
 
-    # 대상 사용자: 로그인 상태면 세션 사용자, 아니면(로그인 화면) 폼의 아이디
-    username = session.get('user') if session.get('logged_in') else (d.get('username') or '').strip()
-    if not _role_for(username):   # 등록된 계정이 아님
+    logged_in = bool(session.get('logged_in'))
+    acting_user = session.get('user') if logged_in else (d.get('username') or '').strip()
+    acting_role = session.get('role') if logged_in else _role_for(acting_user)
+    # 변경 대상: target 지정 시 그 계정, 없으면 본인
+    target = (d.get('target') or '').strip() or acting_user
+    if not _role_for(acting_user) or not _role_for(target):
         return jsonify({'success': False, 'message': '아이디 또는 현재 비밀번호가 올바르지 않습니다.'}), 400
+    target_role = _role_for(target)
+    is_self = (target == acting_user)
 
-    if not verify_password(username, cur):
-        return jsonify({'success': False, 'message': '현재 비밀번호가 올바르지 않습니다.'}), 400
+    if target_role == 'rm':
+        # RM 비밀번호는 '로그인한 연금컨설팅팀'만 변경 가능(연금컨설팅팀 본인 비밀번호로 확인)
+        if not (logged_in and acting_role == 'consulting'):
+            return jsonify({'success': False, 'message': 'RM 비밀번호는 연금컨설팅팀 계정으로 로그인 후에만 변경할 수 있습니다.'}), 403
+        if not verify_password(acting_user, cur):
+            return jsonify({'success': False, 'message': '연금컨설팅팀 비밀번호가 올바르지 않습니다.'}), 400
+    else:
+        # 연금컨설팅팀 대상: 본인만, 본인 현재 비밀번호 확인
+        if not is_self:
+            return jsonify({'success': False, 'message': '본인 비밀번호만 변경할 수 있습니다.'}), 403
+        if logged_in and acting_role == 'rm':
+            return jsonify({'success': False, 'message': 'RM 비밀번호는 연금컨설팅팀만 변경할 수 있습니다.'}), 403
+        if not verify_password(target, cur):
+            return jsonify({'success': False, 'message': '현재 비밀번호가 올바르지 않습니다.'}), 400
+
     if len(new) < MIN_PASSWORD_LEN:
         return jsonify({'success': False,
                         'message': f'새 비밀번호는 {MIN_PASSWORD_LEN}자 이상이어야 합니다.'}), 400
     if new != confirm:
         return jsonify({'success': False, 'message': '새 비밀번호가 서로 일치하지 않습니다.'}), 400
-    if new == cur:
+    if is_self and new == cur:
         return jsonify({'success': False, 'message': '현재 비밀번호와 다른 비밀번호를 입력하세요.'}), 400
 
     auth = _load_auth()
@@ -192,12 +213,12 @@ def api_change_password():
         if 'updated' in auth:
             migrated['updated'] = auth.pop('updated')
         auth[APP_USER] = migrated
-    entry = auth.get(username) if isinstance(auth.get(username), dict) else {}
+    entry = auth.get(target) if isinstance(auth.get(target), dict) else {}
     entry['password_hash'] = generate_password_hash(new)
     entry['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    auth[username] = entry
+    auth[target] = entry
     _save_auth(auth)
-    logger.info('비밀번호 변경 완료 (사용자=%s)', username)
+    logger.info('비밀번호 변경 완료 (대상=%s, 변경자=%s)', target, acting_user)
     return jsonify({'success': True, 'message': '비밀번호가 변경되었습니다.'})
 
 # ── 백그라운드 조회 상태 ───────────────────────────────────────────────
@@ -1321,6 +1342,7 @@ def index():
         agencies=AGENCIES,
         agency_labels=AGENCY_LABELS,
         role=session.get('role', ''),   # consulting=전체, rm=조회·다운로드만(화면 제어용)
+        rm_user=RM_USER,                 # RM 비밀번호 변경 UI 표시/대상용(미설정 시 버튼 숨김)
     )
 
 
