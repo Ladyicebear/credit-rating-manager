@@ -798,13 +798,18 @@ function switchSuper(which){
   const pen = which==='pension';
   const prop = which==='proposal';
   const credit = which==='credit';
-  document.getElementById('super-pension').style.display  = pen  ? 'block' : 'none';
-  document.getElementById('super-proposal').style.display = prop ? 'block' : 'none';
-  document.getElementById('credit-subbar').style.display  = credit ? 'flex' : 'none';
-  document.querySelector('.main').style.display           = credit ? 'block' : 'none';
-  document.getElementById('stab-pension').classList.toggle('active', pen);
-  document.getElementById('stab-credit').classList.toggle('active', credit);
-  document.getElementById('stab-proposal').classList.toggle('active', prop);
+  // 요소가 없을 수도 있으므로(예: RM은 상품제안관리 패널 미렌더) null-safe로 처리.
+  // 이렇게 하지 않으면 중간에서 오류가 나 .main(신용등급 본문)을 숨기는 줄이 실행되지 않아
+  // 원리금 탭에 신용등급 화면이 겹쳐 보이는 버그가 생긴다.
+  const setDisp=(el,show,mode)=>{ if(el) el.style.display = show ? (mode||'block') : 'none'; };
+  const setAct =(el,on)=>{ if(el) el.classList.toggle('active', on); };
+  setDisp(document.getElementById('super-pension'),  pen);
+  setDisp(document.getElementById('super-proposal'), prop);
+  setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
+  setDisp(document.querySelector('.main'),           credit);
+  setAct(document.getElementById('stab-pension'),  pen);
+  setAct(document.getElementById('stab-credit'),   credit);
+  setAct(document.getElementById('stab-proposal'), prop);
   if(pen || prop) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
