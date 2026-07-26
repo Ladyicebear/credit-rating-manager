@@ -41,6 +41,11 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .pane-sub{font-size:11px;color:var(--muted);font-weight:600}
 .tbl-scroll{overflow:auto;max-height:62vh}
 table{width:100%;border-collapse:collapse;font-size:12px}
+/* 왼쪽 DB제도 상품 표: 화면 진입 시 가로 스크롤 없이 모든 열이 보이도록 고정 폭.
+   상품제공기관·상품구분은 좁히고 긴 이름은 …처리(제목 툴팁으로 전체 확인). */
+.left-tbl{table-layout:fixed}
+.left-tbl th,.left-tbl td{padding-left:4px;padding-right:4px}
+.left-tbl td.l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 thead th{position:sticky;top:0;background:#F1F3F5;color:#374151;font-weight:700;
          padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:2}
 tbody td{padding:8px;border-bottom:1px solid #F0F1F3;text-align:center;white-space:nowrap}
@@ -121,9 +126,13 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
         <span class="pane-sub" id="leftSub">0건</span>
       </div>
       <div class="tbl-scroll">
-        <table>
+        <table class="left-tbl">
+          <colgroup>
+            <col style="width:32px"><col style="width:52px"><col style="width:15%"><col style="width:14%">
+            <col style="width:60px"><col style="width:86px"><col style="width:78px"><col style="width:48px"><col style="width:56px">
+          </colgroup>
           <thead><tr>
-            <th style="width:38px"><input type="checkbox" class="chk" id="chkAll" title="전체 선택"></th>
+            <th><input type="checkbox" class="chk" id="chkAll" title="전체 선택"></th>
             <th>업권</th><th>상품제공기관</th><th>상품구분</th>
             <th>유니버스<br>(Y/N)</th><th>연컨사전확인<br>(Y/N)</th><th>판매가능여부</th><th>기간</th><th>금리</th>
           </tr></thead>
