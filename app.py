@@ -36,6 +36,8 @@ if not (os.environ.get('APP_USER') and os.environ.get('APP_PASSWORD')):
 # RM_USER/RM_PASSWORD 미설정 시 RM 로그인 비활성(연금컨설팅팀 계정만 동작).
 RM_USER = os.environ.get('RM_USER', '')
 RM_PASSWORD = os.environ.get('RM_PASSWORD', '')
+# RM 비밀번호 만료 주기(일). 이 기간이 지나면 RM 로그인이 막히고, 연금컨설팅팀이 재설정해야 다시 로그인 가능.
+RM_PW_MAX_AGE_DAYS = int(os.environ.get('RM_PW_MAX_AGE_DAYS', '14'))
 
 
 def _role_for(username: str):
@@ -115,6 +117,40 @@ def verify_password(username: str, pw: str) -> bool:
     return envpw is not None and pw == envpw
 
 
+# ── RM 비밀번호 만료(2주) ─────────────────────────────────────────────
+def _rm_pw_set_at():
+    """RM 비밀번호가 마지막으로 설정된 시각 문자열(없으면 None)."""
+    if not RM_USER:
+        return None
+    u = _load_auth().get(RM_USER)
+    if isinstance(u, dict):
+        return u.get('rm_pw_set_at') or u.get('updated')
+    return None
+
+
+def _mark_rm_pw_set_at():
+    """RM 비밀번호 설정 시각을 now로 기록(만료 시계 리셋). 비밀번호 해시는 건드리지 않음."""
+    if not RM_USER:
+        return
+    auth = _load_auth()
+    entry = auth.get(RM_USER) if isinstance(auth.get(RM_USER), dict) else {}
+    entry['rm_pw_set_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    auth[RM_USER] = entry
+    _save_auth(auth)
+
+
+def _rm_pw_expired() -> bool:
+    """RM 비밀번호가 만료 주기를 넘겼는지. 설정 시각이 없으면 만료 아님(최초 로그인 시 기록)."""
+    ts = _rm_pw_set_at()
+    if not ts:
+        return False
+    try:
+        set_at = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+    except (ValueError, TypeError):
+        return False
+    return (datetime.now() - set_at).days >= RM_PW_MAX_AGE_DAYS
+
+
 @app.before_request
 def _require_login():
     if request.endpoint in _PUBLIC_ENDPOINTS:
@@ -140,14 +176,21 @@ def login():
         p = request.form.get('password', '')
         role = _role_for(u)
         if role and verify_password(u, p):
-            session['logged_in'] = True
-            session['user'] = u
-            session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
-            nxt = request.args.get('next') or '/'
-            if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
-                nxt = '/'
-            return redirect(nxt)
-        error = '아이디 또는 비밀번호가 올바르지 않습니다.'
+            if role == 'rm' and _rm_pw_expired():
+                # 2주 경과 → RM 로그인 차단, 연금컨설팅팀 재설정 필요
+                error = f'RM 비밀번호가 만료되었습니다({RM_PW_MAX_AGE_DAYS}일 경과). 연금컨설팅팀에 재설정을 요청하세요.'
+            else:
+                if role == 'rm' and not _rm_pw_set_at():
+                    _mark_rm_pw_set_at()   # 초기 비밀번호 최초 로그인 → 만료 시계 시작
+                session['logged_in'] = True
+                session['user'] = u
+                session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
+                nxt = request.args.get('next') or '/'
+                if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
+                    nxt = '/'
+                return redirect(nxt)
+        if not error:
+            error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
         return redirect(url_for('index'))
     return render_template('login.html', error=error)
@@ -216,6 +259,8 @@ def api_change_password():
     entry = auth.get(target) if isinstance(auth.get(target), dict) else {}
     entry['password_hash'] = generate_password_hash(new)
     entry['updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if target_role == 'rm':
+        entry['rm_pw_set_at'] = entry['updated']   # RM 만료 시계(2주) 리셋
     auth[target] = entry
     _save_auth(auth)
     logger.info('비밀번호 변경 완료 (대상=%s, 변경자=%s)', target, acting_user)
