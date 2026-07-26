@@ -20,6 +20,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .brand-logo .b-gray{color:#b3bac4}
 .brand-sub{font-size:.82rem;color:#6b7280;margin-top:5px;font-weight:600}
 .hdr-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+/* Goun 로고(brand-mark)가 RM 비밀번호 버튼을 가리지 않게 로고 폭만큼 왼쪽으로 */
+.rmpw-btn{margin-right:62px}
 .hdr-row1 .btn{background:#fff;color:#4b5563;border:1px solid #d5d9e0}
 .hdr-row1 .btn:hover{background:#f4f6f8}
 .brand-mark{position:absolute;right:126px;top:10px;width:46px;height:auto;
@@ -317,7 +319,7 @@ tr.row-done td{transition:background .3s}
     </div>
     <div class="hdr-actions">
       {% if role != 'rm' and rm_user %}
-      <button class="btn btn-sm" onclick="openRmPw()" title="RM 계정 비밀번호 변경">🔑 <span class="btn-label">RM 비밀번호 변경</span></button>
+      <button class="btn btn-sm rmpw-btn" onclick="openRmPw()" title="RM 계정 비밀번호 변경">🔑 <span class="btn-label">RM 비밀번호 변경</span></button>
       {% endif %}
       <a class="btn btn-sm" href="/logout" title="로그아웃">🔓 <span class="btn-label">로그아웃</span></a>
     </div>
