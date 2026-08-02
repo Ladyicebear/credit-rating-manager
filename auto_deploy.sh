@@ -10,6 +10,8 @@ set -uo pipefail
 REPO="$(cd "$(dirname "$0")" && pwd)"
 SERVICE="credit-rating.service"
 LOG="$REPO/auto_deploy.log"
+# sudoers NOPASSWD 규칙과 정확히 같은 절대경로로 호출(매칭 보장)
+SYSTEMCTL="$(command -v systemctl || echo /usr/bin/systemctl)"
 cd "$REPO" || exit 1
 
 git fetch --quiet origin master || { echo "$(date '+%F %T') fetch 실패"; exit 0; } >>"$LOG" 2>&1
@@ -20,7 +22,7 @@ REMOTE="$(git rev-parse origin/master)"
 
 echo "$(date '+%F %T') 업데이트 감지 ${LOCAL:0:7} -> ${REMOTE:0:7}" >>"$LOG"
 if git merge --ff-only origin/master >>"$LOG" 2>&1; then
-  if sudo systemctl restart "$SERVICE" >>"$LOG" 2>&1; then
+  if sudo "$SYSTEMCTL" restart "$SERVICE" >>"$LOG" 2>&1; then
     echo "$(date '+%F %T') 배포 완료 · 서비스 재시작" >>"$LOG"
   else
     echo "$(date '+%F %T') 코드는 반영됐으나 재시작 실패 — 수동 확인 필요" >>"$LOG"
