@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
-# VM에서 1회만 실행 → GitHub 자동 pull 배포(코드 전용)를 systemd 타이머로 설치한다.
-# 사용법:  ./deploy/install_auto_deploy.sh [주기]
-#   예)   ./deploy/install_auto_deploy.sh 3min   (기본 3분)
+# VM에서 1회만 실행 → 웹 「서버배포」 버튼으로 배포(코드 전용)가 되도록 설정한다.
+#   - credit-deploy.service(oneshot): 실행되면 auto_deploy.sh가 git pull(코드만)+재시작.
+#   - Flask 앱(웹 버튼)이 이 oneshot을 트리거만 하고, oneshot이 서비스를 재시작한다.
+#   - 3분 폴링 타이머는 만들지 않는다(원할 때만 버튼으로 배포).
+# 사용법:  ./deploy/install_auto_deploy.sh
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 USER_NAME="$(id -un)"
 SERVICE="credit-rating.service"
-INTERVAL="${1:-3min}"
 SYSTEMCTL="$(command -v systemctl)"
 
 echo "리포: $REPO"
 echo "실행계정: $USER_NAME"
-echo "확인주기: $INTERVAL"
 
-# 1) 서비스 재시작만 무비번 sudo 허용(딱 이 명령 하나만)
-echo "$USER_NAME ALL=(root) NOPASSWD: $SYSTEMCTL restart $SERVICE" | sudo tee /etc/sudoers.d/credit-deploy >/dev/null
+# 1) 무비번 sudo 허용 — 딱 두 명령만:
+#    · 웹 앱이 배포 oneshot을 트리거(--no-block start)
+#    · auto_deploy.sh가 앱 서비스 재시작
+sudo tee /etc/sudoers.d/credit-deploy >/dev/null <<SUDO
+$USER_NAME ALL=(root) NOPASSWD: $SYSTEMCTL --no-block start credit-deploy.service
+$USER_NAME ALL=(root) NOPASSWD: $SYSTEMCTL restart $SERVICE
+SUDO
 sudo chmod 440 /etc/sudoers.d/credit-deploy
 sudo visudo -cf /etc/sudoers.d/credit-deploy >/dev/null && echo "sudoers 등록 OK"
 
 # 2) auto_deploy.sh 실행권한
 chmod +x "$REPO/auto_deploy.sh"
 
-# 3) systemd 유닛(서비스+타이머) 생성
+# 3) 배포 oneshot 서비스(타이머 없음 — 웹 버튼으로만 실행)
 sudo tee /etc/systemd/system/credit-deploy.service >/dev/null <<UNIT
 [Unit]
-Description=Auto-deploy credit-rating from GitHub (code only)
+Description=Deploy credit-rating from GitHub (code only, on-demand)
 After=network-online.target
 Wants=network-online.target
 
@@ -36,26 +41,13 @@ WorkingDirectory=$REPO
 ExecStart=$REPO/auto_deploy.sh
 UNIT
 
-sudo tee /etc/systemd/system/credit-deploy.timer >/dev/null <<UNIT
-[Unit]
-Description=Check GitHub for credit-rating updates every $INTERVAL
+# (이전에 타이머를 설치했다면 제거 — 폴링 안 함)
+sudo systemctl disable --now credit-deploy.timer 2>/dev/null || true
+sudo rm -f /etc/systemd/system/credit-deploy.timer
 
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=$INTERVAL
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-UNIT
-
-# 4) 활성화
 sudo systemctl daemon-reload
-sudo systemctl enable --now credit-deploy.timer
 
 echo
-echo "설치 완료. 상태 확인:"
-echo "  systemctl status credit-deploy.timer --no-pager"
-echo "  systemctl list-timers credit-deploy.timer --no-pager"
+echo "설치 완료 — 이제 웹 헤더의 「서버배포」 버튼으로 배포됩니다."
+echo "테스트(수동 1회 실행):  sudo systemctl --no-block start credit-deploy.service"
 echo "배포 로그:  tail -f $REPO/auto_deploy.log"
-echo "지금 한 번 즉시 실행:  sudo systemctl start credit-deploy.service"

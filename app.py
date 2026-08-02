@@ -4,8 +4,10 @@ import re
 import json
 import time
 import uuid
+import shutil
 import logging
 import threading
+import subprocess
 from collections import Counter
 from datetime import datetime
 from markupsafe import Markup
@@ -80,6 +82,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
     'api_add_institution', 'api_delete_institution',   # 기관 추가/삭제
     'admin_visitors', 'api_visit_stats', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
+    'admin_deploy',              # 서버 배포(연금컨설팅팀 전용)
 }
 
 
@@ -1639,6 +1642,23 @@ def download_visit_stats():
     fname = '방문자통계_%s.xlsx' % datetime.now().strftime('%Y%m%d')
     return send_file(bio, as_attachment=True, download_name=fname,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ── 서버 배포 (웹 「서버배포」 버튼 → VM이 코드 pull+재시작) ─────────────
+#   credit-deploy.service(oneshot)를 비동기(--no-block)로 트리거만 한다.
+#   실제 pull/재시작은 auto_deploy.sh가 수행(코드만, 데이터 미변경).
+#   최초 1회 VM 설치(deploy/install_deploy.sh) 후 동작. sudoers로 이 명령만 무비번 허용.
+@app.route('/admin/deploy', methods=['POST'])
+def admin_deploy():
+    systemctl = shutil.which('systemctl') or '/usr/bin/systemctl'
+    try:
+        subprocess.Popen(['sudo', systemctl, '--no-block', 'start', 'credit-deploy.service'])
+    except Exception as e:
+        logger.exception('배포 트리거 실패')
+        return jsonify({'success': False,
+                        'message': '배포 시작 실패(서버 설정 확인): %s' % e}), 500
+    return jsonify({'success': True,
+                    'message': '배포를 시작했습니다. 20~30초 후 반영됩니다.'})
 
 
 @app.route('/api/export.xlsx')
