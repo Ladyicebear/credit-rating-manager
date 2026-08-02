@@ -47,6 +47,15 @@ data/auth.json.*
 data/proposals.json
 data/proposal_meta.json
 
+# 방문자 통계 런타임 데이터(서버 누적, 배포 제외)
+data/visit_stats.json
+
+# 과거 금리 추이 백업본(로컬 생성물)
+data/rate_history_backup_*
+
+# 자동배포 로그
+auto_deploy.log
+
 # 로컬 백업/임시/도구 파일
 data/ratings.backup_*.json
 .claude/
