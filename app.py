@@ -3,13 +3,14 @@ import io
 import re
 import json
 import time
+import uuid
 import logging
 import threading
 from collections import Counter
 from datetime import datetime
 from markupsafe import Markup
 from flask import (Flask, render_template, jsonify, request, send_file,
-                   redirect, url_for, session)
+                   redirect, url_for, session, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -78,6 +79,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'api_update_rating',         # 신용등급 수정
     'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
     'api_add_institution', 'api_delete_institution',   # 기관 추가/삭제
+    'admin_visitors', 'api_visit_stats', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
 }
 
 
@@ -97,6 +99,79 @@ def _save_auth(data: dict):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(AUTH_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ── 방문자 접속 집계 (일자별) ──────────────────────────────────────────
+#   논문(AI 도입 후 사용률 ↔ WM게시판 상관관계) 기초자료용.
+#   웹/모바일 모든 접속을 집계하되, 두 지표를 함께 저장:
+#     - *_total : 페이지 진입 횟수(총 접속수)
+#     - *_uids  : 방문자 쿠키(vid) 목록 → len()이 순방문자(하루·기기당 1회, 브라우저 기준 근사)
+#   ⚠️ 런타임 데이터 파일 → 배포 시 코드에서 제외(서버 누적 데이터 보호).
+VISIT_FILE = os.path.join(DATA_DIR, 'visit_stats.json')
+_VISIT_LOCK = threading.Lock()
+_MOBILE_UA_RE = re.compile(r'Mobi|Android|iPhone|iPod|Windows Phone|BlackBerry|IEMobile', re.I)
+
+
+def _load_visits() -> dict:
+    if not os.path.exists(VISIT_FILE):
+        return {'days': {}}
+    try:
+        with open(VISIT_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        if not isinstance(d, dict) or 'days' not in d:
+            return {'days': {}}
+        return d
+    except Exception:
+        logger.exception('visit_stats.json 읽기 실패')
+        return {'days': {}}
+
+
+def _save_visits(d: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = VISIT_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(d, f, ensure_ascii=False)
+    os.replace(tmp, VISIT_FILE)
+
+
+def _record_visit(resp):
+    """메인 페이지(index) 로드 1회당 호출 — 일자별 총 접속수 + 순방문자 집계."""
+    try:
+        vid = request.cookies.get('vid')
+        new_vid = not vid
+        if new_vid:
+            vid = uuid.uuid4().hex
+        dev = 'mob' if _MOBILE_UA_RE.search(request.headers.get('User-Agent', '') or '') else 'web'
+        today = datetime.now().strftime('%Y-%m-%d')
+        with _VISIT_LOCK:
+            data = _load_visits()
+            day = data['days'].setdefault(
+                today, {'web_total': 0, 'mob_total': 0, 'web_uids': [], 'mob_uids': []})
+            day[dev + '_total'] = day.get(dev + '_total', 0) + 1
+            uids = day.setdefault(dev + '_uids', [])
+            if vid not in uids:
+                uids.append(vid)
+            _save_visits(data)
+        if new_vid:
+            # 2년짜리 방문자 식별 쿠키(개인정보 아님: 무작위 id) → 순방문자 추정용
+            resp.set_cookie('vid', vid, max_age=60 * 60 * 24 * 730, samesite='Lax')
+    except Exception:
+        logger.exception('방문자 집계 실패')  # 집계 실패가 페이지 로드를 막지 않도록
+    return resp
+
+
+def _visit_series() -> list:
+    """일자 오름차순 집계 시계열. web/mob 총접속·순방문·합계."""
+    data = _load_visits()
+    out = []
+    for day in sorted(data.get('days', {}).keys()):
+        d = data['days'][day] or {}
+        wt, mt = int(d.get('web_total', 0)), int(d.get('mob_total', 0))
+        wu, mu = len(d.get('web_uids', [])), len(d.get('mob_uids', []))
+        out.append({'date': day,
+                    'web_total': wt, 'mob_total': mt, 'total': wt + mt,
+                    'web_uniq': wu, 'mob_uniq': mu, 'uniq': wu + mu})
+    return out
 
 
 def _user_hash(username: str):
@@ -1492,7 +1567,7 @@ def index():
         reverse=True,
     )
 
-    return render_template(
+    html = render_template(
         'index.html',
         data=data,
         last_updated=meta.get('updated', '-'),
@@ -1507,12 +1582,63 @@ def index():
         rm_user=RM_USER,                 # RM 비밀번호 변경 UI 표시/대상용(미설정 시 버튼 숨김)
         rm_days_left=_rm_days_left(),    # RM 비밀번호 만료까지 남은 일수(표시용)
     )
+    # 메인 페이지 로드 = 1 접속 → 일자별 방문자 집계(웹/모바일 모두)
+    return _record_visit(make_response(html))
 
 
 @app.route('/api/me')
 def api_me():
     """현재 로그인 사용자/소속(role). iframe(pension/proposal)에서 화면 제어용."""
     return jsonify({'user': session.get('user', ''), 'role': session.get('role', '')})
+
+
+# ── 방문자 통계 (연금컨설팅팀 전용 관리자 화면) ─────────────────────────
+#   _ADMIN_ONLY_ENDPOINTS 에 등록됨 → RM 계정은 서버측에서 차단.
+@app.route('/admin/visitors')
+def admin_visitors():
+    return send_file(os.path.join(BASE_DIR, 'admin_visitors.html'))
+
+
+@app.route('/api/visit_stats')
+def api_visit_stats():
+    return jsonify({'series': _visit_series()})
+
+
+@app.route('/download/visit_stats.xlsx')
+def download_visit_stats():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '방문자통계'
+    headers = ['일자', '웹 접속수', '모바일 접속수', '총 접속수',
+               '웹 순방문', '모바일 순방문', '총 순방문']
+    ws.append(headers)
+    navy = PatternFill('solid', fgColor='16335B')
+    thin = Side(style='thin', color='D5D9E0')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for c in ws[1]:
+        c.font = Font(bold=True, color='FFFFFF')
+        c.fill = navy
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        c.border = border
+    for r in _visit_series():
+        ws.append([r['date'], r['web_total'], r['mob_total'], r['total'],
+                   r['web_uniq'], r['mob_uniq'], r['uniq']])
+    for row in ws.iter_rows(min_row=2):
+        for i, c in enumerate(row):
+            c.border = border
+            c.alignment = Alignment(horizontal='left' if i == 0 else 'right')
+    ws.column_dimensions['A'].width = 13
+    for col in ('B', 'C', 'D', 'E', 'F', 'G'):
+        ws.column_dimensions[col].width = 13
+    ws.freeze_panes = 'A2'
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    fname = '방문자통계_%s.xlsx' % datetime.now().strftime('%Y%m%d')
+    return send_file(bio, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 @app.route('/api/export.xlsx')

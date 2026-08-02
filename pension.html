@@ -89,7 +89,7 @@
   .cpi-btn{border:none;border-radius:7px;padding:6px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;flex:0 0 auto}
   .cpi-btn-graph{background:#FCEAD8;color:#C77B2E}
   .cpi-btn-graph:hover{background:#F7DCBE}
-  .cpi-btn-dl{background:var(--navy);color:#fff}
+  .cpi-btn-dl{background:var(--navy);color:#fff;font-size:9.5px;padding:5px 7px;letter-spacing:-.3px}   /* 박스 안에 들어가게 축소 */
   .cpi-btn-dl:hover{background:var(--navy-d)}
   /* 물가상승률 그래프 팝업 */
   .cpi-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:20px}
@@ -194,7 +194,7 @@
   tbody tr:hover td{background:#FFF9F3}
   tbody tr:hover td.c-sec,tbody tr:hover td.c-org,tbody tr:hover td.c-prod{background:#FFF4E8}
   .rate{font-variant-numeric:tabular-nums;font-weight:700;color:#1F2937}
-  .rate.hi{color:#BE8639}
+  .rate.hi{color:#1F2937}   /* 금리표: 4% 이상 강조(누런색) 폐지 → 모두 검정 통일 */
   .rate.empty{color:#D1D5DB;font-weight:400}
   .badge-sec{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700}
   .s-은행{background:#E7F0FF;color:#1D4ED8}.s-생명보험{background:#E9F7EF;color:#059669}
@@ -297,6 +297,7 @@
   .prop-tbl{table-layout:fixed}
   .prop-tbl th,.prop-tbl td{border:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .prop-tbl thead th{position:sticky;top:0;z-index:2}
+  .prop-tbl th:nth-child(4),.prop-tbl td:nth-child(4){text-align:center}   /* 금리 열 중앙정렬 */
   .prop-tbl tbody tr{cursor:pointer}
   .prop-tbl tbody tr:active td{background:#FFF4E8}
   .prop-tbl tr.filler td,.prop-tbl tr.filler:active td{cursor:default;background:transparent}
@@ -437,8 +438,8 @@
     </div>
     <div class="prop-scroll" id="propScroll">
       <table class="sv-tbl prop-tbl">
-        <colgroup><col style="width:38%"><col style="width:33%"><col style="width:13%"><col style="width:16%"></colgroup>
-        <thead><tr><th>기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>
+        <colgroup><col style="width:29%"><col style="width:31%"><col style="width:17%"><col style="width:23%"></colgroup>
+        <thead id="propThead"><tr><th>기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>
         <tbody id="propBody"></tbody>
       </table>
     </div>
@@ -1167,6 +1168,15 @@ let propSearchTxt='';     // 제안 검색어(기관·상품구분·기간)
 let propProdFilter='ALL'; // 제안 상품구분 필터
 function onPropSearch(v){ propSearchTxt=v; renderProposalMobile(); }
 function onPropProd(v){ propProdFilter=v; renderProposalMobile(); }
+/* 제안 카드 헤더 정렬(기관·상품구분·기간·금리). 같은 헤더 재클릭 시 방향 토글 */
+let propSortKey=null, propSortDir=1;
+const PROP_SORT_FIRST={org:1,fam:1,period:1,rate:-1};   // 첫 클릭 방향(금리는 높은순부터)
+function propSortBy(key){
+  if(propSortKey===key) propSortDir=-propSortDir;
+  else { propSortKey=key; propSortDir=PROP_SORT_FIRST[key]||1; }
+  renderProposalMobile();
+}
+function propSortArrow(key){ return propSortKey===key ? (propSortDir===1?' ▲':' ▼') : ' ▼'; }
 function propProdMatch(fam){
   if(propProdFilter==='ALL') return true;
   const f=String(fam||'');
@@ -1207,13 +1217,28 @@ function renderProposalMobile(){
   const all=(proposalsAll[curMonth]||[]);
   if(!all.length){ card.style.display='none'; return; }   // 등록된 제안이 없으면 카드 숨김
   card.style.display='block';   /* CSS 기본이 none이라 ''로 두면 다시 숨겨짐 → block 명시 */
+  $('propThead').innerHTML=`<tr>`+
+    `<th onclick="propSortBy('org')">기관${propSortArrow('org')}</th>`+
+    `<th onclick="propSortBy('fam')">상품구분${propSortArrow('fam')}</th>`+
+    `<th class="sv-per" onclick="propSortBy('period')">기간${propSortArrow('period')}</th>`+
+    `<th onclick="propSortBy('rate')">금리${propSortArrow('rate')}</th>`+
+  `</tr>`;
 
   // 검색(기관·상품구분·기간) + 상품구분 필터
   const q=propSearchTxt.trim().toLowerCase();
   let rows=all.filter(r=>propProdMatch(r.fam) &&
     (!q || (String(r.org)+' '+String(r.fam)+' '+String(r.period)).toLowerCase().indexOf(q)>=0));
-  // 기본 정렬: 금리 높은순
-  rows.sort((a,b)=>{ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra; });
+  // 정렬: 헤더 클릭 열 기준(미선택 기본은 금리 높은순)
+  if(propSortKey){
+    const dir=propSortDir;
+    rows.sort((a,b)=>{
+      if(propSortKey==='rate'){ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return dir*(ra-rb); }
+      if(propSortKey==='period') return dir*(periodMonths(a.period)-periodMonths(b.period));
+      return dir*String(a[propSortKey]??'').localeCompare(String(b[propSortKey]??''),'ko');
+    });
+  }else{
+    rows.sort((a,b)=>{ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra; });
+  }
   proposalRows=rows;
 
   // 표는 항상 6행 고정 — 결과가 6개 미만이면 빈 행으로 채우고, 초과면 스크롤

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT_MS        = 20_000   # Playwright 타임아웃 (ms) — KIS 등
 NICE_TIMEOUT_MS   = 50_000   # NICE 서버 응답이 느려 별도 타임아웃 (17s+)
+NICE_MAX_ATTEMPTS = 3        # NICE 간헐 실패(느린 응답·일시 오류로 빈값) 대비 재시도 횟수(새 페이지로)
 # 평가사 1곳당 하드 타임아웃(초). Playwright 타임아웃이 안 걸리는 지점에서 멈춰도
 # 이 시간이 지나면 포기하고 다음으로 넘어간다. NICE 재시도(검색어 변형)를 고려해 넉넉히.
 AGENCY_TIMEOUT_SEC = 180
@@ -193,48 +194,57 @@ def _search_variants(name: str) -> list[str]:
 def scrape_nice(company: str, is_insurance: bool) -> tuple[str, str, str]:
     # 등급 우선순위 (비보험): 기업신용등급(ICR) → 채권(회사채선순위)
     # SC제일은행 → 한국스탠다드차타드은행 등 별칭 자동 적용
+    # NICE는 응답이 느려 간헐적으로 빈값/타임아웃이 발생 → 빈값이면 새 페이지로 재시도
     company = _resolve_company_name(company)
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=_CHROMIUM_ARGS)
-            page = browser.new_page()
-            page.set_extra_http_headers(_PAGE_HEADERS)
             try:
-                table_result = ('', '', '')
-                for search_term in _search_variants(company):
-                    encoded = urllib.parse.quote(search_term)
-                    url = f'https://www.nicerating.com/search/search.do?mainSType=CMP&mainSText={encoded}'
-                    page.goto(url, timeout=NICE_TIMEOUT_MS, wait_until='domcontentloaded')
-                    page.wait_for_timeout(1000)
+                for attempt in range(NICE_MAX_ATTEMPTS):
+                    try:
+                        page = browser.new_page()
+                        page.set_extra_http_headers(_PAGE_HEADERS)
+                        try:
+                            table_result = ('', '', '')
+                            for search_term in _search_variants(company):
+                                encoded = urllib.parse.quote(search_term)
+                                url = f'https://www.nicerating.com/search/search.do?mainSType=CMP&mainSText={encoded}'
+                                page.goto(url, timeout=NICE_TIMEOUT_MS, wait_until='domcontentloaded')
+                                page.wait_for_timeout(1000)
 
-                    if 'companyGradeInfo' not in page.url:
-                        table_result = _nice_parse_search_table(page, company, is_insurance)
+                                if 'companyGradeInfo' not in page.url:
+                                    table_result = _nice_parse_search_table(page, company, is_insurance)
 
-                        # 검색 결과 테이블에서 회사명이 정확히 매칭된 행을 찾았다면
-                        # 추가 클릭(첫 번째 '기업상세' 링크)은 다른 회사로 이동할 위험이 있어 즉시 반환
-                        # 예) 'NH투자증권' 검색 결과의 첫 행이 BNK투자증권이면
-                        #     첫 '기업상세' 클릭 시 BNK 페이지로 이동해 A+를 잘못 반환
-                        if table_result and table_result[0]:
-                            return table_result
+                                    # 검색 결과 테이블에서 회사명이 정확히 매칭된 행을 찾았다면
+                                    # 추가 클릭(첫 번째 '기업상세' 링크)은 다른 회사로 이동할 위험이 있어 즉시 반환
+                                    # 예) 'NH투자증권' 검색 결과의 첫 행이 BNK투자증권이면
+                                    #     첫 '기업상세' 클릭 시 BNK 페이지로 이동해 A+를 잘못 반환
+                                    if table_result and table_result[0]:
+                                        return table_result
 
-                        # 검색 결과 행 중 회사명이 매칭되는 행의 '기업상세' 링크만 선택
-                        detail = _nice_pick_detail_link(page, company)
-                        if detail is not None:
-                            detail.click()
-                            page.wait_for_load_state('domcontentloaded', timeout=NICE_TIMEOUT_MS)
-                            page.wait_for_timeout(1000)
+                                    # 검색 결과 행 중 회사명이 매칭되는 행의 '기업상세' 링크만 선택
+                                    detail = _nice_pick_detail_link(page, company)
+                                    if detail is not None:
+                                        detail.click()
+                                        page.wait_for_load_state('domcontentloaded', timeout=NICE_TIMEOUT_MS)
+                                        page.wait_for_timeout(1000)
 
-                    if 'companyGradeInfo' in page.url:
-                        result = _nice_parse_detail(page, is_insurance)
-                        if result and result[0]:
-                            return result
+                                if 'companyGradeInfo' in page.url:
+                                    result = _nice_parse_detail(page, is_insurance)
+                                    if result and result[0]:
+                                        if attempt > 0:
+                                            logger.info('[NICE] %s: 재시도 %d회째 성공', company, attempt + 1)
+                                        return result
 
-                    if table_result and table_result[0]:
-                        return table_result
-
+                                if table_result and table_result[0]:
+                                    return table_result
+                        finally:
+                            page.close()
+                    except Exception as e:
+                        logger.debug('[NICE] %s (시도 %d/%d): %s', company, attempt + 1, NICE_MAX_ATTEMPTS, e)
+                    # 이번 시도에서 빈값/예외 → 다음 시도(새 페이지)로
                 return '', '', ''
             finally:
-                page.close()
                 browser.close()
     except Exception as e:
         logger.debug('[NICE] %s: %s', company, e)

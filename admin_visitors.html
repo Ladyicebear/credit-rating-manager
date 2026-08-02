@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>방문자 통계</title>
+<style>
+  :root{--navy:#16335B;--navy-d:#0F2647;--orange:#F68121;--orange-d:#E85A00;
+        --line:#E5E7EB;--ink:#1F2937;--muted:#6B7280;--bg:#F3F5F9;--white:#fff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif;font-size:14px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 40px}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .title{font-size:18px;font-weight:800;color:var(--navy);letter-spacing:-.4px}
+  .sub{font-size:12px;color:var(--muted);margin:2px 0 16px}
+  .ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{border:none;background:#fff;color:#4B5563;font:inherit;font-size:12.5px;font-weight:700;
+              padding:7px 13px;cursor:pointer}
+  .seg button.on{background:#FCEAD8;color:var(--orange-d)}
+  select{border:1px solid #D5D9E0;border-radius:8px;padding:7px 10px;font:inherit;font-size:12.5px;
+         color:var(--ink);background:#fff;outline:none}
+  select:focus{border-color:var(--orange);box-shadow:0 0 0 3px #FFF3EA}
+  .btn-dl{border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:8px;
+          padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer}
+  .btn-dl:hover{background:var(--navy-d)}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .kpi .lb{font-size:12px;color:var(--muted);font-weight:700}
+  .kpi .vl{font-size:24px;font-weight:800;color:var(--navy);letter-spacing:-.5px;margin-top:3px;font-variant-numeric:tabular-nums}
+  .kpi .vl small{font-size:12.5px;font-weight:700;color:var(--muted);margin-left:3px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .card-t{font-size:13.5px;font-weight:800;color:var(--navy)}
+  .legend{font-size:12px;color:#4B5563;display:flex;gap:14px;flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .dot-web{background:var(--navy)} .dot-mob{background:var(--orange)}
+  .split{display:flex;height:18px;border-radius:9px;overflow:hidden;background:#EEF1F6}
+  .split .s-web{background:var(--navy)} .split .s-mob{background:var(--orange)}
+  .chart{display:flex;align-items:flex-end;gap:5px;height:210px;overflow-x:auto;padding:6px 2px 0}
+  .col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1 0 24px;min-width:22px;height:100%}
+  .stack{width:64%;max-width:26px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:3px 3px 0 0;overflow:hidden}
+  .seg-mob{background:var(--orange)} .seg-web{background:var(--navy)}
+  .xlab{font-size:10px;color:var(--muted);margin-top:5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:#F7F9FC;color:#4B5563;font-weight:700;text-align:right;padding:9px 12px;border-bottom:1px solid var(--line);position:sticky;top:0}
+  thead th:first-child{text-align:left}
+  tbody td{padding:8px 12px;border-bottom:1px solid #F0F2F6;text-align:right;font-variant-numeric:tabular-nums}
+  tbody td:first-child{text-align:left;font-weight:700;color:var(--navy)}
+  tbody td.tot{font-weight:800}
+  .tbl-wrap{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:14px}
+  .note{font-size:11.5px;color:#9CA3AF;line-height:1.6;margin-top:6px}
+  @media(max-width:720px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <div class="title">일자별 방문자 접속 현황</div>
+    </div>
+    <div class="ctl">
+      <div class="seg" id="metricSeg">
+        <button data-m="total" class="on" onclick="setMetric('total')">총 접속수</button>
+        <button data-m="uniq" onclick="setMetric('uniq')">순방문자</button>
+      </div>
+      <select id="periodSel" onchange="setPeriod(this.value)">
+        <option value="14">최근 14일</option>
+        <option value="30">최근 30일</option>
+        <option value="90">최근 90일</option>
+        <option value="all">전체 기간</option>
+      </select>
+      <button class="btn-dl" onclick="location.href='/download/visit_stats.xlsx'">엑셀 다운로드</button>
+    </div>
+  </div>
+  <div class="sub">웹·모바일 모든 접속을 일자별로 집계합니다. (총 접속수 = 페이지 진입 횟수 / 순방문자 = 하루·기기당 1회, 브라우저 기준 추정)</div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+var SERIES=[], METRIC='total', PERIOD='14';
+var nf=function(n){return (n||0).toLocaleString('ko-KR');};
+
+function setMetric(m){
+  METRIC=m;
+  document.querySelectorAll('#metricSeg button').forEach(function(b){b.classList.toggle('on', b.dataset.m===m);});
+  render();
+}
+function setPeriod(p){ PERIOD=p; render(); }
+
+function filtered(){
+  if(PERIOD==='all') return SERIES.slice();
+  var n=parseInt(PERIOD,10);
+  return SERIES.slice(-n);
+}
+function val(d,dev){ return METRIC==='uniq' ? (d[dev+'_uniq']||0) : (d[dev+'_total']||0); }
+function rowTot(d){ return val(d,'web')+val(d,'mob'); }
+function sumLast(arr,n){ var s=0, a=arr.slice(-n); for(var i=0;i<a.length;i++) s+=rowTot(a[i]); return s; }
+
+function render(){
+  var box=document.getElementById('content');
+  if(!SERIES.length){
+    box.innerHTML='<div class="card empty">아직 집계된 접속 기록이 없습니다.<br>사용자가 시스템에 접속하면 이 곳에 일자별로 쌓입니다.</div>';
+    return;
+  }
+  var rows=filtered();
+  var today = SERIES[SERIES.length-1];
+  var kToday = rowTot(today);
+  var k7 = sumLast(SERIES,7), k30 = sumLast(SERIES,30);
+  var kAll = 0; SERIES.forEach(function(d){ kAll+=rowTot(d); });
+  var unit = METRIC==='uniq' ? '명' : '건';
+
+  var web=0, mob=0; rows.forEach(function(d){ web+=val(d,'web'); mob+=val(d,'mob'); });
+  var tot=web+mob, pw = tot? Math.round(web/tot*100):0;
+
+  var maxT=1; rows.forEach(function(d){ maxT=Math.max(maxT, rowTot(d)); });
+  var CH=170;
+  var bars=rows.map(function(d){
+    var w=val(d,'web'), m=val(d,'mob');
+    var wpx=Math.round(w/maxT*CH), mpx=Math.round(m/maxT*CH);
+    var md=d.date.slice(5);
+    var tip=d.date+'  웹 '+nf(w)+' · 모바일 '+nf(m)+' · 합계 '+nf(w+m);
+    return '<div class="col" title="'+tip+'"><div class="stack" style="height:'+(wpx+mpx)+'px">'+
+           '<div class="seg-mob" style="height:'+mpx+'px"></div>'+
+           '<div class="seg-web" style="height:'+wpx+'px"></div></div>'+
+           '<div class="xlab">'+md+'</div></div>';
+  }).join('');
+
+  var trs=rows.slice().reverse().map(function(d){
+    var w=val(d,'web'), m=val(d,'mob');
+    return '<tr><td>'+d.date+'</td><td>'+nf(w)+'</td><td>'+nf(m)+'</td><td class="tot">'+nf(w+m)+'</td></tr>';
+  }).join('');
+
+  box.innerHTML=
+    '<div class="kpis">'+
+      kpi('오늘 접속', kToday, unit)+
+      kpi('최근 7일', k7, unit)+
+      kpi('최근 30일', k30, unit)+
+      kpi('누적', kAll, unit)+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-h"><div class="card-t">접속 기기 비중</div>'+
+        '<div class="legend"><span><i class="dot dot-web"></i>웹 '+nf(web)+' ('+pw+'%)</span>'+
+        '<span><i class="dot dot-mob"></i>모바일 '+nf(mob)+' ('+(tot?100-pw:0)+'%)</span></div></div>'+
+      '<div class="split"><div class="s-web" style="width:'+pw+'%"></div><div class="s-mob" style="width:'+(100-pw)+'%"></div></div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-h"><div class="card-t">일자별 접속 추이</div>'+
+        '<div class="legend"><span><i class="dot dot-web"></i>웹</span><span><i class="dot dot-mob"></i>모바일</span></div></div>'+
+      '<div class="chart">'+bars+'</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-h"><div class="card-t">일자별 상세</div></div>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>일자</th><th>웹</th><th>모바일</th><th>합계</th></tr></thead>'+
+      '<tbody>'+trs+'</tbody></table></div>'+
+      '<div class="note">* 논문용 기초자료: 총 접속수와 순방문자를 함께 저장합니다. 순방문자는 브라우저 쿠키 기준 하루 1회 집계이며, 계정 공용 특성상 \'사람\' 단위가 아닌 \'기기·브라우저\' 단위 근사치입니다.</div>'+
+    '</div>';
+}
+function kpi(lb,v,unit){
+  return '<div class="kpi"><div class="lb">'+lb+'</div><div class="vl">'+nf(v)+'<small>'+unit+'</small></div></div>';
+}
+
+fetch('/api/visit_stats').then(function(r){return r.json();}).then(function(d){
+  SERIES=(d&&d.series)||[]; render();
+}).catch(function(){ SERIES=[]; render(); });
+</script>
+</body>
+</html>
