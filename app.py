@@ -70,6 +70,7 @@ _PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password'}
 # (다운로드·조회 GET은 여기 없음 → RM 허용). 서버측 최종 방어선이며 화면 숨김과 별개로 강제된다.
 _ADMIN_ONLY_ENDPOINTS = {
     'pension_store_post',        # 원리금 금리 업로드 저장
+    'rate_history_append',       # 과거 금리 추이 월간 평균 추가
     'proposal',                  # 상품제안관리 화면
     'proposals_post',            # 이달의 제안상품 등록
     'proposal_meta_post',        # 유니버스/연컨사전확인/판매가능 저장
@@ -1182,6 +1183,7 @@ _PENSION_ALIAS = {  # 레포트 표기 -> 데이터 표기(예외)
     '기업은행': '중소기업은행', '산업은행': '한국산업은행', 'SBI저축은행': '에스비아이저축은행',
     'NH저축은행': '엔에이치저축은행', 'DB저축은행': '디비저축은행', 'JT친애저축은행': '제이티친애저축은행',
     'BNK투자증권': '비엔케이투자증권', '신한생명': '신한라이프',
+    'SC은행': '한국스탠다드차타드은행',   # 레포트 SC은행 = 데이터 한국스탠다드차타드은행(SC제일은행 정기예금)
 }
 _PENSION_SECMAP = {'증권': '증권', '은행': '은행', '생보': '생명보험', '손보': '손해보험', '저축은행': '저축은행'}
 _ROMAN = [('Ⅲ', '3'), ('Ⅱ', '2'), ('Ⅰ', '1'), ('Ⅳ', '4'), ('Ⅴ', '5'),
@@ -1269,24 +1271,23 @@ def api_pension_ratings():
     return jsonify(out)
 
 
-@app.route('/api/pension_report', methods=['POST'])
-def pension_report():
-    """현재 화면(기준월)의 금리를 레포트 양식에 채워 xlsx로 반환."""
-    import io as _io
-    import openpyxl
-    from openpyxl.cell.cell import MergedCell
-
-    payload = request.get_json(force=True) or {}
-    month = payload.get('month', '')
-    rows = payload.get('rows', [])
-
-    # 클라이언트 그룹 rows 정규화(db/dc 키 int화)
+def _normalize_pen_rows(rows):
+    """클라이언트 그룹 rows(curRows) → 서버 계산용 G(db/dc 키 int화)."""
     G = []
     for r in rows:
         db = {int(k): v for k, v in (r.get('db') or {}).items() if v is not None}
         dc = {int(k): v for k, v in (r.get('dc') or {}).items() if v is not None}
         G.append({'sector': r.get('sector'), 'org': r.get('org') or '', 'fam': r.get('fam') or '',
                   'names': ' '.join(r.get('names') or []), 'db': db, 'dc': dc, 'def': r.get('def')})
+    return G
+
+
+def _build_pension_report_wb(rows, month):
+    """rows(curRows)를 레포트 양식에 채운 워크북 반환 → (wb, ws, matched).
+    금리현황 다운로드와 과거 금리 추이 이력계산이 '동일한 채움 결과'를 쓰도록 공용화."""
+    import openpyxl
+    from openpyxl.cell.cell import MergedCell
+    G = _normalize_pen_rows(rows)
 
     def find_rp(ikey):
         c = [g for g in G if _pen_inst_key(g['org']) == ikey
@@ -1296,6 +1297,13 @@ def pension_report():
 
     wb = openpyxl.load_workbook(os.path.join(BASE_DIR, 'pension_report_template.xlsx'))
     ws = wb.worksheets[0]
+    # 디폴트옵션(X=24열) 섹션 병합(증권 X7:35·생보 X53:70·손보 X71:79) 해제
+    #  → 보험사별 첫 '이율보증형보험' 행에 각자의 디폴트옵션 금리를 개별 기록(병합이면 스킵되던 문제 해결)
+    for _rng in ('X7:X35', 'X53:X70', 'X71:X79'):
+        try:
+            ws.unmerge_cells(_rng)
+        except (KeyError, ValueError):
+            pass
 
     def setcell(rr, cc, v):
         cell = ws.cell(rr, cc)
@@ -1356,14 +1364,110 @@ def pension_report():
                 if 12 in rp['dc']:
                     setcell(r, RP_C['dc'], round(float(rp['dc'][12]), 3))
                     setcell(r, RP_C['irp'], round(float(rp['dc'][12]), 3))
+    return wb, ws, matched
 
+
+@app.route('/api/pension_report', methods=['POST'])
+def pension_report():
+    """현재 화면(기준월)의 금리를 레포트 양식에 채워 xlsx로 반환."""
+    import io as _io
+    payload = request.get_json(force=True) or {}
+    month = payload.get('month', '')
+    rows = payload.get('rows', [])
+    wb, ws, matched = _build_pension_report_wb(rows, month)
     bio = _io.BytesIO()
     wb.save(bio)
     bio.seek(0)
     fname = f"퇴직연금 금리정보 현황_{month}.xlsx" if month else "퇴직연금 금리정보 현황.xlsx"
-    logger.info('금리현황 레포트 생성: month=%s, 데이터 %d행, 매칭 %d행', month, len(G), matched)
+    logger.info('금리현황 레포트 생성: month=%s, 데이터 %d행, 매칭 %d행', month, len(rows), matched)
     return send_file(bio, as_attachment=True, download_name=fname,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ── 과거 금리 추이: 매월 업권별 DB1년 평균 자동 append ──
+#   리포트 H열(=DB 1년)의 업권별 기관행 범위 평균(사용자 지정 2026-08).
+#   ※ 이 범위는 pension_report_template의 고정 행 배치에 대응(증권7~, 은행36~, ...).
+_RH_SECTOR_ROWS = [('증권', 7, 34), ('은행', 36, 52), ('생보', 53, 70),
+                   ('손보', 71, 79), ('저축', 80, 101)]
+_RH_DB_1Y_COL = 8   # 리포트 H열 = DB 1년
+
+
+def _avg_report_col(ws, col, r0, r1):
+    vals = [float(v) for r in range(r0, r1 + 1)
+            for v in [ws.cell(r, col).value]
+            if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    return round(sum(vals) / len(vals), 6) if vals else None
+
+
+@app.route('/api/rate_history_append', methods=['POST'])
+def rate_history_append():
+    """현재 리포트(rows)에서 업권별 DB1년 평균을 계산해 과거 금리 추이(Sheet2)에 그달 한 줄 추가.
+    행: [DATE(그달1일), 증권, 은행, 생보, 손보, 저축, 원리금보장평균(5개 평균), 기준금리]. 같은 DATE는 교체."""
+    import openpyxl
+    payload = request.get_json(force=True) or {}
+    month = str(payload.get('month', ''))
+    rows = payload.get('rows', [])
+    if not re.match(r'^\d{4}-\d{2}$', month):
+        return jsonify({'error': '기준월(YYYY-MM)이 필요합니다'}), 400
+    try:
+        base_rate = float(payload.get('base_rate'))
+    except (TypeError, ValueError):
+        return jsonify({'error': '기준금리(숫자)를 입력해주세요'}), 400
+
+    wb, ws, matched = _build_pension_report_wb(rows, month)
+    secavg = {name: _avg_report_col(ws, _RH_DB_1Y_COL, r0, r1) for name, r0, r1 in _RH_SECTOR_ROWS}
+    # 원리금보장 평균 = 증권·은행·생보·손보 4개 평균(저축은행 제외 — 과거 데이터 산식과 동일)
+    four = [secavg[n] for n in ('증권', '은행', '생보', '손보')]
+    present = [v for v in four if v is not None]
+    overall = round(sum(present) / len(present), 6) if present else None
+    date_str = f"{month}-01"
+    new_row = [date_str, secavg['증권'], secavg['은행'], secavg['생보'],
+               secavg['손보'], secavg['저축'], overall, base_rate]
+
+    def dstr(v):
+        return str(v)[:10] if v is not None else ''
+
+    # json(Sheet2) 갱신 — 같은 DATE 있으면 교체, 없으면 추가 후 날짜순 정렬
+    with open(_RATE_HISTORY_JSON, encoding='utf-8') as f:
+        hist = json.load(f)
+    rj = hist['sheets']['Sheet2']['rows']
+    ix = next((i for i, rr in enumerate(rj) if dstr(rr[0]) == date_str), None)
+    if ix is None:
+        rj.append(new_row)
+    else:
+        rj[ix] = new_row
+    rj.sort(key=lambda rr: dstr(rr[0]))
+    with open(_RATE_HISTORY_JSON, 'w', encoding='utf-8') as f:
+        json.dump(hist, f, ensure_ascii=False)
+
+    # xlsx(Sheet2) 갱신 — 같은 DATE 있으면 그 행 교체, 없으면 맨 아래 추가(날짜는 datetime으로 기록)
+    import datetime as _dt
+    y, mm = month.split('-')
+    dt_val = _dt.datetime(int(y), int(mm), 1)
+    xb = openpyxl.load_workbook(_RATE_HISTORY_XLSX)
+    xs = xb['Sheet2']
+    target = None
+    for r in range(5, xs.max_row + 1):
+        if dstr(xs.cell(r, 1).value) == date_str:
+            target = r
+            break
+    if target is None:
+        target = xs.max_row + 1
+    xs.cell(target, 1, dt_val)
+    for ci, val in enumerate(new_row[1:], start=2):
+        xs.cell(target, ci, val)
+    # 서식을 바로 위 데이터 행과 동일하게 맞춤 → 날짜(시간 없이)·금리 소수점 2자리로 7월 행처럼 표시
+    ref = target - 1
+    if ref >= 5:
+        for ci in range(1, 9):
+            xs.cell(target, ci).number_format = xs.cell(ref, ci).number_format
+    xb.save(_RATE_HISTORY_XLSX)
+
+    logger.info('과거금리추이 append %s: 증권=%s 은행=%s 생보=%s 손보=%s 저축=%s 평균=%s 기준=%s (매칭 %d)',
+                date_str, secavg['증권'], secavg['은행'], secavg['생보'], secavg['손보'],
+                secavg['저축'], overall, base_rate, matched)
+    return jsonify({'ok': True, 'date': date_str, 'sector': secavg, 'overall': overall,
+                    'base_rate': base_rate, 'matched': matched})
 
 
 @app.route('/')

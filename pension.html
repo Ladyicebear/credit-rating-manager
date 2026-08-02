@@ -33,15 +33,16 @@
   .page-head .sub{color:var(--muted);font-size:12.5px;margin-bottom:2px}
   /* ---------- toolbar card ---------- */
   .toolbar{background:var(--white);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
-    padding:14px 16px;display:flex;flex-wrap:nowrap;align-items:center;gap:10px;margin-bottom:14px;overflow-x:auto}
+    padding:9px 12px;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-bottom:14px;overflow-x:hidden}
   .toolbar .btn{flex:0 0 auto}
-  .tb-group{display:flex;align-items:center;gap:8px}
-  .tb-label{font-size:11px;color:var(--muted);font-weight:700}
-  .tb-sep{width:1px;height:26px;background:var(--line);margin:0 4px}
+  .tb-group{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+  .tb-label{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap;line-height:1.15}
+  .tb-sep{width:1px;height:22px;background:var(--line);margin:0 2px;flex:0 0 auto}
+  .toolbar select{height:30px;padding:4px 8px;font-size:12px}
   select,input[type=text]{border:1px solid #D5D9E0;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;color:var(--ink);height:36px}
   select:focus,input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
-  .btn{border:1px solid transparent;border-radius:8px;padding:0 14px;height:36px;font-size:13px;font-weight:700;
-    display:inline-flex;align-items:center;gap:7px;background:#fff;color:var(--ink);border-color:#D5D9E0;transition:.12s}
+  .btn{border:1px solid transparent;border-radius:8px;padding:0 9px;height:30px;font-size:12px;font-weight:700;white-space:nowrap;
+    display:inline-flex;align-items:center;gap:5px;background:#fff;color:var(--ink);border-color:#D5D9E0;transition:.12s}
   .btn:hover{background:#F7F8FA}
   .btn.primary{background:#fff;color:var(--orange);border-color:var(--orange)}
   .btn.primary:hover{background:var(--orange-l)}
@@ -55,7 +56,12 @@
   .btn.ghost{background:#fff}
   .btn.danger{background:#fff;color:#E06A4A;border-color:#F0B4A4}
   .btn.danger:hover{background:#FDF1EE}
-  .btn svg{width:15px;height:15px}
+  .btn svg{width:13px;height:13px;flex:0 0 auto}
+  /* 툴바는 항상 한 행(스크롤·2줄 금지). 좁아질수록 단계적으로 축소 */
+  @media(max-width:1300px){ .toolbar .btn svg{display:none} .toolbar .btn{padding:0 8px} .toolbar{gap:5px} }
+  @media(max-width:1180px){ .toolbar .btn{padding:0 7px;font-size:11.5px} .toolbar select{font-size:11.5px} .toolbar{gap:4px} }
+  @media(max-width:1040px) and (min-width:641px){ .toolbar .btn{padding:0 6px;letter-spacing:-.2px} .toolbar .tb-sep{display:none} .toolbar select{padding:4px 6px} }
+  @media(max-width:1000px) and (min-width:641px){ .toolbar{gap:3px} .toolbar .btn{padding:0 5px;font-size:11px;letter-spacing:-.3px} .toolbar select{font-size:11px;padding:3px 5px} .tb-label{font-size:10px} }
   .spacer{flex:1}
   /* ---------- 제도별 최고금리 요약 ---------- */
   .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:nowrap;align-items:flex-start}
@@ -68,7 +74,15 @@
   .cpi-when{font-size:12px;color:#4B5563;font-weight:700}
   .cpi-diff{font-size:12px;font-weight:700;color:#374151;white-space:nowrap}
   .cpi-src{font-size:10px;color:#9CA3AF;white-space:nowrap}
-  .cpi-rate{font-size:19px;font-weight:800;color:#BE8639;letter-spacing:-.5px;text-align:center;margin-top:2px;line-height:1.1}
+  .cpi-rate{font-size:19px;font-weight:800;color:var(--orange-d);letter-spacing:-.5px;text-align:center;margin-top:2px;line-height:1.1}
+  /* 한국은행 기준금리 박스 + 물가상승률과 나란히 놓는 행 */
+  .sv-row2{display:flex;gap:8px;align-items:stretch}
+  .sv-row2 > .cpi-box{flex:1 1 0;min-width:0}
+  .bok-box{flex:0 0 auto;min-width:112px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:8px 10px}
+  /* 물가상승률 박스(전체 유지)가 좁은 폭에서 안 들어가면 기준금리를 위로 쌓음 */
+  @media(max-width:1360px){ .sv-row2{flex-direction:column} .sv-row2 > .bok-box{flex:1 1 auto} }
+  .bok-rate{font-size:19px;font-weight:800;color:var(--orange-d);letter-spacing:-.5px;line-height:1.1}
+  .bok-when{font-size:11.5px;color:#4B5563;font-weight:700;margin-top:2px}
   /* 물가상승률 박스 버튼(그래프보기 / 과거 물가상승률 다운로드) */
   .cpi-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:3px}
   .cpi-actions .cpi-rate{margin-top:0;flex:0 0 auto}
@@ -86,12 +100,21 @@
   .cpi-modal-x:hover{background:#E5E7EB}
   .cpi-modal-body{padding:2px}
   .sv-title{font-size:12.5px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
-  .sv-tbl{width:100%;border-collapse:collapse;font-size:11px}
-  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:center;border-bottom:1px solid var(--line)}  /* 헤더 구분값 중앙정렬 */
+  .sv-tbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+  .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}  /* 헤더 라벨 한 줄 고정 */
   .sv-tbl td{padding:5px 5px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  .sv-tbl td:nth-child(1),.sv-tbl td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 기관·상품구분 길면 … */
+  .sv-tbl th:nth-child(1),.sv-tbl td:nth-child(1){width:27%}   /* 기관(줄여서 판매여부 확보) */
+  .sv-tbl th:nth-child(2),.sv-tbl td:nth-child(2){width:23%}   /* 상품구분 */
+  .sv-tbl th:nth-child(3),.sv-tbl td:nth-child(3){width:13%}   /* 기간 */
+  .sv-tbl th:nth-child(4),.sv-tbl td:nth-child(4){width:17%;text-align:right}    /* 금리 우측 */
+  .sv-tbl th:nth-child(5),.sv-tbl td:nth-child(5){width:20%;text-align:center;padding-left:2px;padding-right:2px}  /* 판매여부(안 짤리게) */
   .sv-tbl th.sv-per,.sv-tbl td.sv-per{text-align:center;white-space:nowrap;color:#4B5563;font-weight:700}
   .sv-tbl tr:last-child td{border-bottom:none}
-  .sv-tbl td:last-child{text-align:right}   /* 금리 데이터는 우측, 헤더는 중앙 */
+  .sv-tbl .sell-badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:20px;cursor:pointer;white-space:nowrap}
+  .sv-tbl .sell-ok{background:#E1F5EE;color:#0F6E56;border:1px solid #5DCAA5}
+  .sv-tbl .sell-no{background:#FCEBEB;color:#A32D2D;border:1px solid #F09595}
+  body.role-rm .sv-tbl .sell-badge{cursor:default}
   .sv-tbl th,.sv-tbl td{border:1px solid var(--line)}   /* 금리표처럼 격자 셀 테두리 */
   .sv-tbl b{color:#111;font-weight:700}
   /* 요약표를 감싸는 둥근 테두리 박스(금리표 스타일) */
@@ -193,6 +216,8 @@
   .hist-tag{font-size:11px;font-weight:700;color:var(--navy);background:var(--navy-l);padding:3px 9px;border-radius:6px}
   /* 하단 안내문구: 홈페이지(데스크톱)에서는 숨김, 모바일은 종전대로 노출 */
   .foot{display:none;color:var(--muted);font-size:11px;text-align:center;padding:16px}
+  .mobile-note{color:#E11D48;font-weight:800;white-space:nowrap;line-height:1.4;font-size:clamp(6px,2.1vw,9.5px);letter-spacing:-.3px;padding:0 0 7px}   /* 모바일표 카드 안 주의문구(표와 정렬·한 행) */
+  .web-note{color:#E11D48;font-weight:800;font-size:13px;padding:10px 16px 8px;white-space:nowrap}   /* 웹(데스크톱) 표 상단 주의문구 */
   .foot b{color:#4B5563}
   /* ---------- 기타 탭: 특수상품 표(금리연동형 / 기간식) ---------- */
   .special-view{padding:14px 16px;overflow-x:auto}
@@ -212,16 +237,18 @@
   .mtbl-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:8px}
   .mtbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
   /* 긴 기관명/상품구분이 옆 칸을 침범해 글씨가 겹치던 문제: 칸 안에서만 보이도록 잘라냄(…) */
-  .mtbl th,.mtbl td{border:1px solid var(--line);padding:6px 4px;text-align:center;vertical-align:middle;
+  .mtbl th,.mtbl td{border:1px solid var(--line);padding:5px 3px;text-align:center;vertical-align:middle;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mtbl tbody tr{cursor:pointer}
   .mtbl tbody tr:active td{background:#FFF4E8}
-  .mtbl thead th{background:#F1F3F5;color:#374151;font-weight:700;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;-webkit-user-select:none}
-  .mtbl th:nth-child(1),.mtbl td:nth-child(1){width:15%}
-  .mtbl th:nth-child(2),.mtbl td:nth-child(2){width:28%}
-  .mtbl th:nth-child(3),.mtbl td:nth-child(3){width:26%}
-  .mtbl th:nth-child(4),.mtbl td:nth-child(4){width:16%}
+  .mtbl thead th{background:#F1F3F5;color:#374151;font-weight:700;font-size:10px;letter-spacing:-.3px;position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;-webkit-user-select:none}
+  /* 6열: 업권·기관·상품구분·제도·기간·금리 (가로 스크롤 없이 한 화면) */
+  .mtbl th:nth-child(1),.mtbl td:nth-child(1){width:13%}
+  .mtbl th:nth-child(2),.mtbl td:nth-child(2){width:21%}
+  .mtbl th:nth-child(3),.mtbl td:nth-child(3){width:18%}
+  .mtbl th:nth-child(4),.mtbl td:nth-child(4){width:14%}
   .mtbl th:nth-child(5),.mtbl td:nth-child(5){width:15%}
+  .mtbl th:nth-child(6),.mtbl td:nth-child(6){width:19%}
   .mtbl td.l{text-align:left}
   .mtbl td.rt{font-weight:700;color:#1F2937;white-space:nowrap}
   .mtbl .badge-sec{font-size:9.5px;padding:1px 4px;white-space:nowrap}
@@ -274,8 +301,17 @@
   .prop-tbl tbody tr:active td{background:#FFF4E8}
   .prop-tbl tr.filler td,.prop-tbl tr.filler:active td{cursor:default;background:transparent}
   .prop-tbl tr.prop-nomatch td{color:#9CA3AF;text-align:center;cursor:default}
-  /* RM(조회 전용): 엑셀 업로드 버튼 숨김(다운로드·조회는 허용, 권한은 서버서도 강제) */
-  body.role-rm #btnUpload,body.role-rm #emptyState .btn.primary{display:none}
+  /* RM(조회 전용): 엑셀 업로드·금리편집 버튼 숨김(다운로드·조회는 허용, 권한은 서버서도 강제) */
+  body.role-rm #btnUpload,body.role-rm #btnPenEdit,body.role-rm #btnHistAppend,body.role-rm #emptyState .btn.primary{display:none}
+
+  /* ---------- 금리 수기 편집(연금컨설팅팀) ---------- */
+  #btnPenEdit.on{background:var(--orange);border-color:var(--orange);color:#fff}
+  td.sec-db,td.sec-dc,td.sec-def{position:relative}   /* 수기 표시 점 기준 */
+  .man-dot{position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--orange)}
+  body.pen-editing .cell-edit{cursor:pointer}
+  body.pen-editing .cell-edit:hover{background:var(--orange-l) !important;box-shadow:inset 0 0 0 1px var(--orange)}
+  body.pen-editing .cell-edit.cell-empty .rate::before{content:'＋';color:#CBD5E1}
+  .cell-input{width:54px;border:1px solid var(--orange);border-radius:4px;padding:2px 4px;font-size:12px;text-align:right;font-family:inherit;outline:none}
 
   /* ══════════ 휴대폰(앱형) 반응형 : 데스크톱은 그대로, 모바일만 재구성 ══════════ */
   @media(max-width:640px){
@@ -288,21 +324,27 @@
     .toolbar .tb-group{flex:1 1 0;min-width:0}
     .toolbar .tb-group select{flex:1;min-width:0}
     .toolbar .tb-sep,.toolbar .spacer,.toolbar .muted-note{display:none}
-    .toolbar #btnUpload,.toolbar #btnTemplate,.toolbar #btnExport,.toolbar #btnHistory,.toolbar #btnCompare{display:none}
+    .toolbar #btnUpload,.toolbar #btnTemplate,.toolbar #btnExport,.toolbar #btnHistory,.toolbar #btnCompare,.toolbar #btnPenEdit,.toolbar #btnHistAppend{display:none}
     .toolbar #btnReport{flex:1 1 0;min-width:0;height:42px;justify-content:center}
     .toolbar #btnView{flex:1 1 100%;height:42px;justify-content:center}
     /* 제도별 요약: 세로로 스택 */
     .stats{flex-direction:column;gap:10px}
     .stats > .sv-box,.stats > .sv-col{flex:1 1 auto;width:100%}
+    .sv-row2{flex-direction:row;gap:8px}       /* 모바일: 한국은행 기준금리(좌) + 물가상승률(우) 나란히 */
+    .sv-row2 > .bok-box{flex:0 0 auto;min-width:96px}
+    .cpi-btn-dl{display:none}                  /* 모바일만 '과거 물가상승률 다운로드' 버튼 제거(웹은 유지) */
     /* 필터/뷰탭 */
     .filters{padding:10px 12px;gap:8px}
-    .search-wrap{flex:1 1 100%}
-    .search-wrap input{flex:1;min-width:0}
+    .filters > .tb-label{display:none}   /* '업권' 라벨: 모바일에서 삭제(칩만으로 충분) */
+    .filters .search-wrap{flex:1 1 100%;min-width:0}    /* 전체폭 → 상품구분이 박스 안에 들어옴 */
+    .filters .search-wrap input{flex:1 1 auto;min-width:0}
+    .filters .prod-sel{flex:0 0 auto;max-width:42%}
     .filters .spacer{display:none}
     .foot{display:none}                  /* 하단 안내문구: 모바일에서도 숨김 */
+    .web-note{display:none}              /* 웹 주의문구: 모바일에선 숨김(모바일은 표 안 문구 사용) */
     /* 당월·전체: 글씨 작게 균등 한 줄 / 정렬: 흰색·더 작게 */
     .filters #btnMonthExport,.filters #btnAllExport{flex:1 1 0;height:34px;font-size:11.5px;padding:0 6px;justify-content:center;text-align:center}
-    .filters #btnSort{display:inline-flex;flex:0 0 auto;height:30px;font-size:10px;padding:0 9px;background:#fff;color:#1F5AA6;border:1px solid #C3D0E2}
+    .filters #btnSort{display:none}   /* 금리정렬 버튼: 모바일에서 제거 */
     .view-tabs{width:100%}
     .view-tabs button{flex:1}
     /* 표: 고정컬럼 폭 축소해 금리 열이 보이도록 + 터치 스크롤 */
@@ -339,6 +381,10 @@
       엑셀 업로드
     </button>
     <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    <button class="btn ghost" id="btnPenEdit" onclick="togglePenEdit()" title="빈 칸을 클릭해 금리를 직접 입력·수정합니다(연금컨설팅팀 전용)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      <span class="lbl">금리 편집</span>
+    </button>
     <button class="btn ghost" id="btnTemplate">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       업로드 양식 다운로드
@@ -358,6 +404,10 @@
     <button class="btn ghost" id="btnCompare" title="과거 금리 추이를 비교하는 그래프 엑셀 생성">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/><path d="M7 20l3-2 3 1 4-3" opacity=".55"/></svg>
       금리비교하기
+    </button>
+    <button class="btn ghost" id="btnHistAppend" onclick="openHistAppend()" title="이번 기준월의 업권별 DB 1년 평균을 과거 금리 추이에 추가(연금컨설팅팀 전용)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/><circle cx="19" cy="6" r="3" fill="currentColor" stroke="none"/><path d="M19 4.5v3M17.5 6h3" stroke="#fff" stroke-width="1.4"/></svg>
+      이력 추가
     </button>
     <span id="savedInfo" class="muted-note" style="display:none"></span>
     <div class="spacer"></div>
@@ -388,7 +438,7 @@
     <div class="prop-scroll" id="propScroll">
       <table class="sv-tbl prop-tbl">
         <colgroup><col style="width:38%"><col style="width:33%"><col style="width:13%"><col style="width:16%"></colgroup>
-        <thead><tr><th>상품제공기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>
+        <thead><tr><th>기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>
         <tbody id="propBody"></tbody>
       </table>
     </div>
@@ -427,12 +477,13 @@
 
   <!-- table -->
   <div class="tablecard">
+    <div class="web-note">*주의 : 금리정보는 업무 참고용입니다. 판매여부는 제안시 WM게시판에서 꼭 확인 바랍니다.</div>
     <div class="hscroll-top" id="hscrollTop" title="좌우로 밀어 DB / DC·IRP 금리 보기"><div id="hscrollInner"></div></div>
     <div class="table-scroll" id="tableScroll">
       <div class="empty" id="emptyState">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>
         <h3>업로드된 금리 정보가 없습니다</h3>
-        <p>「금리정보_업로드」 엑셀 파일을 업로드하면 상품제공기관·제도별 금리현황이 표시됩니다.</p>
+        <p>「금리정보_업로드」 엑셀 파일을 업로드하면 기관·제도별 금리현황이 표시됩니다.</p>
         <p style="font-size:12px">양식이 필요하면 <b>업로드 양식 다운로드</b>를 이용하세요.</p>
         <button class="btn primary" onclick="document.getElementById('btnUpload').click()">엑셀 업로드하기</button>
       </div>
@@ -460,6 +511,28 @@
   <div class="cpi-modal-card">
     <div class="cpi-modal-head"><button class="cpi-modal-x" onclick="closeCpiGraph()" title="닫기">✕</button></div>
     <div id="cpiModalBody" class="cpi-modal-body"></div>
+  </div>
+</div>
+
+<!-- 과거 금리 추이: 이력 추가 팝업 -->
+<div id="histModal" class="cpi-modal" onclick="if(event.target===this)closeHistAppend()">
+  <div class="cpi-modal-card" style="width:460px;max-width:94vw;padding:0">
+    <div style="padding:18px 20px 6px;display:flex;align-items:center;justify-content:space-between">
+      <b id="histModalTitle" style="font-size:15px;color:var(--navy)">과거 금리 추이 이력 추가</b>
+      <button class="cpi-modal-x" onclick="closeHistAppend()" title="닫기">✕</button>
+    </div>
+    <div style="padding:4px 20px 18px">
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.55">
+        현재 기준월 리포트의 <b style="color:var(--ink)">업권별 DB 1년 평균</b>(증권·은행·생보·손보·저축)이 계산되고, 그 중 <b style="color:var(--ink)">증권·은행·생보·손보 4개 평균</b>(저축 제외)이 '원리금보장 평균'으로 과거 금리 추이에 한 줄 추가됩니다. 같은 달은 덮어씁니다. 기준금리만 입력하세요.
+      </p>
+      <label style="font-size:12px;color:var(--muted);font-weight:700">한국은행 기준금리 (%)</label>
+      <input type="text" id="histBaseRate" inputmode="decimal" placeholder="예: 2.50" style="width:100%;margin-top:6px">
+      <div id="histResult" style="display:none;margin-top:14px;font-size:12.5px;background:var(--orange-l);border:1px solid #F3D8BF;border-radius:8px;padding:10px 12px;line-height:1.6"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn ghost" onclick="closeHistAppend()">취소</button>
+        <button class="btn navy" id="histSubmit" onclick="submitHistAppend()">추가</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -504,8 +577,10 @@ let prodFilter = 'ALL';    // 상품구분 필터(이율보증형보험/정기�
 let sortMode = '';         // ''|'desc'(금리높은순)|'asc'(금리낮은순)
 let curSpecial = {rateLinked:[], period:[]};   // 기타 탭: 금리연동형 / 기간식 특수상품
 let viewMode = 'all';
+let editMode = false;   // 금리 수기 편집 모드(연금컨설팅팀 전용)
 let searchTxt = '';
 let cpiData = null;        // 소비자물가지수 최신월 상승률(/api/cpi)
+let baseRateRows = null;   // 과거 금리 추이 Sheet2 rows (한국은행 기준금리 표시용)
 
 /* ---------- storage ---------- */
 function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
@@ -618,7 +693,7 @@ function buildGroups(raw){
        정기예금(비디폴트, 증권/발행어음 제외) 중 '일단위/월단위' 코호트 변형은 화면에서 숨김.
        (국민은행 특례: 상품명 정기예금(일단위)/C 의 금리를 3개월·6개월 양쪽에 반영)
        그 외(기본 org/정기예금, 만기분할, 우체국·카카오 등 서술형)는 '정기예금'으로 통합. */
-    let fam, monthsOverride=null;
+    let fam, monthsOverride=null, depVariant=false;
     const isDeposit = prod.indexOf('정기예금')>=0 && !isDefault
                       && sec!=='증권' && prod.indexOf('발행어음')<0;
     if(isDeposit){
@@ -629,6 +704,10 @@ function buildGroups(raw){
         else continue;   // 그 외 코호트 변형 숨김
       } else {
         fam='정기예금';
+        // 기본 정기예금과 같은 fam으로 통합되지만 금리가 다른 변형 상품(예: 정기예금(만기금리형)).
+        // 이런 변형은 기본 정기예금이 채운 만기값을 덮어쓰면 안 됨(안 그러면 입력 행 순서에 따라
+        // 1년=만기금리형 값이 기본 정기예금 값을 덮어써 오표기됨 — 기업은행 8월 사례).
+        if(/\([^)]*\)/.test(rest)) depVariant=true;
       }
     } else {
       fam = normFamily(prod);
@@ -636,7 +715,7 @@ function buildGroups(raw){
 
     const key=[sec,r.org,fam].join('||');
     let g=groups.get(key);
-    if(!g){ g={sector:sec,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[]}; groups.set(key,g); }
+    if(!g){ g={sector:sec,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[],dbBase:new Set(),dcBase:new Set()}; groups.set(key,g); }
     g.srcCount++; if(prod) g.names.push(prod);
     let months, n, dbR, dcR, irpR;
     if(monthsOverride){
@@ -651,7 +730,18 @@ function buildGroups(raw){
       const m=months[i]; if(m===null) continue;
       const dcv = dcR[i]!=null ? dcR[i] : irpR[i];
       if(isDefault){ if(m===36 && dcv!=null){ g.def=dcv; } }
-      else { if(dbR[i]!=null) g.db[m]=dbR[i]; if(dcv!=null) g.dc[m]=dcv; }
+      else {
+        // depVariant(정기예금 변형)은 기본 정기예금이 이미 채운 만기만 건너뛰고 빈 만기만 채움.
+        // 기본(정기예금)은 항상 기록하고 dbBase/dcBase에 표시 → 이후 변형이 덮어쓰지 못함(행 순서 무관).
+        if(dbR[i]!=null){
+          if(depVariant){ if(!g.dbBase.has(m)) g.db[m]=dbR[i]; }
+          else { g.db[m]=dbR[i]; if(isDeposit) g.dbBase.add(m); }
+        }
+        if(dcv!=null){
+          if(depVariant){ if(!g.dcBase.has(m)) g.dc[m]=dcv; }
+          else { g.dc[m]=dcv; if(isDeposit) g.dcBase.add(m); }
+        }
+      }
     }
     if(isDefault && g.def===null){                      // fallback: any dc/irp value
       for(let i=0;i<n;i++){ const dcv=dcR[i]!=null?dcR[i]:irpR[i]; if(dcv!=null){ g.def=dcv; break; } }
@@ -776,6 +866,7 @@ function loadMonth(m){
   // 정기예금을 기관별 1행으로 병합 + 코호트(월/일단위) 제외 → 예전 저장분도 새로고침만으로 정정.
   const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
   curRows = normalizeDepositRows(base).filter(r=>!isExcludedProduct(r));
+  applyOverrides(curRows, rec && rec.overrides);   // 수기 입력값 덧씌움 + 수기 표시
   curSpecial = (rec && rec.raw) ? extractSpecial(rec.raw)
              : {rateLinked:[], period:[], noRaw: !!(rec && !rec.raw)};   // 옛 저장분은 원본없음
   $('savedInfo').textContent = rec ? `기준년월 ${m.replace('-','.')} · ${rec.fileName||'파일'} · 업로드 ${rec.uploadedAt}` : '해당 월 데이터 없음';
@@ -785,13 +876,42 @@ function loadMonth(m){
 /* 제도별 최고금리 요약 표 렌더
    저축은행 제외 / 은행=은행+기타 합산 / 증권=ELB만 / 보험=이율보증형만
    만기: 은행·증권=1년(12), 생보·손보=3년(36). 표 = 상품제공기관·상품구분·금리 */
+/* 현재 기준월의 한국은행 기준금리(과거 금리 추이 저장분). 그달 없으면 최신값 */
+function currentBaseRate(){
+  if(!baseRateRows || !baseRateRows.length) return null;
+  const ym = String(curMonth||'').slice(0,7);
+  const same = baseRateRows.filter(r=>String(r[0]).slice(0,7)===ym);
+  const row = same.length ? same[same.length-1] : baseRateRows[baseRateRows.length-1];
+  const d = String(row[0]).slice(0,10);
+  const rate = typeof row[7]==='number' ? row[7] : parseFloat(row[7]);
+  return {rate: (isNaN(rate)?null:rate), year: d.slice(0,4), month: parseInt(d.slice(5,7),10)};
+}
+/* 판매여부 배지(판매가능/판매불가) — 데이터는 proposal_meta.sellable, 미설정=판매가능(기본) */
+function sellBadge(t, field){
+  const key=propKey(t)+'|'+field;   // 제도(db/dc/def)까지 키에 포함 → DB·DC 판매여부 개별 저장
+  const meta=(proposalMeta&&proposalMeta[key])||{};
+  const ok = meta.sellable !== false;
+  return `<span class="sell-badge ${ok?'sell-ok':'sell-no'}" data-k="${htmlAttr(key)}" onclick="toggleSellable(this.dataset.k)">${ok?'판매가능':'판매불가'}</span>`;
+}
+/* 배지 클릭 → 판매가능 ↔ 판매불가 토글·저장(연금컨설팅팀만, RM은 잠금·서버서도 차단) */
+function toggleSellable(key){
+  if(document.body.classList.contains('role-rm')) return;
+  proposalMeta = proposalMeta || {};
+  const meta = proposalMeta[key] = proposalMeta[key] || {};
+  const cur = meta.sellable !== false;
+  meta.sellable = !cur;
+  renderSummary();
+  fetch('/api/proposal_meta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key, sellable:!cur})})
+    .then(r=>{ if(!r.ok){ meta.sellable=cur; renderSummary(); toast('저장 실패(권한·서버 확인)',true); } else toast(!cur?'판매가능으로 저장':'판매불가로 저장'); })
+    .catch(()=>{ meta.sellable=cur; renderSummary(); toast('저장 실패',true); });
+}
 function renderSummary(){
   const rows=curRows;
   const top=(pred,field,month)=>{
     let b=null;
     for(const r of rows){ if(!pred(r)) continue;
       const v = field==='def' ? r.def : (r[field] && r[field][month]);
-      if(v!=null && (b==null || v>b.rate)) b={org:r.org, fam:r.fam, rate:v}; }
+      if(v!=null && (b==null || v>b.rate)) b={sector:r.sector, org:r.org, fam:r.fam, rate:v, months:month}; }
     return b;
   };
   // [업권라벨, 조건, 만기]
@@ -806,14 +926,14 @@ function renderSummary(){
     ['생보', r=>r.sector==='생명보험'],
     ['손보', r=>r.sector==='손해보험'],
   ];
-  const row=(t,per)=> t
-    ? `<tr><td><b>${t.org}</b></td><td>${t.fam}</td><td class="sv-per">${per}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td></tr>`
-    : `<tr><td class="sv-none">-</td><td></td><td></td><td></td></tr>`;
-  const head=`<thead><tr><th>상품제공기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>`;
-  const tbl=field=>`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo), MONTH_LABEL[mo]||'')).join('')+`</tbody></table></div>`;
-  // 디폴트옵션: 전체 최고금리 1건만(3년)
-  const defTop=top(r=>r.def!=null,'def');
-  const defTbl=`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>${row(defTop,'3년')}</tbody></table></div>`;
+  const row=(t,per,field)=> t
+    ? `<tr><td title="${htmlAttr(t.org)}"><b>${t.org}</b></td><td title="${htmlAttr(t.fam)}">${t.fam}</td><td class="sv-per">${per}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td><td>${sellBadge(t,field)}</td></tr>`
+    : `<tr><td class="sv-none">-</td><td></td><td></td><td></td><td></td></tr>`;
+  const head=`<thead><tr><th>기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th><th>판매여부</th></tr></thead>`;
+  const tbl=field=>`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo), MONTH_LABEL[mo]||'', field)).join('')+`</tbody></table></div>`;
+  // 디폴트옵션: 전체 최고금리 1건만(3년) — 판매여부 키는 36개월·제도 def
+  const defTop=top(r=>r.def!=null,'def',36);
+  const defTbl=`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>${row(defTop,'3년','def')}</tbody></table></div>`;
   // 물가상승률(소비자물가지수) 박스
   const c=cpiData;
   const cpiActs = `<div class="cpi-actions">`+
@@ -832,12 +952,20 @@ function renderSummary(){
     : `<div class="sv-box cpi-box"><div class="cpi-top"><div class="sv-title" style="color:var(--navy);margin:0">물가상승률</div></div>`+
       `<div class="cpi-when" style="color:#9CA3AF">소비자물가지수 불러오는 중…</div>`+
       cpiActs+`</div>`;
+  // 한국은행 기준금리 박스(과거 금리 추이의 그달 기준금리) — 물가상승률과 나란히
+  const br = currentBaseRate();
+  const bokBox = `<div class="sv-box bok-box">`+
+      `<div class="sv-title" style="color:var(--navy);margin:0 0 4px">한국은행 기준금리</div>`+
+      (br && br.rate!=null
+        ? `<div class="bok-rate">${br.rate.toFixed(2)}%</div><div class="bok-when">${br.year}년 ${br.month}월</div>`
+        : `<div class="bok-rate" style="color:#C9CED6">–</div><div class="bok-when">${String(curMonth||'').replace('-','년 ')}월</div>`)+
+    `</div>`;
   $('stats').innerHTML=
     `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DB제도 최고금리</div>${tbl('db')}</div>`+
     `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DC/IRP제도 최고금리</div>${tbl('dc')}</div>`+
     `<div class="sv-col">`+
       `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">디폴트옵션 최고금리</div>${defTbl}</div>`+
-      cpiBox+
+      `<div class="sv-row2">`+bokBox+cpiBox+`</div>`+
     `</div>`;
 }
 
@@ -931,18 +1059,19 @@ function sortLabel(){ return sortMode==='asc'?'금리낮은순 ▲': sortMode===
 function mobileFlatRows(){
   const q=searchTxt.trim().toLowerCase();
   const onlyEtc = filterSec==='기타';
-  const useDC = viewMode==='dc';
+  // viewMode: 'all'=DB+DC/IRP 둘 다, 'db'=DB만, 'dc'=DC/IRP만 → 제도(plan) 열로 구분
+  const showDb = viewMode!=='dc', showDc = viewMode!=='db';
   const out=[];
   if(!onlyEtc){
     for(const r of curRows){
       if(filterSec!=='ALL' && r.sector!==filterSec) continue;
-      const map = useDC ? r.dc : r.db;
-      MONTHS.forEach(m=>{ const v=map&&map[m]; if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:MONTH_LABEL[m],rate:v}); });
-      if(viewMode!=='db' && r.def!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:'디폴트(3년)',rate:r.def});
+      if(showDb) MONTHS.forEach(m=>{ const v=r.db&&r.db[m]; if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:'DB',period:MONTH_LABEL[m],rate:v}); });
+      if(showDc) MONTHS.forEach(m=>{ const v=r.dc&&r.dc[m]; if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:'DC/IRP',period:MONTH_LABEL[m],rate:v}); });
+      if(showDc && r.def!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:'DC/IRP',period:'디폴트(3년)',rate:r.def});
     }
   }
-  (curSpecial.rateLinked||[]).forEach(r=>{ if((filterSec==='ALL'||filterSec==='기타') && r.rate!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:'-',rate:r.rate}); });
-  (curSpecial.period||[]).forEach(r=>{ if(filterSec!=='ALL'&&filterSec!=='기타') return; const v=(r.db??r.dc??r.irp); if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,period:r.mat,rate:v}); });
+  (curSpecial.rateLinked||[]).forEach(r=>{ if((filterSec==='ALL'||filterSec==='기타') && r.rate!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:'',period:'-',rate:r.rate}); });
+  (curSpecial.period||[]).forEach(r=>{ if(filterSec!=='ALL'&&filterSec!=='기타') return; const v=(r.db??r.dc??r.irp); if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:(r.db!=null?'DB':'DC/IRP'),period:r.mat,rate:v}); });
   let rows=out.filter(r=>prodMatch(r.fam, r.period));
   if(q) rows=rows.filter(r=>(String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0);
   if(mSortKey){
@@ -968,14 +1097,16 @@ function renderMobileTable(){
   mobileRows=rows;                       // 상세 팝업이 참조할 현재 화면 행
   const fmt=v=> (typeof v==='number') ? v.toFixed(2) : v;
   let body='';
-  if(!rows.length) body=`<tr><td colspan="5" class="mtbl-none">조건에 맞는 금리가 없습니다.</td></tr>`;
-  else rows.forEach((r,i)=>{ body+=`<tr onclick="openPenDetail(${i})"><td><span class="badge-sec s-${r.sector}">${r.sector}</span></td><td class="l" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</td><td class="l" title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td><td>${htmlEsc(r.period)}</td><td class="rt">${fmt(r.rate)}</td></tr>`; });
+  if(!rows.length) body=`<tr><td colspan="6" class="mtbl-none">조건에 맞는 금리가 없습니다.</td></tr>`;
+  else rows.forEach((r,i)=>{ body+=`<tr onclick="openPenDetail(${i})"><td><span class="badge-sec s-${r.sector}">${r.sector}</span></td><td class="l" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</td><td class="l" title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</td><td>${htmlEsc(r.plan||'')}</td><td>${htmlEsc(r.period)}</td><td class="rt">${fmt(r.rate)}</td></tr>`; });
   $('mobileTable').innerHTML =
+    `<div class="mobile-note">*주의 : 금리정보는 업무 참고용입니다. 판매여부는 제안시 WM게시판에서 꼭 확인 바랍니다.</div>`+
     `<div class="mtbl-scroll" id="mtblScroll"><table class="mtbl">`+
       `<thead><tr>`+
         `<th onclick="mSortBy('sector')">업권${mSortArrow('sector')}</th>`+
-        `<th onclick="mSortBy('org')">상품제공기관${mSortArrow('org')}</th>`+
+        `<th onclick="mSortBy('org')">기관${mSortArrow('org')}</th>`+
         `<th onclick="mSortBy('fam')">상품구분${mSortArrow('fam')}</th>`+
+        `<th onclick="mSortBy('plan')">제도${mSortArrow('plan')}</th>`+
         `<th onclick="mSortBy('period')">기간${mSortArrow('period')}</th>`+
         `<th onclick="mSortBy('rate')">금리(%)${mSortArrow('rate')}</th>`+
       `</tr></thead>`+
@@ -1009,7 +1140,7 @@ function openPenDetail(i){
   const row=(label,val,cls)=>`<tr><th>${label}</th><td class="${cls||''}">${val}</td></tr>`;
   $('penDetailBody').innerHTML=
     `<table class="pd-tbl">`+
-      row('상품제공기관', htmlEsc(r.org))+
+      row('기관', htmlEsc(r.org))+
       row('신용등급', `<span id="pdRating" class="pd-na">조회중…</span>`)+
       row('상품구분', htmlEsc(r.fam))+
       row('기간', htmlEsc(r.period))+
@@ -1132,7 +1263,7 @@ function openPropDetail(i){
   const precheck=meta.precheck==='Y'?'Y':'N';
   $('propDetailBody').innerHTML=
     `<table class="pd-tbl">`+
-      row('상품제공기관', htmlEsc(r.org))+
+      row('기관', htmlEsc(r.org))+
       row('상품구분', htmlEsc(r.fam))+
       row('기간', htmlEsc(r.period))+
       row('금리', rateHtml, 'pd-rate')+
@@ -1171,12 +1302,12 @@ function renderSpecial(){
              : `<span class="rate${v>=4?' hi':''}">${v.toFixed(2)}</span>`;
   let h='';
   h+=`<div class="etc-sec"><div class="etc-title">· 금리연동형</div>`
-   + `<table class="etc-tbl"><thead><tr><th>업권</th><th>상품제공기관</th><th>상품구분</th><th>금리</th></tr></thead><tbody>`;
+   + `<table class="etc-tbl"><thead><tr><th>업권</th><th>기관</th><th>상품구분</th><th>금리</th></tr></thead><tbody>`;
   if(!rl.length) h+=`<tr><td colspan="4" class="etc-none">해당 상품이 없습니다.</td></tr>`;
   else rl.forEach(r=> h+=`<tr><td>${r.sector}</td><td class="l">${r.org}</td><td class="l">${r.fam}</td><td>${rt(r.rate)}</td></tr>`);
   h+=`</tbody></table></div>`;
   h+=`<div class="etc-sec"><div class="etc-title">· 기타 (만기지정식·일단위지정)</div>`
-   + `<table class="etc-tbl wide"><thead><tr><th>업권</th><th>상품제공기관</th><th>상품구분</th><th>만기(개월)</th><th>DB</th><th>DC</th><th>IRP</th></tr></thead><tbody>`;
+   + `<table class="etc-tbl wide"><thead><tr><th>업권</th><th>기관</th><th>상품구분</th><th>만기(개월)</th><th>DB</th><th>DC</th><th>IRP</th></tr></thead><tbody>`;
   if(!pd.length) h+=`<tr><td colspan="7" class="etc-none">해당 상품이 없습니다.</td></tr>`;
   else pd.forEach(r=> h+=`<tr><td>${r.sector}</td><td class="l">${r.org}</td><td class="l">${r.fam}</td><td>${r.mat}</td><td>${rt(r.db)}</td><td>${rt(r.dc)}</td><td>${rt(r.irp)}</td></tr>`);
   h+=`</tbody></table></div>`;
@@ -1236,15 +1367,94 @@ function renderHead(){
   $('thead').innerHTML=r1+r2;
 }
 
-function cell(val,cls){
+function cell(val,cls,ed){
+  // ed = {key,field,m,manual} (편집 대상 셀) 또는 없음. 수기값은 점(●)으로 표시.
+  const mk = (ed && ed.manual) ? '<i class="man-dot" title="수기 입력값"></i>' : '';
+  if(editMode && ed){
+    const disp = (val==null||val===undefined) ? '' : val.toFixed(2);
+    const emptyCls = disp==='' ? ' cell-empty' : '';
+    return `<td class="${cls} cell-edit${emptyCls}" data-key="${htmlAttr(ed.key)}" data-field="${ed.field}" data-m="${ed.m}" data-val="${disp}" onclick="startCellEdit(this)">${mk}<span class="rate">${disp}</span></td>`;
+  }
   if(val===null||val===undefined) return `<td class="${cls}"></td>`;
   const hi = val>=4.0 ? ' hi':'';
-  return `<td class="${cls}"><span class="rate${hi}">${val.toFixed(2)}</span></td>`;
+  return `<td class="${cls}">${mk}<span class="rate${hi}">${val.toFixed(2)}</span></td>`;
 }
 
 /* 정기예금 코호트(월단위/일단위) 행은 화면에서 항상 제외 — 옛 저장분 안전망 */
 function isDepositCohort(r){
   return String(r.fam).indexOf('정기예금')>=0 && /일단위|월단위/.test(String(r.fam));
+}
+
+/* ========== 금리 수기 입력·수정(override 층) ==========
+   업로드 원본(raw)은 조회마다 재그룹핑되므로, 수기값은 rec.overrides에 따로 저장해
+   화면 생성 후 덧씌운다. rowKey = sector||org||fam (한 화면행 식별).
+   저장은 기존 save()가 localStorage + 서버(pension_store)로 동기화(RM은 서버서 차단). */
+function penRowKey(r){ return [r.sector,r.org,r.fam].join('||'); }
+
+function applyOverrides(rows, ov){
+  rows.forEach(r=>{ r.manual={db:{},dc:{},def:false}; });   // 수기 표시 초기화
+  if(!ov) return;
+  rows.forEach(r=>{
+    const o=ov[penRowKey(r)]; if(!o) return;
+    if(o.db) for(const k in o.db){ const v=o.db[k]; if(v!=null){ r.db[+k]=v; r.manual.db[+k]=true; } }
+    if(o.dc) for(const k in o.dc){ const v=o.dc[k]; if(v!=null){ r.dc[+k]=v; r.manual.dc[+k]=true; } }
+    if(o.def!=null){ r.def=o.def; r.manual.def=true; }
+  });
+}
+
+/* 재업로드 시: 새 업로드가 값을 제공하는 칸의 수기값은 제거(=업로드값으로 대체) */
+function pruneOverrides(rec){
+  if(!rec || !rec.overrides || !rec.raw) return;
+  const rows = normalizeDepositRows(buildGroups(rec.raw)).filter(r=>!isExcludedProduct(r));
+  const have={};
+  rows.forEach(r=>{ const k=penRowKey(r);
+    MONTHS.forEach(m=>{ if(r.db[m]!=null) have[k+'|db|'+m]=1; if(r.dc[m]!=null) have[k+'|dc|'+m]=1; });
+    if(r.def!=null) have[k+'|def|36']=1;
+  });
+  for(const key in rec.overrides){ const o=rec.overrides[key];
+    ['db','dc'].forEach(f=>{ if(o[f]){ for(const m in o[f]){ if(have[key+'|'+f+'|'+m]) delete o[f][m]; } if(!Object.keys(o[f]).length) delete o[f]; } });
+    if(o.def!=null && have[key+'|def|36']) delete o.def;
+    if(!o.db && !o.dc && o.def==null) delete rec.overrides[key];
+  }
+  if(!Object.keys(rec.overrides).length) delete rec.overrides;
+}
+
+function togglePenEdit(){
+  editMode=!editMode;
+  const b=$('btnPenEdit'); if(b){ b.classList.toggle('on',editMode); const l=b.querySelector('.lbl'); if(l) l.textContent=editMode?'편집 완료':'금리 편집'; }
+  document.body.classList.toggle('pen-editing',editMode);
+  if(editMode){
+    if(!DB[curMonth]){ toast('먼저 기준월 데이터를 업로드/조회하세요',true); editMode=false; b&&b.classList.remove('on'); document.body.classList.remove('pen-editing'); if(b){const l=b.querySelector('.lbl'); if(l) l.textContent='금리 편집';} return; }
+    if(filterSec==='기타') toast('기타(특수상품) 탭은 편집 대상이 아닙니다');
+    else toast('빈 칸/값을 클릭해 입력하세요. 저장은 자동입니다.');
+  }
+  render();
+}
+
+function startCellEdit(td){
+  if(!editMode || td.querySelector('input')) return;
+  const cur=td.dataset.val||'';
+  td.innerHTML=`<input class="cell-input" type="text" inputmode="decimal" value="${cur}">`;
+  const inp=td.querySelector('input'); inp.focus(); inp.select();
+  inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } else if(e.key==='Escape'){ inp.dataset.cancel='1'; inp.blur(); } };
+  inp.onblur=()=>{ if(inp.dataset.cancel){ renderBody(); return; } commitCellEdit(td, inp.value); };
+}
+
+function commitCellEdit(td, raw){
+  const rec=DB[curMonth]; if(!rec){ renderBody(); return; }
+  const key=td.dataset.key, field=td.dataset.field, m=td.dataset.m;
+  let s=String(raw).trim().replace('%','').replace(/,/g,'');
+  let val = (s==='') ? null : parseFloat(s);
+  if(val!=null && (isNaN(val)||val<=0||val>=20)){ toast('0~20 사이 숫자를 입력해주세요',true); renderBody(); return; }
+  rec.overrides = rec.overrides || {};
+  const o = rec.overrides[key] = rec.overrides[key] || {};
+  if(field==='def'){ if(val==null) delete o.def; else o.def=val; }
+  else { o[field]=o[field]||{}; if(val==null) delete o[field][m]; else o[field][m]=val; if(!Object.keys(o[field]).length) delete o[field]; }
+  if(!o.db && !o.dc && o.def==null) delete rec.overrides[key];
+  if(!Object.keys(rec.overrides).length) delete rec.overrides;
+  save();                 // localStorage + 서버 동기화(레포트도 curRows 재사용이라 자동 반영)
+  loadMonth(curMonth);    // override 재적용 + 재렌더
+  toast(val==null ? '금리 삭제됨' : '금리 저장됨');
 }
 
 function renderBody(){
@@ -1260,9 +1470,10 @@ function renderBody(){
       <td class="c-sec"><span class="badge-sec s-${r.sector}">${r.sector}</span></td>
       <td class="c-org" title="${(r.names[0]||'').replace(/"/g,'')}">${r.org}</td>
       <td class="c-prod" title="${r.names.join('\n')}">${r.fam}</td>`;
-    if(showDB()) MONTHS.forEach((m,i)=>html+=cell(r.db[m]??null,'sec-db'+(i===0?' divL':'')));
-    if(showDC()) MONTHS.forEach((m,i)=>html+=cell(r.dc[m]??null,'sec-dc'+(i===0?' divL':'')));
-    if(showDef()) html+=cell(r.def??null,'sec-def divL');
+    const _k=penRowKey(r), _man=r.manual||{db:{},dc:{},def:false};
+    if(showDB()) MONTHS.forEach((m,i)=>html+=cell(r.db[m]??null,'sec-db'+(i===0?' divL':''),{key:_k,field:'db',m,manual:_man.db[m]}));
+    if(showDC()) MONTHS.forEach((m,i)=>html+=cell(r.dc[m]??null,'sec-dc'+(i===0?' divL':''),{key:_k,field:'dc',m,manual:_man.dc[m]}));
+    if(showDef()) html+=cell(r.def??null,'sec-def divL',{key:_k,field:'def',m:36,manual:_man.def});
     html+='</tr>';
   }
   tb.innerHTML=html;
@@ -1278,7 +1489,9 @@ $('fileInput').onchange=e=>{
       const {raw, baseMonth}=readWorkbook(ev.target.result);
       const rows=buildGroups(raw);
       const m = baseMonth || curMonth || thisMonth();   // 파일의 기준년월 우선, 없으면 선택월
+      const prevOv = DB[m] && DB[m].overrides;           // 같은 달 재업로드 시 수기값 승계
       DB[m]={ rows, raw, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length, baseMonth:m, baseFromFile:!!baseMonth };
+      if(prevOv){ DB[m].overrides=prevOv; pruneOverrides(DB[m]); }   // 새 업로드가 채운 칸은 업로드값으로 대체
       save();
       curMonth=m; refreshMonthSel(); loadMonth(m);
       if(baseMonth){
@@ -1286,6 +1499,8 @@ $('fileInput').onchange=e=>{
       }else{
         toast(`기준년월이 파일에 없어 선택월(${m.replace('-','년 ')}월)로 저장했습니다. 양식 A1에 기준년월을 넣어주세요.`, true);
       }
+      // 업로드 시 자동으로 '과거 금리 추이 이력 추가' 모달 열기(기준금리만 확인·입력 → 추가). 연금컨설팅팀 전용.
+      if(!document.body.classList.contains('role-rm')) setTimeout(openHistAppend, 600);
     }catch(err){ console.error(err); toast('업로드 실패: '+err.message,true); }
     $('fileInput').value='';
   };
@@ -1435,6 +1650,41 @@ $('btnCompare').onclick=async()=>{
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
 
+/* ---------- 과거 금리 추이: 이력 추가(연금컨설팅팀) ---------- */
+function openHistAppend(){
+  if(!curRows.length || !DB[curMonth]){ toast('먼저 기준월 데이터를 업로드/조회하세요',true); return; }
+  const [yy,mm]=curMonth.split('-');
+  $('histModalTitle').textContent=`과거 금리 추이 · ${yy}년 ${parseInt(mm,10)}월 이력 추가`;
+  const rslt=$('histResult'); rslt.style.display='none'; rslt.innerHTML='';
+  const inp=$('histBaseRate');
+  // 직전 행의 기준금리를 기본값으로 채워줌(보통 그대로 유지)
+  fetch('/api/rate_history').then(r=>r.json()).then(d=>{
+    try{ const rows=d.sheets.Sheet2.rows, last=rows[rows.length-1];
+      if(last && last[7]!=null && !inp.value) inp.value=(+last[7]).toFixed(2); }catch(e){}
+  }).catch(()=>{});
+  const sb=$('histSubmit'); sb.disabled=false; sb.textContent='추가';
+  document.getElementById('histModal').classList.add('open');
+  setTimeout(()=>inp.focus(),60);
+}
+function closeHistAppend(){ document.getElementById('histModal').classList.remove('open'); }
+async function submitHistAppend(){
+  const base=parseFloat(String($('histBaseRate').value).trim().replace('%',''));
+  if(isNaN(base)||base<0||base>=20){ toast('기준금리를 올바르게 입력해주세요',true); $('histBaseRate').focus(); return; }
+  const btn=$('histSubmit'); btn.disabled=true; btn.textContent='추가 중…';
+  try{
+    const res=await fetch('/api/rate_history_append',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:curMonth, rows:curRows, base_rate:base})});
+    const d=await res.json();
+    if(!res.ok || !d.ok) throw new Error(d.error||('서버 오류 '+res.status));
+    const s=d.sector||{}, f=v=> v==null?'-':(+v).toFixed(2);
+    const rslt=$('histResult'); rslt.style.display='';
+    rslt.innerHTML=`<b>${d.date} 추가 완료</b> (매칭 ${d.matched}건)<br>`
+      +`증권 ${f(s['증권'])} · 은행 ${f(s['은행'])} · 생보 ${f(s['생보'])} · 손보 ${f(s['손보'])} · 저축 ${f(s['저축'])}<br>`
+      +`원리금보장 평균 <b>${f(d.overall)}</b> · 기준금리 ${f(d.base_rate)}`;
+    btn.textContent='완료'; toast('과거 금리 추이에 추가되었습니다');
+  }catch(err){ console.error(err); toast('추가 실패: '+err.message+' (통합 서버에서만 동작)',true); btn.disabled=false; btn.textContent='추가'; }
+}
+
 /* ---------- 물가상승률: 과거 파일 다운로드 + 그래프 팝업 ---------- */
 function downloadCpiHistory(){
   fetch('/download/cpi_history').then(r=>{ if(!r.ok) throw new Error('서버 오류 '+r.status); return r.blob(); }).then(b=>{
@@ -1564,5 +1814,6 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   syncFromServer();   // 서버 저장분 반영(휴대폰/다른 브라우저에서도 조회)
   // 소비자물가지수(e-나라지표) 최신월 상승률 로드 → 요약 갱신
   fetch('/api/cpi').then(r=>r.json()).then(d=>{ cpiData=d; if(curRows.length) renderSummary(); }).catch(()=>{});
+  fetch('/api/rate_history').then(r=>r.json()).then(d=>{ try{ baseRateRows=d.sheets.Sheet2.rows; if(curRows.length) renderSummary(); }catch(e){} }).catch(()=>{});
 })();
 </script>
