@@ -98,6 +98,10 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
 .susp-list .susp-tilde{color:var(--muted);text-align:center}
 .susp-list .susp-hd{font-size:11.5px;color:var(--muted)}
 .susp-none{color:var(--muted);font-size:12.5px;padding:6px 0}
+/* 발행정지 카드: 내용 폭에 맞게 축소 + 저장 버튼 좌측 정렬 */
+.susp-box{width:fit-content;max-width:100%}
+.susp-box .notice-foot{justify-content:flex-start}
+.susp-box .notice-upd{margin-right:0;margin-left:14px}
 .btn-ghost{background:#fff;color:#4b5563;border:1px solid #d5d9e0}.btn-ghost:hover{background:#f4f6f8}
 .chk{width:16px;height:16px;cursor:pointer;accent-color:var(--orange)}
 
@@ -200,15 +204,15 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
   </div>
 
   <!-- 증권사 ELB/DLB 발행정지기간 (모바일 상세 팝업에 표시) -->
-  <div class="notice-box">
+  <div class="notice-box susp-box">
     <div class="notice-head">
       <span class="pane-title">증권사 ELB/DLB 발행정지기간</span>
-      <span class="notice-tip">증권사 ELB/DLB만 자동 표시 · 기관별 <b>시작일~종료일</b> 입력 → 모바일 상세 팝업에 노출</span>
+      <span class="notice-tip">기관별 <b>시작일~종료일</b> → 모바일 상세 팝업에 표시</span>
     </div>
     <div id="suspList" class="susp-list"></div>
     <div class="notice-foot">
-      <span id="suspUpd" class="notice-upd"></span>
       <button class="btn btn-navy" onclick="saveSuspension()">발행정지기간 저장</button>
+      <span id="suspUpd" class="notice-upd"></span>
     </div>
   </div>
 </div>
