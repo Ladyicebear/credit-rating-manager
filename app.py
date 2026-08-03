@@ -78,6 +78,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'proposals_post',            # 이달의 제안상품 등록
     'proposal_meta_post',        # 유니버스/연컨사전확인/판매가능 저장
     'api_notice_post',           # 공지사항 저장(연금컨설팅팀 전용)
+    'api_issue_suspension_post', # 발행정지기간 저장(연금컨설팅팀 전용)
     'api_refresh', 'api_refresh_one',   # 신용등급 지금 조회(스크래핑)
     'api_update_rating',         # 신용등급 수정
     'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
@@ -821,6 +822,37 @@ def api_notice_post():
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     _save_json_file(_NOTICE_FILE, {'text': text, 'updated_at': now})
     return jsonify({'success': True, 'updated_at': now})
+
+
+# ── 증권사 ELB/DLB 발행정지기간 ───────────────────────────────────────
+#   연금컨설팅팀이 상품제안관리에서 기관별 입력 → 모바일 상세 팝업에 표시.
+#   data/issue_suspension.json = {"삼성증권㈜": {"start": "2026-08-20", "end": "2026-08-26"}, ...}
+#   키 = 기관명(org). 그 증권사의 모든 ELB/DLB에 적용. 런타임 데이터 → 배포 제외.
+_ISSUE_SUSPENSION_FILE = os.path.join(BASE_DIR, 'data', 'issue_suspension.json')
+
+
+@app.route('/api/issue_suspension', methods=['GET'])
+def api_issue_suspension_get():
+    """기관별 발행정지기간 반환(로그인한 모든 사용자)."""
+    return jsonify(_load_json_file(_ISSUE_SUSPENSION_FILE))
+
+
+@app.route('/api/issue_suspension', methods=['POST'])
+def api_issue_suspension_post():
+    """발행정지기간 전체 맵 저장(연금컨설팅팀 전용). payload: {map: {org:{start,end}}}"""
+    d = request.get_json(force=True, silent=True) or {}
+    m = d.get('map')
+    if not isinstance(m, dict):
+        return jsonify({'success': False, 'message': 'map 형식 오류'}), 400
+    clean = {}
+    for org, v in m.items():
+        if isinstance(v, dict):
+            s = str(v.get('start', ''))[:10]
+            e = str(v.get('end', ''))[:10]
+            if s or e:                       # 둘 다 비면 미저장(=해제)
+                clean[str(org)[:100]] = {'start': s, 'end': e}
+    _save_json_file(_ISSUE_SUSPENSION_FILE, clean)
+    return jsonify({'success': True, 'count': len(clean)})
 
 
 # ── 과거 금리 추이(내부 보관 데이터) ──

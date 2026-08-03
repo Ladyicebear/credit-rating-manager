@@ -267,6 +267,8 @@
   .pd-tbl td{padding:11px 12px;border:1px solid var(--line);text-align:center;color:#1F2937;
     white-space:normal;word-break:break-all;line-height:1.45}
   .pd-tbl td.pd-rate{font-weight:800;color:var(--orange-d);font-variant-numeric:tabular-nums}
+  .pd-tbl td .pd-susp{display:inline-block;background:#FDECEA;color:#C0392B;font-weight:800;font-size:12px;
+      padding:3px 9px;border-radius:6px;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
   .pd-tbl td .rbadge-lite{display:inline-block;padding:2px 9px;border-radius:6px;font-size:12px;font-weight:800;
     background:#E7F0FF;color:#1D4ED8}
   .pd-tbl td .pd-na{color:#9CA3AF;font-weight:400}
@@ -1158,10 +1160,17 @@ async function loadPenRatings(){
   }catch(e){ penRatingMap={}; }
   return penRatingMap;
 }
+function fmtSusp(s){ return String(s||'').replace(/-/g,'.'); }
 function openPenDetail(i){
   const r=mobileRows[i]; if(!r) return;
   const rate=(typeof r.rate==='number')?r.rate.toFixed(2):(r.rate==null?'-':r.rate);
   const row=(label,val,cls)=>`<tr><th>${label}</th><td class="${cls||''}">${val}</td></tr>`;
+  // 발행정지기간: 증권사 ELB/DLB만, 기관별 등록값이 있을 때 표시
+  const isElbDlb=(r.sector==='증권') && /ELB|DLB/i.test(String(r.fam||''));
+  const sp=isElbDlb ? issueSuspension[r.org] : null;
+  const suspRow=(sp && (sp.start||sp.end))
+    ? row('발행정지기간', `<span class="pd-susp">${fmtSusp(sp.start)}~${fmtSusp(sp.end)}</span>`)
+    : '';
   $('penDetailBody').innerHTML=
     `<table class="pd-tbl">`+
       row('기관', htmlEsc(r.org))+
@@ -1169,6 +1178,7 @@ function openPenDetail(i){
       row('상품구분', htmlEsc(r.fam))+
       row('기간', htmlEsc(r.period))+
       row('금리(%)', rate, 'pd-rate')+
+      suspRow+
     `</table>`;
   $('penDetailModal').classList.add('open');
   loadPenRatings().then(map=>{
@@ -1186,6 +1196,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePenDetail(); 
    ============================================================ */
 let proposalsAll=null;    // {month:[items]}  (1회 조회 후 캐시)
 let proposalMeta=null;    // 상품키 -> {universe,precheck,sellable}
+let issueSuspension={};   // 증권 ELB/DLB 발행정지기간 {org:{start,end}}
 let proposalRows=[];      // 화면에 보이는(필터·정렬 후) 제안 목록 — 팝업이 참조
 let propSearchTxt='';     // 제안 검색어(기관·상품구분·기간)
 let propProdFilter='ALL'; // 제안 상품구분 필터
@@ -1309,6 +1320,12 @@ function openPropDetail(i){
   // 연컨사전확인
   const meta=(proposalMeta&&proposalMeta[propKey(r)])||{};
   const precheck=meta.precheck==='Y'?'Y':'N';
+  // 발행정지기간: 증권사 ELB/DLB만, 기관별 등록값이 있을 때 표시
+  const isElbDlb=(r.sector==='증권') && /ELB|DLB/i.test(String(r.fam||''));
+  const sp=isElbDlb ? issueSuspension[r.org] : null;
+  const suspRow=(sp && (sp.start||sp.end))
+    ? row('발행정지기간', `<span class="pd-susp">${fmtSusp(sp.start)}~${fmtSusp(sp.end)}</span>`)
+    : '';
   $('propDetailBody').innerHTML=
     `<table class="pd-tbl">`+
       row('기관', htmlEsc(r.org))+
@@ -1317,6 +1334,7 @@ function openPropDetail(i){
       row('금리', rateHtml, 'pd-rate')+
       row('신용등급', `<span id="propRating" class="pd-na">조회중…</span>`)+
       row('연컨사전확인', precheck)+
+      suspRow+
     `</table>`;
   $('propDetailModal').classList.add('open');
   loadPenRatings().then(map=>{
@@ -1877,5 +1895,6 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   // 소비자물가지수(e-나라지표) 최신월 상승률 로드 → 요약 갱신
   fetch('/api/cpi').then(r=>r.json()).then(d=>{ cpiData=d; if(curRows.length) renderSummary(); }).catch(()=>{});
   fetch('/api/rate_history').then(r=>r.json()).then(d=>{ try{ baseRateRows=d.sheets.Sheet2.rows; if(curRows.length) renderSummary(); }catch(e){} }).catch(()=>{});
+  fetch('/api/issue_suspension').then(r=>r.json()).then(d=>{ issueSuspension=d||{}; }).catch(()=>{});
 })();
 </script>
