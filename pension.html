@@ -103,6 +103,8 @@
   .sv-tbl{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
   .sv-tbl th{background:#F4F6F8;color:#4B5563;font-weight:700;padding:4px 5px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}  /* 헤더 라벨 한 줄 고정 */
   .sv-tbl td{padding:5px 5px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+  .sv-tbl tr.sv-click{cursor:pointer}
+  .sv-tbl tr.sv-click:hover td{background:#FFF7EF}   /* 요약표 행 클릭→상세 팝업 */
   .sv-tbl td:nth-child(1),.sv-tbl td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* 기관·상품구분 길면 … */
   .sv-tbl th:nth-child(1),.sv-tbl td:nth-child(1){width:27%}   /* 기관(줄여서 판매여부 확보) */
   .sv-tbl th:nth-child(2),.sv-tbl td:nth-child(2){width:23%}   /* 상품구분 */
@@ -269,6 +271,10 @@
   .pd-tbl td.pd-rate{font-weight:800;color:var(--orange-d);font-variant-numeric:tabular-nums}
   .pd-tbl td .pd-susp{display:inline-block;background:#FDECEA;color:#C0392B;font-weight:800;font-size:12px;
       padding:3px 9px;border-radius:6px;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+  /* 상세 팝업 판매여부 배지(요약표 배지와 동일 색) */
+  .pd-tbl .sell-badge{display:inline-block;font-size:11.5px;font-weight:800;padding:3px 11px;border-radius:20px;white-space:nowrap}
+  .pd-tbl .sell-ok{background:#E1F5EE;color:#0F6E56;border:1px solid #5DCAA5}
+  .pd-tbl .sell-no{background:#FCEBEB;color:#A32D2D;border:1px solid #F09595}
   .pd-tbl td .rbadge-lite{display:inline-block;padding:2px 9px;border-radius:6px;font-size:12px;font-weight:800;
     background:#E7F0FF;color:#1D4ED8}
   .pd-tbl td .pd-na{color:#9CA3AF;font-weight:400}
@@ -917,7 +923,7 @@ function sellBadge(t, field){
   const key=propKey(t)+'|'+field;   // 제도(db/dc/def)까지 키에 포함 → DB·DC 판매여부 개별 저장
   const meta=(proposalMeta&&proposalMeta[key])||{};
   const ok = meta.sellable !== false;
-  return `<span class="sell-badge ${ok?'sell-ok':'sell-no'}" data-k="${htmlAttr(key)}" onclick="toggleSellable(this.dataset.k)">${ok?'판매가능':'판매불가'}</span>`;
+  return `<span class="sell-badge ${ok?'sell-ok':'sell-no'}" data-k="${htmlAttr(key)}" onclick="event.stopPropagation();toggleSellable(this.dataset.k)">${ok?'판매가능':'판매불가'}</span>`;
 }
 /* 배지 클릭 → 판매가능 ↔ 판매불가 토글·저장(연금컨설팅팀만, RM은 잠금·서버서도 차단) */
 function toggleSellable(key){
@@ -933,6 +939,7 @@ function toggleSellable(key){
 }
 function renderSummary(){
   const rows=curRows;
+  summaryTops=[];   // 요약표 행 클릭용 데이터 재구성
   const top=(pred,field,month)=>{
     let b=null;
     for(const r of rows){ if(!pred(r)) continue;
@@ -952,9 +959,13 @@ function renderSummary(){
     ['생보', r=>r.sector==='생명보험'],
     ['손보', r=>r.sector==='손해보험'],
   ];
-  const row=(t,per,field)=> t
-    ? `<tr><td title="${htmlAttr(t.org)}"><b>${t.org}</b></td><td title="${htmlAttr(t.fam)}">${t.fam}</td><td class="sv-per">${per}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td><td>${sellBadge(t,field)}</td></tr>`
-    : `<tr><td class="sv-none">-</td><td></td><td></td><td></td><td></td></tr>`;
+  const row=(t,per,field)=>{
+    if(!t) return `<tr><td class="sv-none">-</td><td></td><td></td><td></td><td></td></tr>`;
+    const idx=summaryTops.length;
+    const sellable=((((proposalMeta&&proposalMeta[propKey(t)+'|'+field])||{}).sellable)!==false);
+    summaryTops.push({sector:t.sector, org:t.org, fam:t.fam, rate:t.rate, period:per, sellable});
+    return `<tr class="sv-click" onclick="openSummaryDetail(${idx})"><td title="${htmlAttr(t.org)}"><b>${t.org}</b></td><td title="${htmlAttr(t.fam)}">${t.fam}</td><td class="sv-per">${per}</td><td class="sv-rate">${t.rate.toFixed(2)}%</td><td>${sellBadge(t,field)}</td></tr>`;
+  };
   const head=`<thead><tr><th>기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th><th>판매여부</th></tr></thead>`;
   const tbl=field=>`<div class="sv-scroll"><table class="sv-tbl">${head}<tbody>`+G.map(([n,p,mo])=>row(top(p,field,mo), MONTH_LABEL[mo]||'', field)).join('')+`</tbody></table></div>`;
   // 디폴트옵션: 전체 최고금리 1건만(3년) — 판매여부 키는 36개월·제도 def
@@ -1161,8 +1172,9 @@ async function loadPenRatings(){
   return penRatingMap;
 }
 function fmtSusp(s){ return String(s||'').replace(/-/g,'.'); }
-function openPenDetail(i){
-  const r=mobileRows[i]; if(!r) return;
+/* 상품 상세 팝업 공용: r={sector,org,fam,period,rate}. 금리표·요약표 모두 재사용 */
+function showProductDetail(r){
+  if(!r) return;
   const rate=(typeof r.rate==='number')?r.rate.toFixed(2):(r.rate==null?'-':r.rate);
   const row=(label,val,cls)=>`<tr><th>${label}</th><td class="${cls||''}">${val}</td></tr>`;
   // 발행정지기간: 증권사 ELB/DLB만, 기관별 등록값이 있을 때 표시
@@ -1171,6 +1183,10 @@ function openPenDetail(i){
   const suspRow=(sp && (sp.start||sp.end))
     ? row('발행정지기간', `<span class="pd-susp">${fmtSusp(sp.start)}~${fmtSusp(sp.end)}</span>`)
     : '';
+  // 판매여부: 요약표 행(sellable 지정된 경우)만 표시
+  const sellRow=(r.sellable!==undefined)
+    ? row('판매여부', `<span class="sell-badge ${r.sellable?'sell-ok':'sell-no'}">${r.sellable?'판매가능':'판매불가'}</span>`)
+    : '';
   $('penDetailBody').innerHTML=
     `<table class="pd-tbl">`+
       row('기관', htmlEsc(r.org))+
@@ -1178,6 +1194,7 @@ function openPenDetail(i){
       row('상품구분', htmlEsc(r.fam))+
       row('기간', htmlEsc(r.period))+
       row('금리(%)', rate, 'pd-rate')+
+      sellRow+
       suspRow+
     `</table>`;
   $('penDetailModal').classList.add('open');
@@ -1188,6 +1205,10 @@ function openPenDetail(i){
     else { el.className='pd-na'; el.textContent='-'; }
   });
 }
+function openPenDetail(i){ showProductDetail(mobileRows[i]); }
+/* 요약표(DB·DC·디폴트 최고금리) 행 클릭 → 상세 팝업 */
+let summaryTops=[];
+function openSummaryDetail(idx){ showProductDetail(summaryTops[idx]); }
 function closePenDetail(){ $('penDetailModal').classList.remove('open'); }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePenDetail(); });
 
@@ -1676,7 +1697,7 @@ $('btnReport').onclick=async()=>{
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url;
     a.download=`퇴직연금 금리정보 현황_${(curMonth||'').replace('-','년 ')}월.xlsx`;
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
     toast('금리현황 레포트를 다운로드했습니다');
   }catch(err){ console.error(err); toast('레포트 생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
@@ -1693,7 +1714,7 @@ $('btnHistory').onclick=async()=>{
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url;
     a.download='과거 금리 추이.xlsx';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
     toast('과거 금리 추이 파일을 다운로드했습니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
@@ -1710,7 +1731,7 @@ $('btnCompare').onclick=async()=>{
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url;
     a.download='금리 비교.xlsx';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
     toast('금리 비교 그래프 엑셀을 다운로드했습니다');
   }catch(err){ console.error(err); toast('생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
@@ -1755,7 +1776,7 @@ async function submitHistAppend(){
 function downloadCpiHistory(){
   fetch('/download/cpi_history').then(r=>{ if(!r.ok) throw new Error('서버 오류 '+r.status); return r.blob(); }).then(b=>{
     const url=URL.createObjectURL(b); const a=document.createElement('a'); a.href=url; a.download='과거 물가상승률.xlsx';
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
     toast('과거 물가상승률 파일을 다운로드했습니다');
   }).catch(err=>{ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); });
 }
@@ -1833,7 +1854,7 @@ async function postExport(payload, filename, btn){
     if(!res.ok) throw new Error('서버 오류 '+res.status);
     const blob=await res.blob();
     const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename;
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
     toast('금리표를 다운로드했습니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ if(btn){btn.disabled=false; btn.innerHTML=orig;} }
