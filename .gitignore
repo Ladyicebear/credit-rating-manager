@@ -50,6 +50,9 @@ data/proposal_meta.json
 # 방문자 통계 런타임 데이터(서버 누적, 배포 제외)
 data/visit_stats.json
 
+# 공지사항(연금컨설팅팀 입력, 서버 저장, 배포 제외)
+data/notice.json
+
 # 과거 금리 추이 백업본(로컬 생성물)
 data/rate_history_backup_*
 

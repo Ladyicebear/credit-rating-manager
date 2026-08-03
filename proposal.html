@@ -80,6 +80,16 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
 .foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 14px;border-top:1px solid var(--line)}
 .btn{border:none;border-radius:8px;padding:8px 18px;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
 .btn-navy{background:var(--navy);color:#fff}.btn-navy:hover{background:#1f4576}
+/* 공지사항 입력(모바일 공지 버튼 팝업에 표시) */
+.notice-box{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px}
+.notice-head{display:flex;align-items:center;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+.notice-tip{font-size:11.5px;color:var(--muted)}
+.notice-tip b{color:var(--orange-d)}
+.notice-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+                     font-family:inherit;font-size:13px;color:var(--ink);resize:vertical;min-height:88px;outline:none;line-height:1.5}
+.notice-box textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
+.notice-foot{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:10px}
+.notice-upd{font-size:11.5px;color:var(--muted);margin-right:auto}
 .btn-ghost{background:#fff;color:#4b5563;border:1px solid #d5d9e0}.btn-ghost:hover{background:#f4f6f8}
 .chk{width:16px;height:16px;cursor:pointer;accent-color:var(--orange)}
 
@@ -167,6 +177,19 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
       </div>
     </div>
   </div>
+
+  <!-- 공지사항 입력 (모바일 제안카드 「공지」 버튼 팝업에 표시) -->
+  <div class="notice-box">
+    <div class="notice-head">
+      <span class="pane-title">공지사항</span>
+      <span class="notice-tip">모바일 「이달의 제안 가능 상품」의 <b>공지</b> 버튼 팝업에 표시됩니다</span>
+    </div>
+    <textarea id="noticeText" rows="4" placeholder="공지사항 내용을 입력하세요 (여러 줄 가능)"></textarea>
+    <div class="notice-foot">
+      <span id="noticeUpd" class="notice-upd"></span>
+      <button class="btn btn-navy" onclick="saveNotice()">공지 저장</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -217,6 +240,23 @@ async function boot(){
   renderSecChips();
   bindFilters();
   render();
+  loadNotice();
+}
+
+/* ---------- 공지사항 ---------- */
+function loadNotice(){
+  fetch('/api/notice').then(r=>r.json()).then(d=>{
+    $('noticeText').value=(d&&d.text)||'';
+    $('noticeUpd').textContent=(d&&d.updated_at)?('마지막 저장: '+d.updated_at):'';
+  }).catch(()=>{});
+}
+function saveNotice(){
+  const text=$('noticeText').value;
+  fetch('/api/notice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})})
+    .then(r=>r.json()).then(d=>{
+      if(d&&d.success){ $('noticeUpd').textContent='마지막 저장: '+d.updated_at; toast('공지사항을 저장했습니다'); }
+      else toast((d&&d.message)||'저장 실패(권한 확인)','err');
+    }).catch(()=>toast('서버 통신 실패','err'));
 }
 
 /* ---------- DB제도 상품 평탄화(만기별 1행) ---------- */

@@ -278,6 +278,14 @@
   .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
   .prop-head .prop-title{font-size:12.5px;font-weight:800;color:var(--orange-d);letter-spacing:-.3px}  /* DB제도 최고금리(.sv-title)와 동일 크기 */
   .prop-head .prop-hint{font-size:10.5px;color:var(--muted);font-weight:600;margin-left:auto}
+  /* 공지 버튼(모바일 제안카드) */
+  .prop-head .prop-notice-btn{background:var(--orange);color:#fff;border:none;border-radius:7px;
+      font-size:11px;font-weight:800;padding:3px 11px;cursor:pointer;font-family:inherit;letter-spacing:-.2px;flex:0 0 auto}
+  .prop-head .prop-notice-btn:hover{background:var(--orange-d)}
+  /* 공지사항 팝업 본문 */
+  .notice-modal-body{padding:4px 4px 6px;white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.7;color:var(--ink);min-height:60px}
+  .notice-modal-body.empty{color:var(--muted);text-align:center;padding:24px 4px}
+  .notice-modal-when{font-size:11px;color:var(--muted);margin-top:12px;text-align:right}
   .prop-controls{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line)}
   .prop-controls input{flex:1;min-width:0;height:32px;border:1px solid #D5D9E0;border-radius:8px;
     padding:0 10px;font-size:12px;font-family:inherit}
@@ -422,6 +430,7 @@
   <div class="prop-card" id="proposalMobile">
     <div class="prop-head">
       <span class="prop-title">이달의 제안 가능 상품(DB제도)</span>
+      <button class="prop-notice-btn" onclick="openNotice()">공지</button>
       <span class="prop-hint">탭하면 상세</span>
     </div>
     <div class="prop-controls">
@@ -512,6 +521,20 @@
   <div class="cpi-modal-card">
     <div class="cpi-modal-head"><button class="cpi-modal-x" onclick="closeCpiGraph()" title="닫기">✕</button></div>
     <div id="cpiModalBody" class="cpi-modal-body"></div>
+  </div>
+</div>
+
+<!-- 공지사항 팝업 (모바일 제안카드 공지 버튼) -->
+<div id="noticeModal" class="cpi-modal" onclick="if(event.target===this)closeNotice()">
+  <div class="cpi-modal-card" style="width:420px;max-width:92vw;padding:0">
+    <div style="padding:16px 20px 8px;display:flex;align-items:center;justify-content:space-between">
+      <b style="font-size:15px;color:var(--navy)">📢 공지사항</b>
+      <button class="cpi-modal-x" onclick="closeNotice()" title="닫기">✕</button>
+    </div>
+    <div style="padding:0 20px 18px">
+      <div id="noticeModalBody" class="notice-modal-body"></div>
+      <div id="noticeModalWhen" class="notice-modal-when"></div>
+    </div>
   </div>
 </div>
 
@@ -1718,6 +1741,20 @@ function downloadCpiHistory(){
     toast('과거 물가상승률 파일을 다운로드했습니다');
   }).catch(err=>{ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); });
 }
+/* 공지사항 팝업(모바일 제안카드 「공지」 버튼) */
+function openNotice(){
+  const body=document.getElementById('noticeModalBody');
+  const when=document.getElementById('noticeModalWhen');
+  body.className='notice-modal-body'; body.textContent='불러오는 중…'; when.textContent='';
+  document.getElementById('noticeModal').classList.add('open');
+  fetch('/api/notice').then(r=>r.json()).then(d=>{
+    const t=((d&&d.text)||'').trim();
+    if(t){ body.className='notice-modal-body'; body.textContent=t; }
+    else { body.className='notice-modal-body empty'; body.textContent='등록된 공지사항이 없습니다.'; }
+    when.textContent=(d&&d.updated_at)?('업데이트: '+d.updated_at):'';
+  }).catch(()=>{ body.className='notice-modal-body empty'; body.textContent='공지를 불러오지 못했습니다.'; });
+}
+function closeNotice(){ document.getElementById('noticeModal').classList.remove('open'); }
 function closeCpiGraph(){ document.getElementById('cpiModal').classList.remove('open'); }
 function showCpiGraph(){
   const body=document.getElementById('cpiModalBody');

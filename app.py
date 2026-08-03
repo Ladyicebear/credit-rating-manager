@@ -77,6 +77,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'proposal',                  # 상품제안관리 화면
     'proposals_post',            # 이달의 제안상품 등록
     'proposal_meta_post',        # 유니버스/연컨사전확인/판매가능 저장
+    'api_notice_post',           # 공지사항 저장(연금컨설팅팀 전용)
     'api_refresh', 'api_refresh_one',   # 신용등급 지금 조회(스크래핑)
     'api_update_rating',         # 신용등급 수정
     'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
@@ -794,6 +795,32 @@ def proposal_meta_post():
     meta[key] = entry
     _save_json_file(_PROPOSAL_META_FILE, meta)
     return jsonify({'success': True})
+
+
+# ── 공지사항 ───────────────────────────────────────────────────────────
+#   연금컨설팅팀이 상품제안관리에서 입력 → 모바일 제안카드 「공지」 버튼 팝업에 표시.
+#   data/notice.json = {"text": "...", "updated_at": "YYYY-MM-DD HH:MM:SS"}. 런타임 데이터 → 배포 제외.
+_NOTICE_FILE = os.path.join(BASE_DIR, 'data', 'notice.json')
+
+
+@app.route('/api/notice', methods=['GET'])
+def api_notice_get():
+    """공지 내용 반환(로그인한 모든 사용자)."""
+    d = _load_json_file(_NOTICE_FILE)
+    return jsonify({'text': d.get('text', ''), 'updated_at': d.get('updated_at', '')})
+
+
+@app.route('/api/notice', methods=['POST'])
+def api_notice_post():
+    """공지 저장(연금컨설팅팀 전용 — _ADMIN_ONLY_ENDPOINTS)."""
+    d = request.get_json(force=True, silent=True) or {}
+    text = d.get('text', '')
+    if not isinstance(text, str):
+        return jsonify({'success': False, 'message': 'text 형식 오류'}), 400
+    text = text[:2000]   # 과도한 길이 방지
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _save_json_file(_NOTICE_FILE, {'text': text, 'updated_at': now})
+    return jsonify({'success': True, 'updated_at': now})
 
 
 # ── 과거 금리 추이(내부 보관 데이터) ──
