@@ -1709,9 +1709,11 @@ def download_visit_stats():
 #   최초 1회 VM 설치(deploy/install_deploy.sh) 후 동작. sudoers로 이 명령만 무비번 허용.
 @app.route('/admin/deploy', methods=['POST'])
 def admin_deploy():
+    # systemd 서비스 환경은 PATH가 제한적이라 sudo/systemctl을 절대경로로 호출
+    sudo = shutil.which('sudo') or '/usr/bin/sudo'
     systemctl = shutil.which('systemctl') or '/usr/bin/systemctl'
     try:
-        subprocess.Popen(['sudo', systemctl, '--no-block', 'start', 'credit-deploy.service'])
+        subprocess.Popen([sudo, systemctl, '--no-block', 'start', 'credit-deploy.service'])
     except Exception as e:
         logger.exception('배포 트리거 실패')
         return jsonify({'success': False,
