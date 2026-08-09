@@ -420,8 +420,10 @@
     .toolbar .tb-sep,.toolbar .spacer,.toolbar .muted-note{display:none}
     .toolbar #btnUpload,.toolbar #btnTemplate,.toolbar #btnExport,.toolbar #btnHistory,.toolbar #btnCompare,.toolbar #btnPenEdit,.toolbar #btnHistAppend{display:none}
     /* 순서 변경: 조회(기준월 옆) → 금리현황 다운로드(아래 전체폭) */
-    .toolbar #btnView{order:1;flex:0 0 40%;min-width:0;height:42px;justify-content:center}
-    .toolbar #btnReport{order:2;flex:1 1 100%;min-width:0;height:42px;justify-content:center}
+    .toolbar #btnView{order:1;flex:0 0 40%;min-width:0;height:42px;justify-content:center;gap:6px}
+    .toolbar #btnReport{order:2;flex:1 1 100%;min-width:0;height:42px;justify-content:center;gap:6px}
+    /* 조회 🔍 / 다운로드 ⬇ 아이콘 모바일에서 표시 */
+    .toolbar #btnView svg,.toolbar #btnReport svg{display:inline-block;width:17px;height:17px;flex:0 0 auto}
     /* 제도별 요약: 세로로 스택 */
     .stats{flex-direction:column;gap:10px;margin-bottom:4px}
     .stats > .sv-box,.stats > .sv-col{flex:1 1 auto;width:100%}
@@ -489,7 +491,7 @@
       기준월 금리 다운로드
     </button>
     <button class="btn ghost" id="btnReport" title="현재 화면의 금리현황 레포트를 엑셀로 생성">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-5m4 5V8m4 9v-3"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
       금리현황 다운로드
     </button>
     <button class="btn ghost" id="btnHistory" title="과거 금리 추이 데이터를 엑셀로 다운로드">

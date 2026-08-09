@@ -40,6 +40,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
            color:#8a92a0;transition:all .12s;margin-bottom:-1px;border-radius:0}
 .super-tab.active{color:#F68121;border-bottom-color:#F68121}    /* 선택: 오렌지 글자+밑줄 */
 .super-tab:not(.active):hover{color:#16335B}                    /* 미선택: 회색→호버 네이비 */
+.super-tab .stab-ic{display:none}
 
 /* ── 신용등급관리 서브바(설명 + 조회 컨트롤) : 회색(아래 화면과 동일 톤) ── */
 .credit-subbar{background:#eceef1;color:#333;padding:10px 28px 12px;display:flex;
@@ -311,10 +312,15 @@ tr.row-done td{transition:background .3s}
   .brand-smart{display:block;line-height:0}
   .brand-smart img{height:22px;width:auto;display:block}
   /* 탭 겹침(레이어) 5:5 — 선택 탭이 위로 올라와 옆 탭을 덮음 */
-  .super-tabs{border-bottom:none;gap:0}
-  .super-tab{flex:1;border-radius:22px;padding:11px 18px;font-weight:800;background:#ECEFF4;color:#8A92A0;border-bottom:none;position:relative;z-index:1;white-space:nowrap}
-  .super-tab + .super-tab{margin-left:-18px}
+  /* 탭: 라운드 레일 + 아이콘 배지 + 겹침(5:5) */
+  .super-tabs{border-bottom:none;gap:0;background:#E7E9ED;border-radius:28px;padding:5px}
+  .super-tab{display:flex;align-items:center;justify-content:center;flex:1;border-radius:24px;padding:9px 8px;font-weight:800;background:transparent;color:#8A92A0;border-bottom:none;position:relative;z-index:1;white-space:nowrap}
+  .super-tab + .super-tab{margin-left:-16px}
   .super-tab.active{background:#F58220;color:#fff;z-index:2;box-shadow:0 3px 10px rgba(245,130,32,.30)}
+  .super-tab .stab-ic{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;margin-right:7px;flex:0 0 auto;background:#fff}
+  .super-tab .stab-ic svg{width:16px;height:16px}
+  .super-tab.active .stab-ic svg{color:#F58220}
+  .super-tab:not(.active) .stab-ic svg{color:#9AA2AE}
   #stab-credit::after{content:' ›'}
   /* 신용등급 서브바: 긴 설명은 숨기고 컨트롤만 */
   .credit-subbar{padding:8px 13px;gap:8px}
@@ -383,8 +389,8 @@ tr.row-done td{transition:background .3s}
     </div>
   </div>
   <div class="super-tabs">
-    <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')">원리금보장상품 금리</button>
-    <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')">신용등급관리</button>
+    <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')"><span class="stab-ic"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="13" width="4" height="7" rx="1"/><rect x="10" y="9" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg></span>원리금보장상품 금리</button>
+    <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')"><span class="stab-ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V5l-8-3Z"/></svg></span>신용등급관리</button>
     {% if role != 'rm' %}
     <button id="stab-proposal" class="super-tab"       onclick="switchSuper('proposal')">상품제안관리</button>
     <button id="stab-visitors" class="super-tab"       onclick="switchSuper('visitors')">방문자 통계</button>
