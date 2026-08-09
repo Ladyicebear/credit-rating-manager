@@ -312,6 +312,7 @@
   .prop-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:8px;margin:10px 12px 12px}
   .prop-tbl{table-layout:fixed}
   .prop-tbl th,.prop-tbl td{border:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prop-tbl td{padding:9px 6px}   /* 5행 균등하게 조금 높임 */
   .prop-tbl thead th{position:sticky;top:0;z-index:2}
   .prop-tbl th:nth-child(4),.prop-tbl td:nth-child(4){text-align:center}   /* 금리 열 중앙정렬 */
   .prop-tbl tbody tr{cursor:pointer}
@@ -1557,10 +1558,13 @@ function renderProposalMobile(){
    검색·필터로 내용이 바뀌어도 이 높이는 변하지 않는다. */
 function fitPropTable(){
   const sc=$('propScroll'); if(!sc) return;
-  const thead=sc.querySelector('thead'), fr=sc.querySelector('tbody tr');
-  if(!thead||!fr){ sc.style.height=''; return; }
-  const th=thead.getBoundingClientRect().height, rh=fr.getBoundingClientRect().height;
-  sc.style.height=Math.round(th+rh*5+1)+'px';   // 5행 고정(height)
+  const thead=sc.querySelector('thead'), rows=sc.querySelectorAll('tbody tr');
+  if(!thead||!rows.length){ sc.style.height=''; return; }
+  // 헤더 + 실제 5행 높이를 합산(테두리 반올림 오차로 마지막 행이 잘리던 문제 방지)
+  let h=thead.getBoundingClientRect().height;
+  const n=Math.min(5,rows.length);
+  for(let i=0;i<n;i++) h+=rows[i].getBoundingClientRect().height;
+  sc.style.height=Math.ceil(h)+3+'px';   // 5행 전체 노출 + 여유 3px
 }
 function openPropDetail(i){
   const r=proposalRows[i]; if(!r) return;
