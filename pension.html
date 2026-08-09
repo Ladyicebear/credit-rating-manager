@@ -1377,7 +1377,7 @@ function applyBizHeight(total){
   const first=list.querySelector('.biz-card');
   if(!first){ list.style.maxHeight=''; list.style.overflowY='visible'; return; }
   const gap=10, ch=first.getBoundingClientRect().height;
-  const visible=bizExpanded?5:3;
+  const visible=bizExpanded?4:3;
   if(total<=visible){ list.style.maxHeight=''; list.style.overflowY='visible'; return; }
   list.style.maxHeight=Math.round(visible*ch+(visible-1)*gap)+'px';
   list.style.overflowY=bizExpanded?'auto':'hidden';
