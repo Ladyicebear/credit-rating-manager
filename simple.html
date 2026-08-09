@@ -5,100 +5,276 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>간편조회 · 퇴직연금</title>
 <style>
-  :root{--navy:#16335B;--navy-d:#0F2647;--orange:#F68121;--orange-d:#E85A00;
-        --bg:#F4F6FA;--card:#fff;--line:#E7EBF1;--ink:#1F2937;--muted:#8A92A0}
+  :root{--navy:#16335B;--navy-2:#1E4278;--orange:#F26522;--orange-d:#DB531A;
+        --bg:#FFFFFF;--card:#FFFFFF;--line:#E7EBF1;--line-2:#EEF1F6;
+        --ink:#1F2937;--muted:#8A92A0;--muted-2:#A9B2C2}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--bg);color:var(--ink);
-       font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif;
-       padding-bottom:env(safe-area-inset-bottom)}
-  .wrap{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+       font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif}
+  .app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
 
-  /* 상단 앱바 */
-  .appbar{background:linear-gradient(135deg,var(--navy) 0%,#1f4a80 100%);color:#fff;
-          padding:calc(env(safe-area-inset-top) + 14px) 18px 16px;position:sticky;top:0;z-index:10}
-  .appbar-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .brand{font-size:17px;font-weight:800;letter-spacing:-.4px}
-  .brand .b-org{color:var(--orange)}
-  .appbar-acts{display:flex;gap:8px}
-  .abtn{background:rgba(255,255,255,.16);color:#fff;border:none;border-radius:8px;
-        font-size:11.5px;font-weight:700;padding:6px 10px;cursor:pointer;font-family:inherit;text-decoration:none}
-  .abtn:active{background:rgba(255,255,255,.28)}
-  .appbar-sub{font-size:12px;opacity:.85;margin-top:6px;font-weight:600}
+  /* ── 헤더 ── */
+  .hdr{padding:calc(env(safe-area-inset-top) + 14px) 18px 0}
+  .logo{font-size:21px;font-weight:800;letter-spacing:-.4px;line-height:1.15}
+  .logo .l-navy{color:var(--navy)} .logo .l-org{color:var(--orange)} .logo .l-gray{color:#AEB6C2}
+  .logo-sub{font-size:16px;font-weight:800;color:#AEB6C2;letter-spacing:-.3px;margin-top:1px}
+  .tabs{display:flex;gap:8px;margin-top:14px}
+  .tab{flex:0 0 auto;border:none;background:none;font-family:inherit;font-size:15px;font-weight:800;
+       color:var(--muted);padding:9px 20px;border-radius:22px;cursor:pointer;letter-spacing:-.3px}
+  .tab.on{background:var(--orange);color:#fff}
 
-  /* 콘텐츠 */
-  .body{flex:1;padding:16px 16px 28px}
-  .hello{font-size:14px;color:var(--muted);font-weight:700;margin:2px 2px 12px}
-  .hello b{color:var(--navy)}
+  /* ── 기준월/조회 박스 ── */
+  .qbox{margin:14px 16px 0;background:var(--navy);border-radius:16px;padding:16px 16px 14px;color:#fff}
+  .q-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .q-label{font-size:12.5px;color:var(--muted-2);font-weight:700}
+  .q-month{position:relative;margin-top:4px}
+  .q-month select{appearance:none;-webkit-appearance:none;background:none;border:none;color:#fff;
+       font-family:inherit;font-size:24px;font-weight:800;letter-spacing:-.5px;padding:0 22px 0 0;outline:none;cursor:pointer}
+  .q-month::after{content:'⌄';position:absolute;right:2px;top:-3px;font-size:20px;color:#fff;pointer-events:none}
+  .q-month select option{color:#1F2937}
+  .q-dl{background:none;border:1.5px solid #fff;color:#fff;border-radius:9px;font-family:inherit;
+        font-size:13px;font-weight:700;padding:9px 14px;cursor:pointer;white-space:nowrap;margin-top:2px}
+  .q-dl:active{background:rgba(255,255,255,.15)}
+  .q-search{width:100%;margin-top:14px;background:#fff;color:var(--navy);border:none;border-radius:10px;
+            font-family:inherit;font-size:15px;font-weight:800;padding:13px;cursor:pointer}
+  .q-search:active{background:#eef}
 
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 14px;
-        box-shadow:0 2px 10px rgba(16,24,40,.05);cursor:pointer;transition:transform .08s}
-  .tile:active{transform:scale(.97)}
-  .tile .ic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px}
-  .tile .t{font-size:14.5px;font-weight:800;color:var(--navy);letter-spacing:-.3px}
-  .tile .d{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.4}
-  .ic-rate{background:#FFF1E6} .ic-credit{background:#E9F1FF} .ic-prop{background:#E7F7F0} .ic-more{background:#F1F0F6}
+  /* ── 섹션 ── */
+  .sec{padding:20px 18px 0}
+  .sec-title{font-size:16.5px;font-weight:800;color:var(--navy);letter-spacing:-.4px;display:flex;align-items:center;gap:5px}
+  .sec-title .i{width:15px;height:15px;border-radius:50%;background:#C7CFDD;color:#fff;font-size:10px;
+                display:inline-flex;align-items:center;justify-content:center;font-weight:800}
 
-  .wip{margin-top:18px;background:#FFF8EE;border:1px dashed #F1C99E;border-radius:14px;padding:16px;
-       font-size:12.5px;color:#8a6a3a;line-height:1.7}
-  .wip b{color:var(--orange-d)}
+  /* 주요 지표 3카드 */
+  .ind{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:12px}
+  .ind-c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 10px 11px;
+         display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:0 2px 8px rgba(16,24,40,.04)}
+  .ind-l{font-size:12px;color:#5A6474;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+  .ind-v{font-size:23px;font-weight:800;color:var(--navy);letter-spacing:-.8px;margin-top:8px;line-height:1;font-variant-numeric:tabular-nums}
+  .ind-d{font-size:11px;color:#8A92A0;font-weight:600;margin-top:7px;white-space:nowrap}
+  .ind-b{margin-top:9px;background:var(--navy);color:#fff;border:none;border-radius:16px;
+         font-family:inherit;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer}
+  .ind-b:active{background:var(--navy-2)}
 
-  .foot{text-align:center;font-size:10.5px;color:#B4B2A9;padding:16px}
+  /* 이달의 제안 가능 상품 */
+  .prop{margin:22px 16px 0;background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:15px 15px 8px;box-shadow:0 2px 10px rgba(16,24,40,.05)}
+  .prop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .prop-title{font-size:15px;font-weight:800;color:var(--orange);letter-spacing:-.4px}
+  .prop-notice{background:var(--orange);color:#fff;border:none;border-radius:8px;font-family:inherit;
+               font-size:13px;font-weight:800;padding:6px 16px;cursor:pointer}
+  .prop-notice:active{background:var(--orange-d)}
+  .prop-list{display:flex;flex-direction:column}
+  .prow{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.15fr) 42px 58px;gap:6px;align-items:center;
+        padding:12px 2px;border-top:1px solid var(--line-2)}
+  .prow:first-child{border-top:none}
+  .prow .p-org{font-size:13.5px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .p-fam{font-size:12.5px;color:#6B7480;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .p-per{font-size:12.5px;color:#6B7480;text-align:center}
+  .prow .p-rate{font-size:14px;font-weight:800;color:var(--orange);text-align:right;font-variant-numeric:tabular-nums}
+  .prop-none{padding:20px 4px;text-align:center;color:var(--muted);font-size:12.5px}
+
+  /* ── 하단 네비 ── */
+  .botnav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--line);
+          display:flex;max-width:480px;margin:0 auto;padding:8px 0 calc(6px + env(safe-area-inset-bottom))}
+  .nav-i{flex:1;background:none;border:none;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:3px;
+         color:#B0B7C2;cursor:pointer;text-decoration:none}
+  .nav-i .ni{font-size:20px;line-height:1}
+  .nav-i .nl{font-size:11px;font-weight:700}
+  .nav-i.on{color:var(--orange)}
+
+  /* ── 공지 팝업 ── */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center;padding:22px}
+  .modal.open{display:flex}
+  .modal-card{background:#fff;border-radius:16px;width:360px;max-width:100%;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+  .modal-head{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+  .modal-head b{font-size:15px;font-weight:800}
+  .modal-x{background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:8px;font-size:14px;cursor:pointer}
+  .modal-body{padding:16px;font-size:13.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:var(--ink);min-height:50px}
+  .modal-body.empty{color:var(--muted);text-align:center;padding:26px 16px}
+  .modal-when{font-size:11px;color:var(--muted);text-align:right;padding:0 16px 14px}
+
+  #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--navy-d,#0F2647);
+         color:#fff;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:20px;opacity:0;
+         transition:opacity .2s;pointer-events:none;z-index:60;white-space:nowrap}
+  #toast.on{opacity:.96}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="appbar">
-    <div class="appbar-row">
-      <div class="brand"><span class="b-org">Pension</span> 간편조회</div>
-      <div class="appbar-acts">
-        <a class="abtn" href="/switch_view" title="기존 웹버전으로">🖥️ 웹버전</a>
-        <a class="abtn" href="/logout" title="로그아웃">로그아웃</a>
-      </div>
+<div class="app">
+  <!-- 헤더 -->
+  <header class="hdr">
+    <div class="logo"><span class="l-navy">Retirement</span> <span class="l-org">Pension</span></div>
+    <div class="logo-sub">Management System</div>
+    <div class="tabs">
+      <button class="tab on">원리금보장상품 금리</button>
+      <button class="tab" onclick="toast('신용등급 화면 준비중')">신용등급관리 ›</button>
     </div>
-    <div class="appbar-sub">퇴직연금 원리금보장상품 · 모바일 새 버전 (v2)</div>
   </header>
 
-  <main class="body">
-    <div class="hello">안녕하세요 <b id="who">사용자</b>님 👋</div>
+  <!-- 기준월 / 조회 -->
+  <div class="qbox">
+    <div class="q-top">
+      <div>
+        <div class="q-label">기준월</div>
+        <div class="q-month"><select id="monthSel" onchange="onMonth()"></select></div>
+      </div>
+      <button class="q-dl" onclick="downloadReport()">금리현황 다운로드</button>
+    </div>
+    <button class="q-search" onclick="doQuery()">조회하기</button>
+  </div>
 
-    <div class="grid">
-      <div class="tile" onclick="alert('원리금 금리 화면 — 여기에 v2 디자인을 만들 예정')">
-        <div class="ic ic-rate">💰</div>
-        <div class="t">원리금 금리</div>
-        <div class="d">DB·DC/IRP 금리 조회</div>
+  <!-- 이번달 주요 지표 -->
+  <section class="sec">
+    <div class="sec-title">이번달 주요 지표 <span class="i">i</span></div>
+    <div class="ind">
+      <div class="ind-c">
+        <div class="ind-l">한국은행 기준금리</div>
+        <div class="ind-v" id="bokVal">–</div>
+        <div class="ind-d" id="bokWhen">–</div>
+        <button class="ind-b" onclick="toast('그래프 준비중')">그래프 보기</button>
       </div>
-      <div class="tile" onclick="alert('신용등급 화면 — v2 예정')">
-        <div class="ic ic-credit">🏦</div>
-        <div class="t">신용등급</div>
-        <div class="d">3사 최신 등급</div>
+      <div class="ind-c">
+        <div class="ind-l">물가상승률</div>
+        <div class="ind-v" id="cpiVal">–</div>
+        <div class="ind-d" id="cpiWhen">–</div>
+        <button class="ind-b" onclick="toast('그래프 준비중')">그래프 보기</button>
       </div>
-      <div class="tile" onclick="alert('제안상품 화면 — v2 예정')">
-        <div class="ic ic-prop">📋</div>
-        <div class="t">제안상품</div>
-        <div class="d">이달의 제안</div>
-      </div>
-      <div class="tile" onclick="alert('더보기 — v2 예정')">
-        <div class="ic ic-more">✨</div>
-        <div class="t">더보기</div>
-        <div class="d">공지·물가·기준금리</div>
+      <div class="ind-c">
+        <div class="ind-l">국고채 금리1년</div>
+        <div class="ind-v" id="bondVal">2.80%</div>
+        <div class="ind-d" id="bondWhen">2026년 08월 09일</div>
+        <button class="ind-b" onclick="toast('그래프 준비중')">그래프 보기</button>
       </div>
     </div>
+  </section>
 
-    <div class="wip">
-      <b>🚧 간편조회(v2) 준비 중</b><br>
-      지금은 시작 뼈대예요. 여기부터 <b>모바일 사용자 중심</b>으로 화면을 하나씩 새로 디자인합니다.
-      기존 기능이 필요하면 오른쪽 위 <b>🖥️ 웹버전</b>으로 언제든 전환할 수 있어요.
+  <!-- 이달의 제안 가능 상품(DB제도) -->
+  <section class="prop">
+    <div class="prop-head">
+      <span class="prop-title">이달의 제안 가능 상품(DB제도)</span>
+      <button class="prop-notice" onclick="openNotice()">공지</button>
     </div>
-  </main>
-
-  <div class="foot">System Designed &amp; Built by Goun · v2</div>
+    <div class="prop-list" id="propList"><div class="prop-none">불러오는 중…</div></div>
+  </section>
 </div>
 
+<!-- 하단 네비 -->
+<nav class="botnav">
+  <a class="nav-i on"><span class="ni">🏠</span><span class="nl">홈</span></a>
+  <button class="nav-i" onclick="toast('상품조회 준비중')"><span class="ni">🔍</span><span class="nl">상품조회</span></button>
+  <button class="nav-i" onclick="toast('금리현황 준비중')"><span class="ni">📈</span><span class="nl">금리현황</span></button>
+  <button class="nav-i" onclick="toast('신용등급 준비중')"><span class="ni">🎗️</span><span class="nl">신용등급</span></button>
+</nav>
+
+<!-- 공지 팝업 -->
+<div class="modal" id="noticeModal" onclick="if(event.target===this)closeNotice()">
+  <div class="modal-card">
+    <div class="modal-head"><b>📢 공지사항</b><button class="modal-x" onclick="closeNotice()">✕</button></div>
+    <div class="modal-body" id="noticeBody"></div>
+    <div class="modal-when" id="noticeWhen"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
 <script>
-  fetch('/api/me').then(r=>r.json()).then(d=>{
-    if(d&&d.user){ const el=document.getElementById('who'); if(el) el.textContent=d.user; }
-  }).catch(()=>{});
+const $=id=>document.getElementById(id);
+let STORE={}, months=[], curMonth='', baseRows=null, proposals={};
+const MONTH_LABEL={3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
+
+let _tt;
+function toast(m){ const el=$('toast'); el.textContent=m; el.classList.add('on'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('on'),2000); }
+function htmlEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function ymLabel(ym){ ym=String(ym||''); return ym.slice(0,4)+'년 '+ym.slice(5,7)+'월'; }
+
+function currentBaseRate(){
+  if(!baseRows||!baseRows.length) return null;
+  const ym=String(curMonth||'').slice(0,7);
+  const same=baseRows.filter(r=>String(r[0]).slice(0,7)===ym);
+  const row=same.length?same[same.length-1]:baseRows[baseRows.length-1];
+  const d=String(row[0]).slice(0,10);
+  const rate=typeof row[7]==='number'?row[7]:parseFloat(row[7]);
+  return {rate:isNaN(rate)?null:rate, year:d.slice(0,4), month:d.slice(5,7)};
+}
+
+async function boot(){
+  try{
+    const [ps,cp,rh,pr]=await Promise.all([
+      fetch('/api/pension_store').then(r=>r.json()),
+      fetch('/api/cpi').then(r=>r.json()).catch(()=>null),
+      fetch('/api/rate_history').then(r=>r.json()).catch(()=>null),
+      fetch('/api/proposals').then(r=>r.json()).catch(()=>({})),
+    ]);
+    STORE=ps||{}; proposals=pr||{};
+    try{ baseRows=rh.sheets.Sheet2.rows; }catch(e){ baseRows=null; }
+    // 물가
+    if(cp&&cp.ok){ $('cpiVal').textContent=cp.rate.toFixed(2)+'%'; $('cpiWhen').textContent=cp.year+'년 '+String(cp.month).padStart(2,'0')+'월'; }
+    else { $('cpiVal').textContent='–'; $('cpiWhen').textContent='-'; }
+  }catch(e){ toast('데이터를 불러오지 못했습니다'); }
+  months=Object.keys(STORE).sort();
+  curMonth=months[months.length-1]||'';
+  $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('') || `<option>-</option>`;
+  $('monthSel').value=curMonth;
+  render();
+}
+function onMonth(){ curMonth=$('monthSel').value; render(); }
+function doQuery(){ curMonth=$('monthSel').value; render(); toast(ymLabel(curMonth)+' 조회'); }
+
+function render(){
+  // 기준금리
+  const br=currentBaseRate();
+  if(br&&br.rate!=null){ $('bokVal').textContent=br.rate.toFixed(2)+'%'; $('bokWhen').textContent=br.year+'년 '+br.month+'월'; }
+  else { $('bokVal').textContent='–'; $('bokWhen').textContent='-'; }
+  // 제안상품
+  const list=(proposals[curMonth]||[]).slice().sort((a,b)=>{
+    const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra;
+  });
+  const el=$('propList');
+  if(!list.length){ el.innerHTML=`<div class="prop-none">등록된 제안상품이 없습니다.</div>`; return; }
+  el.innerHTML=list.map(r=>{
+    const per=r.period||MONTH_LABEL[r.months]||'';
+    const rate=(typeof r.rate==='number')?r.rate.toFixed(2)+'%':(r.rate==null?'-':r.rate);
+    return `<div class="prow"><div class="p-org" title="${htmlEsc(r.org)}">${htmlEsc(r.org)}</div>`+
+           `<div class="p-fam" title="${htmlEsc(r.fam)}">${htmlEsc(r.fam)}</div>`+
+           `<div class="p-per">${htmlEsc(per)}</div><div class="p-rate">${rate}</div></div>`;
+  }).join('');
+}
+
+/* 금리현황 다운로드 (서버 레포트, blob) — 모바일 안전(정리 지연) */
+async function downloadReport(){
+  const e=STORE[curMonth]; const rows=(e&&e.rows)||[];
+  if(!rows.length){ toast('다운로드할 데이터가 없습니다'); return; }
+  toast('금리현황 레포트 생성 중…');
+  try{
+    const res=await fetch('/api/pension_report',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:curMonth, rows})});
+    if(!res.ok) throw new Error('서버 '+res.status);
+    const blob=await res.blob(); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download=`퇴직연금 금리정보 현황_${(curMonth||'').replace('-','년 ')}월.xlsx`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
+    toast('다운로드했습니다');
+  }catch(err){ toast('다운로드 실패: '+err.message); }
+}
+
+/* 공지 */
+function openNotice(){
+  const body=$('noticeBody'), when=$('noticeWhen');
+  body.className='modal-body'; body.textContent='불러오는 중…'; when.textContent='';
+  $('noticeModal').classList.add('open');
+  fetch('/api/notice').then(r=>r.json()).then(d=>{
+    const t=((d&&d.text)||'').trim();
+    if(t){ body.className='modal-body'; body.textContent=t; }
+    else { body.className='modal-body empty'; body.textContent='등록된 공지사항이 없습니다.'; }
+    when.textContent=(d&&d.updated_at)?('업데이트: '+d.updated_at):'';
+  }).catch(()=>{ body.className='modal-body empty'; body.textContent='공지를 불러오지 못했습니다.'; });
+}
+function closeNotice(){ $('noticeModal').classList.remove('open'); }
+
+boot();
 </script>
 </body>
 </html>

@@ -1621,6 +1621,12 @@ def rate_history_append():
                     'base_rate': base_rate, 'matched': matched})
 
 
+@app.route('/simple2')
+def simple2_preview():
+    # 모바일 ver2 미리보기(개발용) — 로그인 세션 공유로 /api/* 정상 동작
+    return _record_visit(make_response(send_file(os.path.join(BASE_DIR, 'simple2.html'))))
+
+
 @app.route('/')
 def index():
     # 간편조회(v2, 모바일 신규 디자인) — 로그인 시 선택. 기존 v1은 아래 그대로 유지.

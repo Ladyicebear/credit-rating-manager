@@ -19,6 +19,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .brand-logo .b-org{color:#F68121}
 .brand-logo .b-gray{color:#b3bac4}
 .brand-sub{font-size:.82rem;color:#6b7280;margin-top:5px;font-weight:600}
+.brand-smart{display:none}
 .hdr-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
 /* Goun 곰 로고(brand-mark)는 hdr-actions 인라인 아이템(RM 비번 버튼과 로그아웃 사이) */
 /* RM 비밀번호 만료 안내(연금컨설팅팀 전용): 평소 회색, 임박(3일 이하)·만료 시 주황 */
@@ -305,6 +306,16 @@ tr.row-done td{transition:background .3s}
   .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
   /* 상품제안관리·방문자 통계는 관리자용 데스크톱 화면 → 모바일에서는 탭 숨김 */
   #stab-proposal,#stab-visitors{display:none}
+  /* ── 모바일 상단 변경(요청): SMART FUTURE 로고 + 원리금/신용등급 알약 탭 ── */
+  .brand-logo,.brand-sub{display:none}
+  .brand-smart{display:block;line-height:0}
+  .brand-smart img{height:22px;width:auto;display:block}
+  /* 탭 겹침(레이어) 5:5 — 선택 탭이 위로 올라와 옆 탭을 덮음 */
+  .super-tabs{border-bottom:none;gap:0}
+  .super-tab{flex:1;border-radius:22px;padding:11px 18px;font-weight:800;background:#ECEFF4;color:#8A92A0;border-bottom:none;position:relative;z-index:1;white-space:nowrap}
+  .super-tab + .super-tab{margin-left:-18px}
+  .super-tab.active{background:#F26B12;color:#fff;z-index:2;box-shadow:0 3px 10px rgba(242,107,18,.30)}
+  #stab-credit::after{content:' ›'}
   /* 신용등급 서브바: 긴 설명은 숨기고 컨트롤만 */
   .credit-subbar{padding:8px 13px;gap:8px}
   .credit-subbar .hdr-sub{display:none}
@@ -355,6 +366,7 @@ tr.row-done td{transition:background .3s}
     <div>
       <div class="brand-logo"><span class="b-nav">Retirement</span> <span class="b-org">Pension</span> <span class="b-gray">Management System</span></div>
       <div class="brand-sub">퇴직연금 상품제공기관 통합관리</div>
+      <div class="brand-smart"><img src="/static/images/smart_future.png" alt="SMART FUTURE"></div>
     </div>
     <div class="hdr-actions">
       {% if role != 'rm' %}

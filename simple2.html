@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>간편조회 · 퇴직연금</title>
+<style>
+  :root{--navy:#043B72;--navy-2:#0A4E8A;--orange:#F58220;--orange-d:#CB6015;
+        --bg:#FFFFFF;--card:#FFFFFF;--line:#E7EBF1;--line-2:#EEF1F6;
+        --ink:#1F2937;--muted:#8A92A0;--muted-2:#A9B2C2}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif}
+  .app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+
+  /* ── 헤더 ── */
+  .hdr{padding:calc(env(safe-area-inset-top) + 14px) 18px 0}
+  .hdr-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .logo{font-size:21px;font-weight:800;letter-spacing:-.4px;line-height:1.15}
+  .logo .l-navy{color:var(--navy)} .logo .l-org{color:var(--orange)} .logo .l-gray{color:#AEB6C2}
+  .logo-sub{font-size:16px;font-weight:800;color:#AEB6C2;letter-spacing:-.3px;margin-top:1px}
+  .logout{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;border:1.5px solid var(--line);
+          background:#fff;color:var(--ink);font-family:inherit;font-size:13px;font-weight:700;
+          padding:8px 13px;border-radius:11px;cursor:pointer;white-space:nowrap;margin-top:2px}
+  .logout:active{background:#f3f5f9}
+  .tabs{display:flex;margin-top:14px}
+  .tab{flex:1 1 0;text-align:center;border:none;background:#ECEFF4;font-family:inherit;font-size:15px;font-weight:800;
+       color:var(--muted);padding:11px 18px;border-radius:22px;cursor:pointer;letter-spacing:-.3px;white-space:nowrap;
+       position:relative;z-index:1}
+  .tab + .tab{margin-left:-18px}
+  .tab.on{background:var(--orange);color:#fff;z-index:2;box-shadow:0 3px 10px rgba(245,130,32,.30)}
+
+  /* ── 기준월/조회 박스 ── */
+  .qbox{margin:14px 16px 0;background:var(--navy);border-radius:16px;padding:16px 16px 14px;color:#fff}
+  .q-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .q-label{font-size:12.5px;color:var(--muted-2);font-weight:700}
+  .q-month{position:relative;margin-top:4px}
+  .q-month select{appearance:none;-webkit-appearance:none;background:none;border:none;color:#fff;
+       font-family:inherit;font-size:24px;font-weight:800;letter-spacing:-.5px;padding:0 22px 0 0;outline:none;cursor:pointer}
+  .q-month::after{content:'⌄';position:absolute;right:2px;top:-3px;font-size:20px;color:#fff;pointer-events:none}
+  .q-month select option{color:#1F2937}
+  .q-dl{background:none;border:1.5px solid #fff;color:#fff;border-radius:9px;font-family:inherit;
+        font-size:13px;font-weight:700;padding:9px 14px;cursor:pointer;white-space:nowrap;margin-top:2px}
+  .q-dl:active{background:rgba(255,255,255,.15)}
+  .q-search{width:100%;margin-top:14px;background:#fff;color:var(--navy);border:none;border-radius:10px;
+            font-family:inherit;font-size:15px;font-weight:800;padding:13px;cursor:pointer}
+  .q-search:active{background:#eef}
+
+  /* ── 섹션 ── */
+  .sec{padding:20px 18px 0}
+  .sec-title{font-size:16.5px;font-weight:800;color:var(--navy);letter-spacing:-.4px;display:flex;align-items:center;gap:5px}
+  .sec-title .i{width:15px;height:15px;border-radius:50%;background:#C7CFDD;color:#fff;font-size:10px;
+                display:inline-flex;align-items:center;justify-content:center;font-weight:800}
+
+  /* 주요 지표 3카드 */
+  .ind{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:12px}
+  .ind-c{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 10px 11px;
+         display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:0 2px 8px rgba(16,24,40,.04)}
+  .ind-l{font-size:12px;color:#5A6474;font-weight:700;letter-spacing:-.3px;white-space:nowrap}
+  .ind-v{font-size:23px;font-weight:800;color:var(--navy);letter-spacing:-.8px;margin-top:8px;line-height:1;font-variant-numeric:tabular-nums}
+  .ind-d{font-size:11px;color:#8A92A0;font-weight:600;margin-top:7px;white-space:nowrap}
+  .ind-b{margin-top:9px;background:var(--navy);color:#fff;border:none;border-radius:16px;
+         font-family:inherit;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer}
+  .ind-b:active{background:var(--navy-2)}
+
+  /* 이달의 제안 가능 상품 */
+  .prop{margin:22px 16px 0;background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:15px 15px 8px;box-shadow:0 2px 10px rgba(16,24,40,.05)}
+  .prop-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .prop-title{font-size:15px;font-weight:800;color:var(--orange);letter-spacing:-.4px}
+  .prop-notice{background:var(--orange);color:#fff;border:none;border-radius:8px;font-family:inherit;
+               font-size:13px;font-weight:800;padding:6px 16px;cursor:pointer}
+  .prop-notice:active{background:var(--orange-d)}
+  .prop-list{display:flex;flex-direction:column}
+  .prow{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.15fr) 42px 58px;gap:6px;align-items:center;
+        padding:12px 2px;border-top:1px solid var(--line-2)}
+  .prow:first-child{border-top:none}
+  .prow .p-org{font-size:13.5px;font-weight:800;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .p-fam{font-size:12.5px;color:#6B7480;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .p-per{font-size:12.5px;color:#6B7480;text-align:center}
+  .prow .p-rate{font-size:14px;font-weight:800;color:var(--orange);text-align:right;font-variant-numeric:tabular-nums}
+  .prop-none{padding:20px 4px;text-align:center;color:var(--muted);font-size:12.5px}
+
+  /* ── 하단 네비 ── */
+  .botnav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--line);
+          display:flex;max-width:480px;margin:0 auto;padding:8px 0 calc(6px + env(safe-area-inset-bottom))}
+  .nav-i{flex:1;background:none;border:none;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;
+         color:#A0A6A8;cursor:pointer;text-decoration:none}
+  .nav-i .ni{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+  .nav-i .ni svg{width:24px;height:24px;display:block}
+  .nav-i .nl{font-size:11px;font-weight:700}
+  .nav-i.on{color:var(--orange)}
+
+  /* ── 공지 팝업 ── */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center;padding:22px}
+  .modal.open{display:flex}
+  .modal-card{background:#fff;border-radius:16px;width:360px;max-width:100%;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+  .modal-head{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+  .modal-head b{font-size:15px;font-weight:800}
+  .modal-x{background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:8px;font-size:14px;cursor:pointer}
+  .modal-body{padding:16px;font-size:13.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:var(--ink);min-height:50px}
+  .modal-body.empty{color:var(--muted);text-align:center;padding:26px 16px}
+  .modal-when{font-size:11px;color:var(--muted);text-align:right;padding:0 16px 14px}
+
+  #toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--navy-d,#032A52);
+         color:#fff;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:20px;opacity:0;
+         transition:opacity .2s;pointer-events:none;z-index:60;white-space:nowrap}
+  #toast.on{opacity:.96}
+
+  /* ── 금리현황 화면 ── */
+  .rate-view{min-height:100vh}
+  .rt-hdr{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 14px) 16px 8px}
+  .rt-back{background:none;border:none;padding:4px;margin:-4px;cursor:pointer;color:var(--ink);display:flex}
+  .rt-back svg{width:24px;height:24px;display:block}
+  .rt-title{font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-.4px}
+  .rt-monthrow{display:flex;align-items:center;gap:10px;padding:8px 16px 2px}
+  .rt-monthrow .lbl{font-size:13px;font-weight:700;color:var(--muted)}
+  .rt-msel{position:relative}
+  .rt-msel select{appearance:none;-webkit-appearance:none;background:#fff;border:1.5px solid var(--line);
+       color:var(--ink);font-family:inherit;font-size:15px;font-weight:700;letter-spacing:-.3px;
+       padding:9px 34px 9px 14px;border-radius:10px;outline:none;cursor:pointer}
+  .rt-msel::after{content:'⌄';position:absolute;right:12px;top:6px;font-size:16px;color:var(--muted);pointer-events:none}
+  .rt-subtabs{display:flex;gap:26px;padding:6px 18px 0;border-bottom:1px solid var(--line);margin-top:4px}
+  .rt-subtab{background:none;border:none;font-family:inherit;font-size:17px;font-weight:800;letter-spacing:-.4px;
+       color:#AEB6C2;padding:10px 0 12px;border-bottom:2.5px solid transparent;margin-bottom:-1px;cursor:pointer}
+  .rt-subtab.on{color:var(--orange);border-bottom-color:var(--orange)}
+  .rt-body{padding:2px 16px 8px}
+  .rt-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 14px 6px;margin-top:14px;
+       box-shadow:0 2px 10px rgba(16,24,40,.04)}
+  .rt-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .rt-card-title{font-size:15px;font-weight:800;color:var(--navy);letter-spacing:-.3px}
+  .rt-more{background:none;border:none;font-family:inherit;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
+  .rt-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+  .rt-tbl th{font-size:11.5px;font-weight:700;color:#5A6474;background:#F4F6FA;padding:8px 3px;text-align:center;
+       border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2)}
+  .rt-tbl td{font-size:12.5px;padding:11px 3px;text-align:center;border-bottom:1px solid var(--line-2);
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rt-tbl tr:last-child td{border-bottom:none}
+  .rt-tbl .c-org{width:26%;font-weight:800;color:var(--navy);text-align:left;padding-left:6px}
+  .rt-tbl .c-fam{width:29%;color:#6B7480}
+  .rt-tbl .c-per{width:13%;color:#6B7480}
+  .rt-tbl .c-rate{width:16%;font-weight:800;color:var(--orange);font-variant-numeric:tabular-nums}
+  .rt-tbl .c-sell{width:16%}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:11px;white-space:nowrap}
+  .badge.ok{color:#1A9E67;background:#E7F7EF;border:1px solid #B7E7CF}
+  .badge.no{color:#D64545;background:#FCECEC;border:1px solid #F3C9C9}
+  .rt-none{color:var(--muted);font-size:12px}
+  .rt-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="homeView">
+  <!-- 헤더 -->
+  <header class="hdr">
+    <div class="hdr-top">
+      <div>
+        <div class="logo"><span class="l-navy">Retirement</span> <span class="l-org">Pension</span></div>
+        <div class="logo-sub">Management System</div>
+      </div>
+      <button class="logout" onclick="location.href='/logout'">🔒 로그아웃</button>
+    </div>
+    <div class="tabs">
+      <button class="tab on">원리금보장상품 금리</button>
+      <button class="tab" onclick="toast('신용등급 화면 준비중')">신용등급관리 ›</button>
+    </div>
+  </header>
+
+  <!-- 기준월 / 조회 -->
+  <div class="qbox">
+    <div class="q-top">
+      <div>
+        <div class="q-label">기준월</div>
+        <div class="q-month"><select id="monthSel" onchange="onMonth()"></select></div>
+      </div>
+      <button class="q-dl" onclick="downloadReport()">금리현황 다운로드</button>
+    </div>
+    <button class="q-search" onclick="doQuery()">조회하기</button>
+  </div>
+
+  <!-- 이번달 주요 지표 -->
+  <section class="sec">
+    <div class="sec-title">이번달 주요 지표 <span class="i">i</span></div>
+    <div class="ind">
+      <div class="ind-c">
+        <div class="ind-l">한국은행 기준금리</div>
+        <div class="ind-v" id="bokVal">–</div>
+        <div class="ind-d" id="bokWhen">–</div>
+        <button class="ind-b" onclick="toast('그래프 준비중')">그래프 보기</button>
+      </div>
+      <div class="ind-c">
+        <div class="ind-l">물가상승률</div>
+        <div class="ind-v" id="cpiVal">–</div>
+        <div class="ind-d" id="cpiWhen">–</div>
+        <button class="ind-b" onclick="toast('그래프 준비중')">그래프 보기</button>
+      </div>
+      <div class="ind-c">
+        <div class="ind-l">국고채 금리1년</div>
+        <div class="ind-v" id="bondVal">3.37%</div>
+        <div class="ind-d" id="bondWhen">2026년 08월 07일</div>
+        <button class="ind-b" onclick="toast('그래프 준비중')">그래프 보기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 이달의 제안 가능 상품(DB제도) -->
+  <section class="prop">
+    <div class="prop-head">
+      <span class="prop-title">이달의 제안 가능 상품(DB제도)</span>
+      <button class="prop-notice" onclick="openNotice()">공지</button>
+    </div>
+    <div class="prop-list" id="propList"><div class="prop-none">불러오는 중…</div></div>
+  </section>
+  </div><!-- /homeView -->
+
+  <!-- 금리현황 화면 -->
+  <div id="rateView" class="rate-view" style="display:none">
+    <div class="rt-hdr">
+      <button class="rt-back" onclick="showHome()" aria-label="뒤로">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="rt-title">금리현황</div>
+    </div>
+    <div class="rt-monthrow">
+      <span class="lbl">기준월</span>
+      <div class="rt-msel"><select id="rtMonthSel" onchange="onRateMonth()"></select></div>
+    </div>
+    <div class="rt-subtabs">
+      <button class="rt-subtab on" id="rtTabBest" onclick="setRateTab('best')">이달의 최고금리</button>
+      <button class="rt-subtab" id="rtTabBiz" onclick="setRateTab('biz')">사업자금리 현황</button>
+    </div>
+    <div class="rt-body" id="rtBest">
+      <div class="rt-card">
+        <div class="rt-card-head"><span class="rt-card-title">DB제도 최고금리</span><button class="rt-more" onclick="toast('전체보기 준비중')">전체보기 ›</button></div>
+        <table class="rt-tbl"><thead><tr><th>기관</th><th>상품구분</th><th>기간</th><th>금리(%)</th><th>판매여부</th></tr></thead><tbody id="rtDb"></tbody></table>
+      </div>
+      <div class="rt-card">
+        <div class="rt-card-head"><span class="rt-card-title">DC/IRP제도 최고금리</span><button class="rt-more" onclick="toast('전체보기 준비중')">전체보기 ›</button></div>
+        <table class="rt-tbl"><thead><tr><th>기관</th><th>상품구분</th><th>기간</th><th>금리(%)</th><th>판매여부</th></tr></thead><tbody id="rtDc"></tbody></table>
+      </div>
+      <div class="rt-card">
+        <div class="rt-card-head"><span class="rt-card-title">디폴트옵션 최고금리</span><button class="rt-more" onclick="toast('전체보기 준비중')">전체보기 ›</button></div>
+        <table class="rt-tbl"><thead><tr><th>기관</th><th>상품구분</th><th>기간</th><th>금리(%)</th><th>판매여부</th></tr></thead><tbody id="rtDef"></tbody></table>
+      </div>
+    </div>
+    <div class="rt-body" id="rtBiz" style="display:none">
+      <div class="rt-empty">사업자금리 현황 화면은 준비 중입니다.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 하단 네비 -->
+<nav class="botnav">
+  <button class="nav-i on" id="navHome" onclick="showHome()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></span><span class="nl">홈</span></button>
+  <button class="nav-i" onclick="toast('상품조회 준비중')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.6-3.6"/></svg></span><span class="nl">상품조회</span></button>
+  <button class="nav-i" id="navRate" onclick="showRate()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="m7 14 3.5-4 3 2.5L20 7"/></svg></span><span class="nl">금리현황</span></button>
+  <button class="nav-i" onclick="toast('신용등급 준비중')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="M9 13.5 7.5 21l4.5-2.6L16.5 21 15 13.5"/></svg></span><span class="nl">신용등급</span></button>
+</nav>
+
+<!-- 공지 팝업 -->
+<div class="modal" id="noticeModal" onclick="if(event.target===this)closeNotice()">
+  <div class="modal-card">
+    <div class="modal-head"><b>📢 공지사항</b><button class="modal-x" onclick="closeNotice()">✕</button></div>
+    <div class="modal-body" id="noticeBody"></div>
+    <div class="modal-when" id="noticeWhen"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+let STORE={}, months=[], curMonth='', baseRows=null, proposals={};
+const MONTH_LABEL={3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
+
+let _tt;
+function toast(m){ const el=$('toast'); el.textContent=m; el.classList.add('on'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('on'),2000); }
+function htmlEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function ymLabel(ym){ ym=String(ym||''); return ym.slice(0,4)+'년 '+ym.slice(5,7)+'월'; }
+
+function currentBaseRate(){
+  if(!baseRows||!baseRows.length) return null;
+  const ym=String(curMonth||'').slice(0,7);
+  const same=baseRows.filter(r=>String(r[0]).slice(0,7)===ym);
+  const row=same.length?same[same.length-1]:baseRows[baseRows.length-1];
+  const d=String(row[0]).slice(0,10);
+  const rate=typeof row[7]==='number'?row[7]:parseFloat(row[7]);
+  return {rate:isNaN(rate)?null:rate, year:d.slice(0,4), month:d.slice(5,7)};
+}
+
+async function boot(){
+  try{
+    const [ps,cp,rh,pr]=await Promise.all([
+      fetch('/api/pension_store').then(r=>r.json()),
+      fetch('/api/cpi').then(r=>r.json()).catch(()=>null),
+      fetch('/api/rate_history').then(r=>r.json()).catch(()=>null),
+      fetch('/api/proposals').then(r=>r.json()).catch(()=>({})),
+    ]);
+    STORE=ps||{}; proposals=pr||{};
+    try{ baseRows=rh.sheets.Sheet2.rows; }catch(e){ baseRows=null; }
+    // 물가
+    if(cp&&cp.ok){ $('cpiVal').textContent=cp.rate.toFixed(2)+'%'; $('cpiWhen').textContent=cp.year+'년 '+String(cp.month).padStart(2,'0')+'월'; }
+    else { $('cpiVal').textContent='–'; $('cpiWhen').textContent='-'; }
+  }catch(e){ toast('데이터를 불러오지 못했습니다'); }
+  months=Object.keys(STORE).sort();
+  curMonth=months[months.length-1]||'';
+  $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('') || `<option>-</option>`;
+  $('monthSel').value=curMonth;
+  render();
+}
+function onMonth(){ curMonth=$('monthSel').value; render(); }
+function doQuery(){ curMonth=$('monthSel').value; render(); toast(ymLabel(curMonth)+' 조회'); }
+
+function render(){
+  // 기준금리
+  const br=currentBaseRate();
+  if(br&&br.rate!=null){ $('bokVal').textContent=br.rate.toFixed(2)+'%'; $('bokWhen').textContent=br.year+'년 '+br.month+'월'; }
+  else { $('bokVal').textContent='–'; $('bokWhen').textContent='-'; }
+  // 제안상품
+  const list=(proposals[curMonth]||[]).slice().sort((a,b)=>{
+    const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra;
+  });
+  const el=$('propList');
+  if(!list.length){ el.innerHTML=`<div class="prop-none">등록된 제안상품이 없습니다.</div>`; return; }
+  el.innerHTML=list.map(r=>{
+    const per=r.period||MONTH_LABEL[r.months]||'';
+    const rate=(typeof r.rate==='number')?r.rate.toFixed(2)+'%':(r.rate==null?'-':r.rate);
+    return `<div class="prow"><div class="p-org" title="${htmlEsc(r.org)}">${htmlEsc(r.org)}</div>`+
+           `<div class="p-fam" title="${htmlEsc(r.fam)}">${htmlEsc(r.fam)}</div>`+
+           `<div class="p-per">${htmlEsc(per)}</div><div class="p-rate">${rate}</div></div>`;
+  }).join('');
+}
+
+/* 금리현황 다운로드 (서버 레포트, blob) — 모바일 안전(정리 지연) */
+async function downloadReport(){
+  const e=STORE[curMonth]; const rows=(e&&e.rows)||[];
+  if(!rows.length){ toast('다운로드할 데이터가 없습니다'); return; }
+  toast('금리현황 레포트 생성 중…');
+  try{
+    const res=await fetch('/api/pension_report',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:curMonth, rows})});
+    if(!res.ok) throw new Error('서버 '+res.status);
+    const blob=await res.blob(); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url;
+    a.download=`퇴직연금 금리정보 현황_${(curMonth||'').replace('-','년 ')}월.xlsx`;
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
+    toast('다운로드했습니다');
+  }catch(err){ toast('다운로드 실패: '+err.message); }
+}
+
+/* 공지 */
+function openNotice(){
+  const body=$('noticeBody'), when=$('noticeWhen');
+  body.className='modal-body'; body.textContent='불러오는 중…'; when.textContent='';
+  $('noticeModal').classList.add('open');
+  fetch('/api/notice').then(r=>r.json()).then(d=>{
+    const t=((d&&d.text)||'').trim();
+    if(t){ body.className='modal-body'; body.textContent=t; }
+    else { body.className='modal-body empty'; body.textContent='등록된 공지사항이 없습니다.'; }
+    when.textContent=(d&&d.updated_at)?('업데이트: '+d.updated_at):'';
+  }).catch(()=>{ body.className='modal-body empty'; body.textContent='공지를 불러오지 못했습니다.'; });
+}
+function closeNotice(){ $('noticeModal').classList.remove('open'); }
+
+/* ═══════════════ 금리현황 화면 (ver1 데이터 파이프라인 이식) ═══════════════ */
+const MONTHS=[3,6,12,18,24,30,36,48,60];
+const SECTOR_ORDER=['은행','저축은행','생명보험','손해보험','증권','기타'];
+let proposalMeta=null, rateMonth='', rateTab='best';
+
+function parseRate(v){ if(v==null) return null; let s=String(v).trim();
+  if(s===''||s==='-'||s==='0'||s==='0.0'||s.toUpperCase()==='N/A') return null;
+  s=s.split('~')[0].trim(); const f=parseFloat(s); if(isNaN(f)||f===0) return null; return f; }
+function normFamily(prod){ if(!prod) return '(미지정)'; let parts=String(prod).split('/');
+  if(parts.length>1) parts=parts.slice(1); let p=parts.join('/');
+  p=p.replace(/\(디폴트옵션[^)]*\)/g,''); p=p.replace(/디폴트옵션(전용|용)?\s*/g,'');
+  let segs=p.split('/');
+  while(segs.length>1){ const last=segs[segs.length-1].trim();
+    const isMat=/^\d+\s*년(\s*\d+\s*개월)?$/.test(last)||/^\d+\s*개월$/.test(last)||/\d+\s*(일|개월|년).*(~|미만|이상|초과)/.test(last)||/^\d+년\s*~/.test(last);
+    if(isMat) segs.pop(); else break; }
+  p=segs.join('/').replace(/\s+/g,' ').trim(); return p||String(prod); }
+function parseMaturities(mat){ if(mat==null) return [];
+  if(typeof mat==='number'){ const m=Math.round(mat); return [MONTHS.includes(m)?m:null]; }
+  return String(mat).split('/').map(t=>{ t=t.trim(); if(/^\d+$/.test(t)){ const m=parseInt(t,10); return MONTHS.includes(m)?m:null; } return null; }); }
+function rateList(v,n){ if(v==null) return Array(n).fill(null); const s=String(v);
+  if(s.indexOf('/')>=0){ const t=s.split('/').map(parseRate); while(t.length<n)t.push(null); return t; }
+  return Array(n).fill(parseRate(s)); }
+function isRateLinkedProd(prod){ return /금리연동형/.test(String(prod||'')); }
+function isRangeMat(mat){ return (typeof mat==='string')&&/(~|미만|이상|초과)/.test(mat); }
+
+/* raw(원본 엑셀행) → 기관·제도별 그룹행 (ver1 buildGroups 그대로) */
+function buildGroups(raw){
+  const groups=new Map();
+  for(const r of raw){
+    if(!r.org) continue;
+    const prod = r.prod ? String(r.prod) : '';
+    if(isRateLinkedProd(prod) || isRangeMat(r.mat)) continue;
+    const sec = r.sector==='기타' ? '은행' : r.sector;
+    const isDefault = prod.indexOf('디폴트옵션')>=0;
+    let fam, monthsOverride=null, depVariant=false;
+    const isDeposit = prod.indexOf('정기예금')>=0 && !isDefault && sec!=='증권' && prod.indexOf('발행어음')<0;
+    if(isDeposit){
+      const rest = prod.split('/').slice(1).join('/');
+      if(/일단위|월단위/.test(rest)){
+        if(r.org==='국민은행' && /\(일단위\)\/C$/.test(rest)){ fam='정기예금'; monthsOverride=[3,6]; }
+        else continue;
+      } else { fam='정기예금'; if(/\([^)]*\)/.test(rest)) depVariant=true; }
+    } else { fam = normFamily(prod); }
+    const key=[sec,r.org,fam].join('||');
+    let g=groups.get(key);
+    if(!g){ g={sector:sec,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[],dbBase:new Set(),dcBase:new Set()}; groups.set(key,g); }
+    g.srcCount++; if(prod) g.names.push(prod);
+    let months, n, dbR, dcR, irpR;
+    if(monthsOverride){
+      months=monthsOverride; n=months.length;
+      const dbv=parseRate(r.db), dcv=parseRate(r.dc), irpv=parseRate(r.irp);
+      dbR=Array(n).fill(dbv); dcR=Array(n).fill(dcv); irpR=Array(n).fill(irpv);
+    } else {
+      months=parseMaturities(r.mat); n=months.length;
+      dbR=rateList(r.db,n); dcR=rateList(r.dc,n); irpR=rateList(r.irp,n);
+    }
+    for(let i=0;i<n;i++){
+      const m=months[i]; if(m===null) continue;
+      const dcv = dcR[i]!=null ? dcR[i] : irpR[i];
+      if(isDefault){ if(m===36 && dcv!=null){ g.def=dcv; } }
+      else {
+        if(dbR[i]!=null){ if(depVariant){ if(!g.dbBase.has(m)) g.db[m]=dbR[i]; } else { g.db[m]=dbR[i]; if(isDeposit) g.dbBase.add(m); } }
+        if(dcv!=null){ if(depVariant){ if(!g.dcBase.has(m)) g.dc[m]=dcv; } else { g.dc[m]=dcv; if(isDeposit) g.dcBase.add(m); } }
+      }
+    }
+    if(isDefault && g.def===null){
+      for(let i=0;i<n;i++){ const dcv=dcR[i]!=null?dcR[i]:irpR[i]; if(dcv!=null){ g.def=dcv; break; } }
+      if(g.def===null){ const v=parseRate(r.dc)??parseRate(r.irp); if(v!=null) g.def=v; }
+    }
+  }
+  const rows=[...groups.values()];
+  const prodRank=(fam)=>{ const f=String(fam); if(/ELB/.test(f)) return 0; if(/DLB/.test(f)) return 1; if(/RP|환매조건부/.test(f)) return 2; return 3; };
+  rows.sort((a,b)=>{
+    const sa=SECTOR_ORDER.indexOf(a.sector), sb=SECTOR_ORDER.indexOf(b.sector);
+    if(sa!==sb) return (sa<0?99:sa)-(sb<0?99:sb);
+    if(a.org!==b.org) return String(a.org).localeCompare(b.org,'ko');
+    const ra=prodRank(a.fam), rb=prodRank(b.fam);
+    if(ra!==rb) return ra-rb;
+    return String(a.fam).localeCompare(b.fam,'ko');
+  });
+  return rows;
+}
+function isDepositFam(r){ const f=String(r.fam); return f.indexOf('정기예금')>=0 && r.sector!=='증권' && f.indexOf('발행어음')<0; }
+function normalizeDepositRows(rows){
+  const out=[]; const merged=new Map();
+  for(const r of rows){
+    if(!isDepositFam(r)){ out.push(r); continue; }
+    if(/일단위|월단위/.test(String(r.fam))) continue;
+    const key=r.sector+'||'+r.org;
+    let m=merged.get(key);
+    if(!m){ m={sector:r.sector,org:r.org,fam:'정기예금',db:{},dc:{},def:null,srcCount:0,names:[]}; merged.set(key,m); out.push(m); }
+    m.srcCount++; if(r.names) m.names.push(...r.names);
+    for(const k in r.db){ if(m.db[k]==null && r.db[k]!=null) m.db[k]=r.db[k]; }
+    for(const k in r.dc){ if(m.dc[k]==null && r.dc[k]!=null) m.dc[k]=r.dc[k]; }
+    if(m.def==null && r.def!=null) m.def=r.def;
+  }
+  return out;
+}
+function isExcludedProduct(r){
+  const t=String(r.fam)+' '+((r.names||[]).join(' '));
+  if(/실버연금예금/.test(t)) return true;
+  if((r.sector==='생명보험'||r.sector==='손해보험') && /이율변동형|금리혼합형/.test(t)) return true;
+  return false;
+}
+function penRowKey(r){ return [r.sector,r.org,r.fam].join('||'); }
+function applyOverrides(rows, ov){
+  rows.forEach(r=>{ r.manual={db:{},dc:{},def:false}; });
+  if(!ov) return;
+  rows.forEach(r=>{
+    const o=ov[penRowKey(r)]; if(!o) return;
+    if(o.db) for(const k in o.db){ const v=o.db[k]; if(v!=null){ r.db[+k]=v; r.manual.db[+k]=true; } }
+    if(o.dc) for(const k in o.dc){ const v=o.dc[k]; if(v!=null){ r.dc[+k]=v; r.manual.dc[+k]=true; } }
+    if(o.def!=null){ r.def=o.def; r.manual.def=true; }
+  });
+}
+/* 기준월의 정규화된 관리행 (ver1 loadMonth와 동일 경로) */
+function rateRowsFor(m){
+  const rec=STORE[m];
+  const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
+  const rows = normalizeDepositRows(base).filter(r=>!isExcludedProduct(r));
+  applyOverrides(rows, rec && rec.overrides);
+  return rows;
+}
+/* 판매여부(미설정=판매가능) */
+function sellableOf(t, field){
+  const key=[t.sector,t.org,t.fam,t.months].join('|')+'|'+field;
+  const meta=(proposalMeta&&proposalMeta[key])||{};
+  return meta.sellable!==false;
+}
+function bestTop(rows, pred, field, month){
+  let b=null;
+  for(const r of rows){ if(!pred(r)) continue;
+    const v = field==='def' ? r.def : (r[field] && r[field][month]);
+    if(v!=null && (b==null || v>b.rate)) b={sector:r.sector, org:r.org, fam:r.fam, rate:v, months:month}; }
+  return b;
+}
+function bestRowHtml(t, per, field){
+  if(!t) return `<tr><td class="rt-none" colspan="5" style="text-align:center;padding:14px 4px">-</td></tr>`;
+  const ok=sellableOf(t,field);
+  return `<tr><td class="c-org" title="${htmlEsc(t.org)}">${htmlEsc(t.org)}</td>`+
+         `<td class="c-fam" title="${htmlEsc(t.fam)}">${htmlEsc(t.fam)}</td>`+
+         `<td class="c-per">${htmlEsc(per)}</td>`+
+         `<td class="c-rate">${t.rate.toFixed(2)}%</td>`+
+         `<td class="c-sell"><span class="badge ${ok?'ok':'no'}">${ok?'판매가능':'판매불가'}</span></td></tr>`;
+}
+function renderBest(){
+  const rows=rateRowsFor(rateMonth);
+  if(!rows.length){
+    const none=`<tr><td class="rt-none" colspan="5" style="text-align:center;padding:16px 4px">해당 월 데이터가 없습니다.</td></tr>`;
+    $('rtDb').innerHTML=$('rtDc').innerHTML=$('rtDef').innerHTML=none; return;
+  }
+  const G=[
+    ['은행', r=>(r.sector==='은행'||r.sector==='기타') && r.fam==='정기예금', 12],
+    ['증권', r=>r.sector==='증권' && /ELB/.test(r.fam),                       12],
+    ['생보', r=>r.sector==='생명보험' && /이율보증형/.test(r.fam),            36],
+    ['손보', r=>r.sector==='손해보험' && /이율보증형/.test(r.fam),            36],
+  ];
+  const tbody=field=>G.map(([n,p,mo])=>bestRowHtml(bestTop(rows,p,field,mo), MONTH_LABEL[mo]||'', field)).join('');
+  $('rtDb').innerHTML=tbody('db');
+  $('rtDc').innerHTML=tbody('dc');
+  $('rtDef').innerHTML=bestRowHtml(bestTop(rows, r=>r.def!=null, 'def', 36), '3년', 'def');
+}
+function setNav(id){ document.querySelectorAll('.botnav .nav-i').forEach(n=>n.classList.remove('on')); const el=$(id); if(el) el.classList.add('on'); }
+function showHome(){ $('rateView').style.display='none'; $('homeView').style.display=''; setNav('navHome'); window.scrollTo(0,0); }
+function showRate(){
+  $('homeView').style.display='none'; $('rateView').style.display=''; setNav('navRate');
+  const sel=$('rtMonthSel');
+  sel.innerHTML=months.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('') || `<option>-</option>`;
+  rateMonth = (rateMonth && months.includes(rateMonth)) ? rateMonth : (curMonth || months[months.length-1] || '');
+  sel.value=rateMonth;
+  renderBest();
+  if(!proposalMeta){
+    fetch('/api/proposal_meta').then(r=>r.ok?r.json():{}).then(m=>{ proposalMeta=m||{}; if(rateTab==='best') renderBest(); }).catch(()=>{ proposalMeta={}; });
+  }
+  window.scrollTo(0,0);
+}
+function onRateMonth(){ rateMonth=$('rtMonthSel').value; renderBest(); }
+function setRateTab(t){
+  rateTab=t;
+  $('rtTabBest').classList.toggle('on',t==='best');
+  $('rtTabBiz').classList.toggle('on',t==='biz');
+  $('rtBest').style.display=t==='best'?'':'none';
+  $('rtBiz').style.display=t==='biz'?'':'none';
+}
+
+boot();
+</script>
+</body>
+</html>
