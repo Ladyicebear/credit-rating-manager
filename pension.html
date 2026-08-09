@@ -401,6 +401,7 @@
     .biz-conv{font-size:12px;color:#9AA2AF;font-weight:600;white-space:nowrap}
     .biz-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
     .biz-chip{font-size:11px;font-weight:700;color:#5A6474;background:#EEF1F6;border-radius:7px;padding:4px 9px;letter-spacing:-.2px}
+    .biz-protect{font-size:11px;font-weight:700;color:#1E874B;background:#E4F6EC;border-radius:7px;padding:4px 9px;letter-spacing:-.2px}
     .biz-none{padding:34px 10px;text-align:center;color:var(--muted);font-size:13px}
     .biz-more{width:100%;margin-top:12px;background:var(--white);border:1px solid var(--line);border-radius:12px;
         font-family:inherit;font-size:13.5px;font-weight:700;color:var(--muted);padding:12px;cursor:pointer}
@@ -1363,7 +1364,9 @@ function renderBizCards(){
     const rate=(typeof r.rate==='number')?r.rate.toFixed(2)+'%':(r.rate==null?'-':r.rate);
     const sc=(isBoseungCompound(r.sector,r.fam)&&r.months!=null)?simpleConv(r.rate,r.months):null;
     const scHtml = (sc!=null) ? `<span class="biz-conv">(단리환산 ${sc.toFixed(2)}%)</span>` : '';
-    const chips=[r.plan, r.period, bizCat(r.fam)].filter(Boolean).map(c=>`<span class="biz-chip">${htmlEsc(c)}</span>`).join('');
+    const isDcPlan = (r.plan==='DC/IRP');
+    const planChip = r.plan ? `<span class="biz-chip">${htmlEsc(r.plan)}</span>${isDcPlan?'<span class="biz-protect">예금자보호</span>':''}` : '';
+    const chips = planChip + [r.period, bizCat(r.fam)].filter(Boolean).map(c=>`<span class="biz-chip">${htmlEsc(c)}</span>`).join('');
     return `<div class="biz-card">`+
       `<div class="biz-top"><span class="biz-org" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</span><span class="biz-rate">${rate}</span></div>`+
       `<div class="biz-mid"><span class="biz-fam" title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</span>${scHtml}</div>`+
