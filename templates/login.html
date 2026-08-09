@@ -3,94 +3,114 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>로그인 · 퇴직연금 상품제공기관 통합관리</title>
+<title>로그인 · 퇴직연금 원리금보장상품 Mobile 서비스</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
-     background:linear-gradient(135deg,#123E7C 0%,#0D2F63 100%);color:#222;
-     min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.login-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.3);
-            width:360px;max-width:100%;padding:34px 30px}
-.brand{text-align:center;margin-bottom:24px}
-.brand .ico{font-size:2.2rem}
-.brand h1{font-size:1.15rem;font-weight:800;color:#16335B;margin-top:8px;letter-spacing:-.4px}
-.brand p{font-size:.72rem;color:#999;margin-top:4px}
-.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
-.fg label{font-size:.74rem;font-weight:700;color:#555}
-.fg input{padding:10px 12px;border:1px solid #dde3ec;border-radius:8px;font-size:.9rem;
-          transition:border-color .15s}
-.fg input:focus{outline:none;border-color:#F68121;box-shadow:0 0 0 3px rgba(246,129,33,.15)}
-.btn-login{width:100%;padding:11px;border:none;border-radius:8px;background:#F68121;color:#fff;
-           font-size:.9rem;font-weight:800;cursor:pointer;transition:background .15s;margin-top:4px}
-.btn-login:hover{background:#d65f0f}
-.btn-login-web{background:#fff;color:#16335B;border:1.5px solid #16335B;margin-top:10px}
-.btn-login-web:hover{background:#f4f6f8}
-.btn-sub{font-size:.7rem;font-weight:600;opacity:.85;margin-left:2px}
-.view-hint{font-size:.72rem;color:#8a92a0;text-align:center;margin:2px 0 10px;font-weight:600}
-.err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:8px;
-     padding:9px 12px;font-size:.76rem;margin-bottom:14px;text-align:center}
-.foot{text-align:center;margin-top:18px;font-size:.66rem;color:#bbb}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;color:#222;
+     min-height:100vh;background:#F7F4EF url('/static/images/login_bg.png') no-repeat center top;background-size:cover}
+.lg-wrap{min-height:100vh;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+/* 상단: 로고 + 타이틀 */
+.lg-top{padding:34px 28px 0;min-height:30vh;box-sizing:border-box}
+.lg-logo{height:30px;width:auto;display:block;margin-bottom:20px}
+.lg-title{font-size:1.4rem;font-weight:800;color:#1a1a1a;letter-spacing:-.5px;line-height:1.3}
+.lg-title .m{color:#F26B12}
+.lg-sub{font-size:.92rem;color:#9298a1;margin-top:10px;font-weight:500}
+.lg-spacer{flex:none;min-height:0}
+/* 카드 */
+.lg-card{background:#fff;border-radius:22px;margin:24px 16px 18px;padding:26px 22px 20px;
+         box-shadow:0 12px 44px rgba(90,66,30,.16)}
+.lg-err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:10px;
+        padding:10px 12px;font-size:.8rem;margin-bottom:16px;text-align:center}
+.fg{margin-bottom:15px}
+.fg label{display:block;font-size:.92rem;font-weight:800;color:#333;margin-bottom:8px}
+.inp{position:relative}
+.inp .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9aa0a8;display:flex}
+.inp .ic svg{width:18px;height:18px}
+.inp input{width:100%;padding:14px 44px 14px 42px;border:1px solid #e6e8ec;border-radius:12px;
+           background:#fff;font-size:.95rem;color:#222;font-family:inherit}
+.inp input::placeholder{color:#b6bbc2}
+.inp input:focus{outline:none;border-color:#F26B12;box-shadow:0 0 0 3px rgba(242,107,18,.12)}
+.inp .eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;
+          color:#9aa0a8;cursor:pointer;padding:5px;display:flex}
+.inp .eye svg{width:19px;height:19px}
+.lg-remember{display:flex;align-items:center;gap:8px;font-size:.86rem;color:#555;font-weight:600;
+             margin:4px 2px 18px;cursor:pointer;user-select:none}
+.lg-remember input{width:17px;height:17px;accent-color:#F26B12;margin:0}
+.lg-btn{width:100%;padding:15px;border:none;border-radius:12px;background:#F26B12;color:#fff;
+        font-size:1rem;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:-.2px}
+.lg-btn:hover{background:#DB5E0C}
+.lg-pwlink{display:block;width:100%;margin-top:15px;background:none;border:none;font-family:inherit;
+           font-size:.82rem;font-weight:700;color:#8a8f98;text-decoration:underline;cursor:pointer}
+.lg-pwlink:hover{color:#F26B12}
+.lg-foot{text-align:center;margin-top:16px;font-size:.72rem;color:#b6bbc2;font-weight:500}
 /* 비밀번호 만료 팝업 */
-.exp-ov{display:flex;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;
-        align-items:center;justify-content:center;padding:20px}
-.exp-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.35);
-          width:340px;max-width:100%;padding:28px 26px 22px;text-align:center}
+.exp-ov{display:flex;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;align-items:center;justify-content:center;padding:20px}
+.exp-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.35);width:340px;max-width:100%;padding:28px 26px 22px;text-align:center}
 .exp-card .exp-ico{font-size:2rem}
 .exp-card .exp-msg{font-size:.9rem;font-weight:700;color:#16335B;line-height:1.5;margin:12px 0 20px}
-.exp-card .exp-ok{width:100%;padding:11px;border:none;border-radius:8px;background:#F68121;color:#fff;
-                  font-size:.9rem;font-weight:800;cursor:pointer;font-family:inherit}
-.exp-card .exp-ok:hover{background:#d65f0f}
-/* 비밀번호 변경(로그인 화면에서 바로) */
-.pw-link{display:block;width:100%;margin-top:14px;background:none;border:none;font-family:inherit;
-         font-size:.72rem;font-weight:700;color:#8a92a0;cursor:pointer;text-decoration:underline}
-.pw-link:hover{color:#F68121}
-.pw-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;
-       align-items:center;justify-content:center;padding:20px}
+.exp-card .exp-ok{width:100%;padding:11px;border:none;border-radius:8px;background:#F26B12;color:#fff;font-size:.9rem;font-weight:800;cursor:pointer;font-family:inherit}
+.exp-card .exp-ok:hover{background:#DB5E0C}
+/* 비밀번호 변경 모달 */
+.pw-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:center;justify-content:center;padding:20px}
 .pw-ov.open{display:flex}
-.pw-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.3);
-         width:360px;max-width:100%;padding:26px 30px 22px}
+.pw-card{background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.3);width:360px;max-width:100%;padding:26px 30px 22px}
 .pw-card h2{font-size:1rem;font-weight:800;color:#16335B;margin-bottom:18px;text-align:center}
-.pw-hint{font-size:.68rem;color:#8a92a0;margin-top:2px}
-.pw-msg{display:none;margin-top:12px;padding:9px 12px;border-radius:8px;font-size:.72rem;
-        font-weight:600;text-align:center}
+.pw-card .fg label{font-size:.8rem;color:#555;font-weight:700;margin-bottom:5px}
+.pw-card .fg input{width:100%;padding:10px 12px;border:1px solid #dde3ec;border-radius:8px;font-size:.9rem;font-family:inherit}
+.pw-card .fg input:focus{outline:none;border-color:#F26B12;box-shadow:0 0 0 3px rgba(242,107,18,.15)}
+.pw-hint{font-size:.68rem;color:#8a92a0;margin-top:4px}
+.pw-msg{display:none;margin-top:12px;padding:9px 12px;border-radius:8px;font-size:.72rem;font-weight:600;text-align:center}
 .pw-msg.show{display:block}
 .pw-msg.err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b}
 .pw-msg.ok{background:#eaf6ee;border:1px solid #bfe0cb;color:#1c6b3a}
 .pw-foot{display:flex;gap:8px;margin-top:16px}
-.pw-foot button{flex:1;padding:10px;border:none;border-radius:8px;font-family:inherit;
-                font-size:.82rem;font-weight:800;cursor:pointer}
+.pw-foot button{flex:1;padding:10px;border:none;border-radius:8px;font-family:inherit;font-size:.82rem;font-weight:800;cursor:pointer}
 .pw-cancel{background:#eee;color:#555}
 .pw-cancel:hover{background:#e2e2e2}
-.pw-save{background:#F68121;color:#fff}
-.pw-save:hover{background:#d65f0f}
+.pw-save{background:#F26B12;color:#fff}
+.pw-save:hover{background:#DB5E0C}
 .pw-save:disabled{background:#f0b988;cursor:default}
 </style>
 </head>
 <body>
-  <form class="login-card" method="POST" action="{{ url_for('login', next=request.args.get('next','')) }}">
-    <div class="brand">
-      <div class="ico">🔐</div>
-      <h1>퇴직연금 상품제공기관 통합관리</h1>
-      <p>로그인이 필요합니다</p>
+  <div class="lg-wrap">
+    <div class="lg-top">
+      <img class="lg-logo" src="/static/images/smart_future.png" alt="SMART FUTURE"/>
+      <div class="lg-title">퇴직연금 원리금보장상품<br><span class="m">Mobile 서비스</span></div>
+      <div class="lg-sub">로그인이 필요합니다</div>
     </div>
+    <div class="lg-spacer"></div>
 
-    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form class="lg-card" method="POST" action="{{ url_for('login', next=request.args.get('next','')) }}">
+      {% if error %}<div class="lg-err">{{ error }}</div>{% endif %}
 
-    <div class="fg">
-      <label for="username">아이디</label>
-      <input type="text" id="username" name="username" autocomplete="username" autofocus required/>
-    </div>
-    <div class="fg">
-      <label for="password">비밀번호</label>
-      <input type="password" id="password" name="password" autocomplete="current-password" required/>
-    </div>
-    <div class="view-hint">조회 방식을 선택하세요</div>
-    <button type="submit" name="view" value="simple" class="btn-login">📱 간편조회 <span class="btn-sub">모바일 새 버전</span></button>
-    <button type="submit" name="view" value="web" class="btn-login btn-login-web">🖥️ 웹버전조회 <span class="btn-sub">기존 버전</span></button>
-    <button type="button" class="pw-link" onclick="openPw()">비밀번호 변경</button>
+      <div class="fg">
+        <label for="username">아이디</label>
+        <div class="inp">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6.2 8-6.2s8 2.2 8 6.2"/></svg></span>
+          <input type="text" id="username" name="username" placeholder="아이디를 입력하세요" autocomplete="username" required/>
+        </div>
+      </div>
 
-    <div class="foot">System Designed &amp; Built by Goun</div>
-  </form>
+      <div class="fg">
+        <label for="password">비밀번호</label>
+        <div class="inp">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+          <input type="password" id="password" name="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password" required/>
+          <button type="button" class="eye" id="eyeBtn" onclick="toggleEye()" aria-label="비밀번호 표시">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <label class="lg-remember"><input type="checkbox" id="remember"/> 아이디 저장</label>
+
+      <button type="submit" name="view" value="web" class="lg-btn">로그인</button>
+      <button type="button" class="lg-pwlink" onclick="openPw()">비밀번호 변경</button>
+
+      <div class="lg-foot">System Designed &amp; Built by Goun</div>
+    </form>
+  </div>
 
   {% if rm_expired %}
   <!-- RM 비밀번호 사용기간 만료 팝업 -->
@@ -134,9 +154,19 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 
 <script>
 const $=id=>document.getElementById(id);
+/* 비밀번호 보기/숨기기 */
+function toggleEye(){ const p=$('password'); p.type = (p.type==='password')?'text':'password'; }
+/* 아이디 저장(체크 시 브라우저에 아이디 기억) */
+(function(){
+  try{ const s=localStorage.getItem('sf_saved_id'); if(s){ $('username').value=s; $('remember').checked=true; } }catch(e){}
+})();
+document.querySelector('.lg-card').addEventListener('submit',function(){
+  try{ if($('remember').checked) localStorage.setItem('sf_saved_id',$('username').value.trim()); else localStorage.removeItem('sf_saved_id'); }catch(e){}
+});
+/* 비밀번호 변경 모달 */
 function openPw(){
   ['pw-user','pw-cur','pw-new','pw-confirm'].forEach(id=>$(id).value='');
-  $('pw-user').value=$('username').value.trim();   // 위에 입력한 아이디가 있으면 가져옴
+  $('pw-user').value=$('username').value.trim();
   pwMsg('');
   $('pw-ov').classList.add('open');
   ($('pw-user').value ? $('pw-cur') : $('pw-user')).focus();
@@ -171,10 +201,7 @@ async function submitPw(){
     btn.disabled=false;
   }
 }
-/* 모달 안에서 Enter=제출, ESC=닫기 */
-$('pw-ov').addEventListener('keydown',e=>{
-  if(e.key==='Enter'){ e.preventDefault(); submitPw(); }
-});
+$('pw-ov').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitPw(); } });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePw(); });
 </script>
 </body>
