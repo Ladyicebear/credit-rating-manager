@@ -280,6 +280,8 @@ def login():
             session['logged_in'] = True
             session['user'] = u
             session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
+            # 조회 방식: simple=간편조회(모바일 v2 신규), web=웹버전조회(기존 v1). 기본 web.
+            session['view'] = 'simple' if request.form.get('view') == 'simple' else 'web'
             nxt = request.args.get('next') or '/'
             if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
                 nxt = '/'
@@ -1621,6 +1623,9 @@ def rate_history_append():
 
 @app.route('/')
 def index():
+    # 간편조회(v2, 모바일 신규 디자인) — 로그인 시 선택. 기존 v1은 아래 그대로 유지.
+    if session.get('view') == 'simple':
+        return _record_visit(make_response(send_file(os.path.join(BASE_DIR, 'simple.html'))))
     institutions = load_institutions()
     ratings = load_ratings()
     data = build_response_data(institutions, ratings)
@@ -1660,10 +1665,18 @@ def index():
     return _record_visit(make_response(html))
 
 
+@app.route('/switch_view')
+def switch_view():
+    """간편조회(v2) ↔ 웹버전조회(v1) 전환. 로그아웃 없이 토글."""
+    session['view'] = 'web' if session.get('view') == 'simple' else 'simple'
+    return redirect(url_for('index'))
+
+
 @app.route('/api/me')
 def api_me():
-    """현재 로그인 사용자/소속(role). iframe(pension/proposal)에서 화면 제어용."""
-    return jsonify({'user': session.get('user', ''), 'role': session.get('role', '')})
+    """현재 로그인 사용자/소속(role) + 조회방식(view). iframe/화면 제어용."""
+    return jsonify({'user': session.get('user', ''), 'role': session.get('role', ''),
+                    'view': session.get('view', 'web')})
 
 
 # ── 방문자 통계 (연금컨설팅팀 전용 관리자 화면) ─────────────────────────

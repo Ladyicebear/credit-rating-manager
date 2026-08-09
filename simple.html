@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>간편조회 · 퇴직연금</title>
+<style>
+  :root{--navy:#16335B;--navy-d:#0F2647;--orange:#F68121;--orange-d:#E85A00;
+        --bg:#F4F6FA;--card:#fff;--line:#E7EBF1;--ink:#1F2937;--muted:#8A92A0}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif;
+       padding-bottom:env(safe-area-inset-bottom)}
+  .wrap{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+
+  /* 상단 앱바 */
+  .appbar{background:linear-gradient(135deg,var(--navy) 0%,#1f4a80 100%);color:#fff;
+          padding:calc(env(safe-area-inset-top) + 14px) 18px 16px;position:sticky;top:0;z-index:10}
+  .appbar-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .brand{font-size:17px;font-weight:800;letter-spacing:-.4px}
+  .brand .b-org{color:var(--orange)}
+  .appbar-acts{display:flex;gap:8px}
+  .abtn{background:rgba(255,255,255,.16);color:#fff;border:none;border-radius:8px;
+        font-size:11.5px;font-weight:700;padding:6px 10px;cursor:pointer;font-family:inherit;text-decoration:none}
+  .abtn:active{background:rgba(255,255,255,.28)}
+  .appbar-sub{font-size:12px;opacity:.85;margin-top:6px;font-weight:600}
+
+  /* 콘텐츠 */
+  .body{flex:1;padding:16px 16px 28px}
+  .hello{font-size:14px;color:var(--muted);font-weight:700;margin:2px 2px 12px}
+  .hello b{color:var(--navy)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 14px;
+        box-shadow:0 2px 10px rgba(16,24,40,.05);cursor:pointer;transition:transform .08s}
+  .tile:active{transform:scale(.97)}
+  .tile .ic{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px}
+  .tile .t{font-size:14.5px;font-weight:800;color:var(--navy);letter-spacing:-.3px}
+  .tile .d{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.4}
+  .ic-rate{background:#FFF1E6} .ic-credit{background:#E9F1FF} .ic-prop{background:#E7F7F0} .ic-more{background:#F1F0F6}
+
+  .wip{margin-top:18px;background:#FFF8EE;border:1px dashed #F1C99E;border-radius:14px;padding:16px;
+       font-size:12.5px;color:#8a6a3a;line-height:1.7}
+  .wip b{color:var(--orange-d)}
+
+  .foot{text-align:center;font-size:10.5px;color:#B4B2A9;padding:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="appbar">
+    <div class="appbar-row">
+      <div class="brand"><span class="b-org">Pension</span> 간편조회</div>
+      <div class="appbar-acts">
+        <a class="abtn" href="/switch_view" title="기존 웹버전으로">🖥️ 웹버전</a>
+        <a class="abtn" href="/logout" title="로그아웃">로그아웃</a>
+      </div>
+    </div>
+    <div class="appbar-sub">퇴직연금 원리금보장상품 · 모바일 새 버전 (v2)</div>
+  </header>
+
+  <main class="body">
+    <div class="hello">안녕하세요 <b id="who">사용자</b>님 👋</div>
+
+    <div class="grid">
+      <div class="tile" onclick="alert('원리금 금리 화면 — 여기에 v2 디자인을 만들 예정')">
+        <div class="ic ic-rate">💰</div>
+        <div class="t">원리금 금리</div>
+        <div class="d">DB·DC/IRP 금리 조회</div>
+      </div>
+      <div class="tile" onclick="alert('신용등급 화면 — v2 예정')">
+        <div class="ic ic-credit">🏦</div>
+        <div class="t">신용등급</div>
+        <div class="d">3사 최신 등급</div>
+      </div>
+      <div class="tile" onclick="alert('제안상품 화면 — v2 예정')">
+        <div class="ic ic-prop">📋</div>
+        <div class="t">제안상품</div>
+        <div class="d">이달의 제안</div>
+      </div>
+      <div class="tile" onclick="alert('더보기 — v2 예정')">
+        <div class="ic ic-more">✨</div>
+        <div class="t">더보기</div>
+        <div class="d">공지·물가·기준금리</div>
+      </div>
+    </div>
+
+    <div class="wip">
+      <b>🚧 간편조회(v2) 준비 중</b><br>
+      지금은 시작 뼈대예요. 여기부터 <b>모바일 사용자 중심</b>으로 화면을 하나씩 새로 디자인합니다.
+      기존 기능이 필요하면 오른쪽 위 <b>🖥️ 웹버전</b>으로 언제든 전환할 수 있어요.
+    </div>
+  </main>
+
+  <div class="foot">System Designed &amp; Built by Goun · v2</div>
+</div>
+
+<script>
+  fetch('/api/me').then(r=>r.json()).then(d=>{
+    if(d&&d.user){ const el=document.getElementById('who'); if(el) el.textContent=d.user; }
+  }).catch(()=>{});
+</script>
+</body>
+</html>

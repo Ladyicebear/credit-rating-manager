@@ -23,6 +23,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .btn-login{width:100%;padding:11px;border:none;border-radius:8px;background:#F68121;color:#fff;
            font-size:.9rem;font-weight:800;cursor:pointer;transition:background .15s;margin-top:4px}
 .btn-login:hover{background:#d65f0f}
+.btn-login-web{background:#fff;color:#16335B;border:1.5px solid #16335B;margin-top:10px}
+.btn-login-web:hover{background:#f4f6f8}
+.btn-sub{font-size:.7rem;font-weight:600;opacity:.85;margin-left:2px}
+.view-hint{font-size:.72rem;color:#8a92a0;text-align:center;margin:2px 0 10px;font-weight:600}
 .err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:8px;
      padding:9px 12px;font-size:.76rem;margin-bottom:14px;text-align:center}
 .foot{text-align:center;margin-top:18px;font-size:.66rem;color:#bbb}
@@ -80,7 +84,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       <label for="password">비밀번호</label>
       <input type="password" id="password" name="password" autocomplete="current-password" required/>
     </div>
-    <button type="submit" class="btn-login">로그인</button>
+    <div class="view-hint">조회 방식을 선택하세요</div>
+    <button type="submit" name="view" value="simple" class="btn-login">📱 간편조회 <span class="btn-sub">모바일 새 버전</span></button>
+    <button type="submit" name="view" value="web" class="btn-login btn-login-web">🖥️ 웹버전조회 <span class="btn-sub">기존 버전</span></button>
     <button type="button" class="pw-link" onclick="openPw()">비밀번호 변경</button>
 
     <div class="foot">System Designed &amp; Built by Goun</div>
