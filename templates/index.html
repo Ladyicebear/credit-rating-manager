@@ -335,7 +335,14 @@ tr.row-done td{transition:background .3s}
   .tab-history{display:none}
   /* 기관명 검색: 칩 마지막 줄 오른쪽에 인라인 배치(생명보험·기타 옆) — 칩을 줄여서라도 한 줄에 */
   .tabs{gap:8px}
-  .tab-btn{padding:7px 11px;font-size:.77rem}
+  .tab-btn{padding:8px 12px;font-size:.77rem;border:1.5px solid #E0E3E8;background:#fff}
+  /* ── 신용등급 화면(모바일) 요청 반영 ── */
+  .credit-subbar{display:none}          /* 상단 회색 바 삭제 */
+  .spill{display:none}                  /* 조회성공 배지 삭제 */
+  th.th-name,td.td-name{text-align:center}
+  th.th-agency,td.td-agency{text-align:center}
+  .th-name{cursor:pointer;user-select:none}
+  .rsort-arrow{margin-left:3px;font-size:.9em;color:#9AA2AE;font-weight:800}
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
   .main{padding:10px 10px 44px}
@@ -344,7 +351,7 @@ tr.row-done td{transition:background .3s}
   table{font-size:.72rem}
   thead th{padding:6px 4px!important;font-size:.63rem}
   td{padding:6px 4px}
-  .card-head{flex-wrap:wrap;gap:6px;padding:10px 12px}
+  .card-head{display:none}   /* 전체/분류기준/엑셀 박스 삭제 → 표를 검색 밑으로 */
   .modal{width:96vw;padding:18px 16px}
   .mo-final{display:inline-block;margin-top:6px;background:#FCEAD8;border:1px solid #F1C99E;color:#B5651D;
             border-radius:14px;padding:3px 11px;font-size:.72rem;font-weight:800}
@@ -514,7 +521,7 @@ tr.row-done td{transition:background .3s}
           </colgroup>
           <thead>
             <tr>
-              <th class="th-name" rowspan="2">기관명</th>
+              <th class="th-name" rowspan="2" onclick="sortRatingName()">기관명 <span class="rsort-arrow">↕</span></th>
               <th class="th-agency th-grp-nice">나이스신용평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
               <th class="th-agency th-grp-kr">한국기업평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
               <th class="th-agency th-grp-kis">한국신용평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
@@ -939,6 +946,17 @@ function switchSuper(which){
 })();
 
 /* ── Tabs ── */
+let ratingSortDir=0;   /* 0=기본, 1=오름, -1=내림 */
+function sortRatingName(){
+  ratingSortDir = (ratingSortDir===1) ? -1 : 1;
+  const tb=document.querySelector('.panel.active tbody');
+  if(tb){
+    const rows=[...tb.querySelectorAll('tr')];
+    rows.sort((a,b)=> ratingSortDir*String(a.dataset.name||'').localeCompare(String(b.dataset.name||''),'ko'));
+    rows.forEach(r=>tb.appendChild(r));
+  }
+  document.querySelectorAll('.rsort-arrow').forEach(el=>el.textContent = ratingSortDir===1?'↑':'↓');
+}
 function switchTab(cat){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
