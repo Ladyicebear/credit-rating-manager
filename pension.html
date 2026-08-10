@@ -401,6 +401,8 @@
     .biz-conv{font-size:12px;color:#9AA2AF;font-weight:600;white-space:nowrap}
     .biz-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
     .biz-chip{font-size:11px;font-weight:700;color:#5A6474;background:#EEF1F6;border-radius:7px;padding:4px 9px;letter-spacing:-.2px}
+    .biz-chip .dep-y{color:#F58220} .biz-chip .dep-n{color:#C0392B}
+    .biz-chip-gov{color:#043B72;background:#E7EFF8}
     .biz-none{padding:34px 10px;text-align:center;color:var(--muted);font-size:13px}
     .biz-more{width:100%;margin-top:12px;background:var(--white);border:1px solid var(--line);border-radius:12px;
         font-family:inherit;font-size:13.5px;font-weight:700;color:var(--muted);padding:12px;cursor:pointer}
@@ -1349,10 +1351,18 @@ function bizRows(){
   return rows;
 }
 let bizCurRows=[];
+/* 예금자보호 여부: 우체국=국가전액보장 / ELB·DLB=N / DB(우체국제외)=N / DC·IRP(정기예금·이율보증형·금리연동형)=Y */
+function depProtect(org,fam,plan){
+  if(/우체국/.test(String(org||''))) return '국가전액보장';
+  if(/ELB|DLB/.test(String(fam||''))) return 'N';
+  if(plan==='DB') return 'N';
+  return 'Y';
+}
 function renderBizCards(){
   const list=$('bizList'); if(!list) return;
   const rows=bizRows(); bizCurRows=rows;
   const more=$('bizMore');
+  if(!penRatingMap){ loadPenRatings().then(()=>{ if(isMobileView()) renderBizCards(); }); }   // 신용등급 1회 로드 후 재렌더
   if(!rows.length){
     list.innerHTML=`<div class="biz-none">조건에 맞는 상품이 없습니다.</div>`;
     list.style.maxHeight=''; list.style.overflowY='visible';
@@ -1363,7 +1373,17 @@ function renderBizCards(){
     const rate=(typeof r.rate==='number')?r.rate.toFixed(2)+'%':(r.rate==null?'-':r.rate);
     const sc=(isBoseungCompound(r.sector,r.fam)&&r.months!=null)?simpleConv(r.rate,r.months):null;
     const scHtml = (sc!=null) ? `<span class="biz-conv">(단리환산 ${sc.toFixed(2)}%)</span>` : '';
-    const chips=[r.plan, r.period, bizCat(r.fam)].filter(Boolean).map(c=>`<span class="biz-chip">${htmlEsc(c)}</span>`).join('');
+    const rating=(penRatingMap&&penRatingMap[penCore(r.org)])?penRatingMap[penCore(r.org)]:'';
+    const dp=depProtect(r.org,r.fam,r.plan);
+    const depHtml = (dp==='국가전액보장')
+      ? `<span class="biz-chip biz-chip-gov">국가전액보장</span>`
+      : `<span class="biz-chip">예금자보호 <b class="dep-${dp==='Y'?'y':'n'}">${dp}</b></span>`;
+    const chips=[
+      r.plan?`<span class="biz-chip">${htmlEsc(r.plan)}</span>`:'',
+      (r.period&&r.period!=='-')?`<span class="biz-chip">${htmlEsc(r.period)}</span>`:'',
+      rating?`<span class="biz-chip">${htmlEsc(rating)}</span>`:'',
+      depHtml
+    ].filter(Boolean).join('');
     return `<div class="biz-card">`+
       `<div class="biz-top"><span class="biz-org" title="${htmlAttr(r.org)}">${htmlEsc(r.org)}</span><span class="biz-rate">${rate}</span></div>`+
       `<div class="biz-mid"><span class="biz-fam" title="${htmlAttr(r.fam)}">${htmlEsc(r.fam)}</span>${scHtml}</div>`+
