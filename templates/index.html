@@ -352,7 +352,7 @@ tr.row-done td{transition:background .3s}
   .td-name .td-org{display:block;margin:3px 0 1px}
   .td-name .bell{display:none}
   /* 업권별 색상(CI 보조색) */
-  .cat-tag[data-cat="증권"]{background:#0086B8}
+  .cat-tag[data-cat="증권"]{background:#043B72}
   .cat-tag[data-cat="시중은행"]{background:#00A9CE}
   .cat-tag[data-cat="지방은행"]{background:#7EA0C3}
   .cat-tag[data-cat="저축은행"]{background:#84888B}
@@ -949,7 +949,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-visitors'), visit);
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
-  if(credit) fitRatingTable();   // .main 표시 후 신용등급표 5행 고정 재계산
+  if(credit){ fitRatingTable(); setTimeout(fitRatingTable, 80); }   // .main 표시 후 5행 고정(레이아웃 안정 후 재보정)
   setAct(document.getElementById('stab-pension'),  pen);
   setAct(document.getElementById('stab-credit'),   credit);
   setAct(document.getElementById('stab-proposal'), prop);
@@ -967,25 +967,28 @@ function switchSuper(which){
 /* ── Tabs ── */
 let ratingSortDir=0;   /* 0=기본, 1=오름, -1=내림 */
 /* 신용등급표: 모바일에서 최대 5행만 보이고, 초과 시 표 안에서만 스크롤(헤더 고정) */
-let RATING_FIX_H=0;   // 헤더+5행 고정 높이(px) 캐시 — 박스가 줄었다 늘었다 하지 않도록 1회만 측정
+var RATING_FIX_H=0;   // 헤더+5행 고정 높이(px) 캐시 (var: 초기 로드 TDZ 방지 — 예전엔 let이라 credit 탭 저장 시 로드에서 에러로 5행고정 자체가 안 걸렸음)
 function fitRatingTable(){
-  if(window.innerWidth>768){ document.querySelectorAll('.tbl-wrap').forEach(x=>{x.style.height='';x.style.maxHeight='';x.style.overflowY='';}); return; }
-  const w=document.querySelector('.panel.active .tbl-wrap'); if(!w||w.offsetParent===null) return;
-  const table=w.querySelector('table'); const thead=table&&table.querySelector('thead'); if(!thead) return;
+  var wraps=document.querySelectorAll('.tbl-wrap');
+  if(window.innerWidth>768){ wraps.forEach(function(x){x.style.height='';x.style.maxHeight='';x.style.overflowY='';}); return; }
+  var w=document.querySelector('.panel.active .tbl-wrap'); if(!w||w.offsetParent===null) return;
+  var table=w.querySelector('table'); var thead=table&&table.querySelector('thead'); if(!thead) return;
   // 검색 안 한 전체 표시 상태에서 헤더+5행 높이를 1회 측정해 고정값으로 캐시
-  const sv=((document.getElementById('ratingSearch')||{}).value||'').trim();
+  var sv=((document.getElementById('ratingSearch')||{}).value||'').trim();
   if(!RATING_FIX_H && !sv){
-    const all=[...table.querySelectorAll('tbody tr')];
-    if(all.length>=5){
-      let h=thead.getBoundingClientRect().height;
-      for(let i=0;i<5;i++) h+=all[i].getBoundingClientRect().height;
-      if(h>20) RATING_FIX_H=Math.ceil(h)+3;
+    var rows=table.querySelectorAll('tbody tr');
+    if(rows.length>=5){
+      var h=thead.getBoundingClientRect().height;
+      for(var i=0;i<5;i++) h+=rows[i].getBoundingClientRect().height;
+      if(h>120) RATING_FIX_H=Math.ceil(h)+3;   // 값이 작으면 레이아웃 미완료로 보고 캐시 보류(다음 호출에서 재시도)
     }
   }
   if(!RATING_FIX_H) return;
   // 검색결과가 1개여도 표 박스는 항상 5행 높이로 고정(안에서 한 줄만 표시), 초과 시 표 안 스크롤
-  document.querySelectorAll('.tbl-wrap').forEach(x=>{ x.style.height=''; x.style.maxHeight=''; x.style.overflowY=''; });
-  w.style.height=RATING_FIX_H+'px'; w.style.overflowY='auto';
+  wraps.forEach(function(x){ x.style.height=''; x.style.maxHeight=''; x.style.overflowY=''; });
+  w.style.setProperty('height', RATING_FIX_H+'px', 'important');
+  w.style.setProperty('max-height', RATING_FIX_H+'px', 'important');
+  w.style.overflowY='auto';
 }
 window.addEventListener('load', fitRatingTable);
 window.addEventListener('resize', fitRatingTable);
