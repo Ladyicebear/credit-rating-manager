@@ -1343,6 +1343,23 @@ def _pen_core(s):
     return s
 
 
+def _pen_sec_token(sector):
+    """업권 구분 토큰. 손보/생명은 같은 브랜드(삼성·한화·DB·하나 등)가 양쪽에
+    모두 있어 _pen_core만으로는 'db'처럼 키가 충돌한다. 손보/생명 등급이 서로
+    덮어쓰이지 않도록 정규화 키 앞에 업권 토큰을 붙여 구분한다.
+    pension.html penSecTok()와 동일 규칙이어야 한다(변경 시 양쪽 같이 수정)."""
+    if sector == '손해보험':
+        return '손보'
+    if sector == '생명보험':
+        return '생명'
+    return ''
+
+
+def _pen_rating_key(sector, name):
+    """신용등급 맵의 조회 키 = 업권토큰 + 정규화기관명."""
+    return _pen_sec_token(sector) + _pen_core(name)
+
+
 def _pen_inst_key(name, is_report=False):
     if is_report and name in _PENSION_ALIAS:
         name = _PENSION_ALIAS[name]
@@ -1409,12 +1426,13 @@ def api_pension_ratings():
     """
     data = build_response_data(load_institutions(), load_ratings())
     out = {}
-    for rows in data.values():
+    for category, rows in data.items():
         for row in rows:
             if row.get('final'):
-                out[_pen_core(row['name'])] = row['final']
+                out[_pen_rating_key(category, row['name'])] = row['final']
     # 별칭: 원리금 데이터 기관명이 신용등급 기관명과 달라 매칭 안 되는 경우
     #       지정한 신용등급 기관의 등급을 그 이름 키로도 넣어준다(SC·IBK 등).
+    #       별칭 대상은 은행·증권(업권토큰 없음)이라 정규화 키만으로 매칭한다.
     for pen_name, cred_name in _PEN_RATING_ALIAS.items():
         ck = _pen_core(cred_name)
         if ck in out:

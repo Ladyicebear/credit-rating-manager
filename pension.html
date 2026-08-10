@@ -1374,7 +1374,7 @@ function renderBizCards(){
     const rate=(typeof r.rate==='number')?r.rate.toFixed(2)+'%':(r.rate==null?'-':r.rate);
     const sc=(isBoseungCompound(r.sector,r.fam)&&r.months!=null)?simpleConv(r.rate,r.months):null;
     const scHtml = (sc!=null) ? `<span class="biz-conv">(단리환산 ${sc.toFixed(2)}%)</span>` : '';
-    const rating=(penRatingMap&&penRatingMap[penCore(r.org)])?penRatingMap[penCore(r.org)]:'';
+    const rating=penRatingOf(penRatingMap,r);
     const dp=depProtect(r.org,r.fam,r.plan);
     const depHtml = (dp==='국가전액보장')
       ? `<span class="biz-chip biz-chip-gov">국가전액보장</span>`
@@ -1425,6 +1425,15 @@ function penCore(s){
   v=v.replace(/(화재|생명|손보|손해|연금)$/,'');
   return v;
 }
+/* app.py _pen_sec_token()와 동일 규칙. 손보/생명은 같은 브랜드(삼성·한화·DB·하나)가
+   양쪽에 있어 penCore만으로 'db'처럼 키가 충돌 → 업권토큰으로 구분 */
+function penSecTok(sec){ return sec==='손해보험'?'손보':(sec==='생명보험'?'생명':''); }
+/* 원리금 행(sector,org) → 최종 신용등급. 업권토큰+정규화키로 조회, 미스 시 정규화키 폴백 */
+function penRatingOf(map,r){
+  if(!map||!r) return '';
+  const core=penCore(r.org);
+  return map[penSecTok(r.sector)+core] || map[core] || '';
+}
 /* 신용등급 맵 로드(통합앱 전용). standalone/오류 시 {}로 두고 '-' 표시 */
 async function loadPenRatings(){
   if(penRatingMap) return penRatingMap;
@@ -1463,7 +1472,7 @@ function showProductDetail(r){
   $('penDetailModal').classList.add('open');
   loadPenRatings().then(map=>{
     const el=$('pdRating'); if(!el) return;              // 조회 중 팝업이 닫혔을 수 있음
-    const g=map[penCore(r.org)];
+    const g=penRatingOf(map,r);
     if(g){ el.className='rbadge-lite'; el.textContent=g; }
     else { el.className='pd-na'; el.textContent='-'; }
   });
@@ -1626,7 +1635,7 @@ function openPropDetail(i){
   $('propDetailModal').classList.add('open');
   loadPenRatings().then(map=>{
     const el=$('propRating'); if(!el) return;
-    const g=map[penCore(r.org)];
+    const g=penRatingOf(map,r);
     if(g){ el.className='rbadge-lite'; el.textContent=g; }
     else { el.className='pd-na'; el.textContent='-'; }
   });
