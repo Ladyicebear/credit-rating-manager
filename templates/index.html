@@ -343,6 +343,7 @@ tr.row-done td{transition:background .3s}
   th.th-agency,td.td-agency{text-align:center}
   .th-name{cursor:pointer;user-select:none}
   .rsort-arrow{margin-left:3px;font-size:.9em;color:#9AA2AE;font-weight:800}
+  .main thead th{position:sticky;top:0;z-index:3}   /* 6행 스크롤 시 헤더 고정 */
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
   .main{padding:10px 10px 44px}
@@ -947,6 +948,20 @@ function switchSuper(which){
 
 /* ── Tabs ── */
 let ratingSortDir=0;   /* 0=기본, 1=오름, -1=내림 */
+/* 신용등급표: 모바일에서 최대 6행만 보이고, 초과 시 표 안에서만 스크롤(헤더 고정) */
+function fitRatingTable(){
+  document.querySelectorAll('.tbl-wrap').forEach(w=>{ w.style.maxHeight=''; w.style.overflowY=''; });
+  if(window.innerWidth>768) return;
+  const w=document.querySelector('.panel.active .tbl-wrap'); if(!w) return;
+  const table=w.querySelector('table'); const thead=table&&table.querySelector('thead'); if(!thead) return;
+  const vis=[...table.querySelectorAll('tbody tr')].filter(r=>r.style.display!=='none');
+  if(vis.length<=6) return;
+  let h=thead.getBoundingClientRect().height;
+  for(let i=0;i<6;i++) h+=vis[i].getBoundingClientRect().height;
+  w.style.maxHeight=Math.ceil(h)+3+'px'; w.style.overflowY='auto';
+}
+window.addEventListener('load', fitRatingTable);
+window.addEventListener('resize', fitRatingTable);
 function sortRatingName(){
   ratingSortDir = (ratingSortDir===1) ? -1 : 1;
   const tb=document.querySelector('.panel.active tbody');
@@ -956,12 +971,14 @@ function sortRatingName(){
     rows.forEach(r=>tb.appendChild(r));
   }
   document.querySelectorAll('.rsort-arrow').forEach(el=>el.textContent = ratingSortDir===1?'↑':'↓');
+  fitRatingTable();
 }
 function switchTab(cat){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelector(`.tab-btn[data-tab="${cat}"]`).classList.add('active');
   document.getElementById(`panel-${cat}`).classList.add('active');
+  fitRatingTable();
 }
 /* 기관·상품명 검색: 기관명(data-name)으로 모든 패널 행을 부분일치 필터(활성 탭에 즉시 반영) */
 function filterRatingRows(){
@@ -970,6 +987,7 @@ function filterRatingRows(){
     const name=(tr.getAttribute('data-name')||'').toLowerCase();
     tr.style.display=(!q || name.indexOf(q)>=0)?'':'none';
   });
+  fitRatingTable();
 }
 
 /* ── Rating helpers (JS) ── */
