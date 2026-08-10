@@ -337,14 +337,14 @@ tr.row-done td{transition:background .3s}
   .tabs{gap:8px}
   .tab-btn{padding:8px 12px;font-size:.77rem;border:1.5px solid #E0E3E8;background:#fff}
   /* ── 신용등급 화면(모바일) 요청 반영 ── */
-  .credit-subbar{display:none}          /* 상단 회색 바 삭제 */
+  .credit-subbar{display:none!important}  /* 회색 띠 삭제(JS 인라인 display 덮어쓰기 방지) */
   .spill{display:none}                  /* 조회성공 배지 삭제 */
   th.th-name,td.td-name{text-align:center}
   th.th-agency,td.td-agency{text-align:center}
   .th-name{cursor:pointer;user-select:none}
   .rsort-arrow{margin-left:3px;font-size:.9em;color:#9AA2AE;font-weight:800}
   .main thead th{position:sticky;top:0;z-index:3}   /* 5행 스크롤 시 헤더 고정 */
-  .legend .lg-mo-hide{display:none}   /* 하단 변경/하향/상향 범례: 모바일 숨김 */
+  .legend .lg-mo-hide,.legend .admin-mark{display:none}   /* 하단 변경/하향/상향 범례 + admin.Goun: 모바일 숨김 */
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
   .main{padding:10px 10px 44px}
