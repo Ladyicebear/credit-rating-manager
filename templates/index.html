@@ -347,7 +347,7 @@ tr.row-done td{transition:background .3s}
   .legend .lg-mo-hide,.legend .admin-mark{display:none}   /* 하단 변경/하향/상향 범례 + admin.Goun: 모바일 숨김 */
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
-  .main{padding:10px 10px 44px}
+  .main{padding:10px 10px 12px}   /* 하단 패딩 축소: 5행+등급유형 범례가 페이지 스크롤 없이 보이도록 */
   .form-row{grid-template-columns:1fr}
   /* 신용등급 표(모바일): 기관명(+최종등급 주황박스) + 3평가사만, 한 화면 폭에 맞춤(스크롤 없음) */
   table{font-size:.72rem}
@@ -951,18 +951,25 @@ function switchSuper(which){
 /* ── Tabs ── */
 let ratingSortDir=0;   /* 0=기본, 1=오름, -1=내림 */
 /* 신용등급표: 모바일에서 최대 5행만 보이고, 초과 시 표 안에서만 스크롤(헤더 고정) */
+let RATING_FIX_H=0;   // 헤더+5행 고정 높이(px) 캐시 — 박스가 줄었다 늘었다 하지 않도록 1회만 측정
 function fitRatingTable(){
-  document.querySelectorAll('.tbl-wrap').forEach(w=>{ w.style.maxHeight=''; w.style.overflowY=''; });
-  if(window.innerWidth>768) return;
-  const w=document.querySelector('.panel.active .tbl-wrap'); if(!w) return;
-  if(w.offsetParent===null) return;   // 표가 화면에 없으면(탭 숨김) 건드리지 않음 → 0높이 클리핑 방지
+  if(window.innerWidth>768){ document.querySelectorAll('.tbl-wrap').forEach(x=>{x.style.height='';x.style.maxHeight='';x.style.overflowY='';}); return; }
+  const w=document.querySelector('.panel.active .tbl-wrap'); if(!w||w.offsetParent===null) return;
   const table=w.querySelector('table'); const thead=table&&table.querySelector('thead'); if(!thead) return;
-  const vis=[...table.querySelectorAll('tbody tr')].filter(r=>r.style.display!=='none');
-  if(vis.length<=5) return;
-  let h=thead.getBoundingClientRect().height;
-  for(let i=0;i<5;i++) h+=vis[i].getBoundingClientRect().height;
-  if(h<=20) return;   // 레이아웃 미완료(높이 0) 시 적용 안 함
-  w.style.maxHeight=Math.ceil(h)+3+'px'; w.style.overflowY='auto';
+  // 검색 안 한 전체 표시 상태에서 헤더+5행 높이를 1회 측정해 고정값으로 캐시
+  const sv=((document.getElementById('ratingSearch')||{}).value||'').trim();
+  if(!RATING_FIX_H && !sv){
+    const all=[...table.querySelectorAll('tbody tr')];
+    if(all.length>=5){
+      let h=thead.getBoundingClientRect().height;
+      for(let i=0;i<5;i++) h+=all[i].getBoundingClientRect().height;
+      if(h>20) RATING_FIX_H=Math.ceil(h)+3;
+    }
+  }
+  if(!RATING_FIX_H) return;
+  // 검색결과가 1개여도 표 박스는 항상 5행 높이로 고정(안에서 한 줄만 표시), 초과 시 표 안 스크롤
+  document.querySelectorAll('.tbl-wrap').forEach(x=>{ x.style.height=''; x.style.maxHeight=''; x.style.overflowY=''; });
+  w.style.height=RATING_FIX_H+'px'; w.style.overflowY='auto';
 }
 window.addEventListener('load', fitRatingTable);
 window.addEventListener('resize', fitRatingTable);
