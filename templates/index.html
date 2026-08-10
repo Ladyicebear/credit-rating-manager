@@ -220,6 +220,7 @@ td.td-act   {padding:6px 7px}
 /* '전체' 탭에서 각 행이 어느 분류인지 표시 */
 .cat-tag{display:inline-block;padding:1px 6px;border-radius:7px;background:#EEF1F5;color:#6b7280;
          font-size:.63rem;font-weight:700;margin-right:5px;vertical-align:middle}
+.cat-tag-dup{display:none}   /* 데스크톱: '전체' 외 탭에선 업권버튼 숨김(기존과 동일) */
 .spill-sb    {background:#E1EAF6;color:#16335B}
 
 /* ── Bell / alert ── */
@@ -345,6 +346,21 @@ tr.row-done td{transition:background .3s}
   .rsort-arrow{margin-left:3px;font-size:.9em;color:#9AA2AE;font-weight:800}
   .main thead th{position:sticky;top:0;z-index:3}   /* 5행 스크롤 시 헤더 고정 */
   .legend .lg-mo-hide,.legend .admin-mark{display:none}   /* 하단 변경/하향/상향 범례 + admin.Goun: 모바일 숨김 */
+  /* 기관 칸: 항상 3줄(업권버튼 / 기관명 / 최종) */
+  .td-name .cat-tag-dup{display:inline-block}   /* 모바일선 모든 탭에서 업권버튼 표시 */
+  .td-name .cat-tag{margin:0;padding:2px 9px;font-size:.62rem;color:#fff!important;border:none}
+  .td-name .td-org{display:block;margin:3px 0 1px}
+  .td-name .bell{display:none}
+  /* 업권별 색상(CI 보조색) */
+  .cat-tag[data-cat="증권"]{background:#0086B8}
+  .cat-tag[data-cat="시중은행"]{background:#00A9CE}
+  .cat-tag[data-cat="지방은행"]{background:#7EA0C3}
+  .cat-tag[data-cat="저축은행"]{background:#84888B}
+  .cat-tag[data-cat="생명보험"]{background:#CB6015}
+  .cat-tag[data-cat="손해보험"]{background:#AD624E}
+  .cat-tag[data-cat="기타"]{background:#F0B26B}
+  /* 신용등급표: 박스형(테두리+라운드), 안에서만 스크롤 */
+  .main .tbl-wrap{border:1px solid #E5E7EB;border-radius:12px}
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
   .main{padding:10px 10px 12px}   /* 하단 패딩 축소: 5행+등급유형 범례가 페이지 스크롤 없이 보이도록 */
@@ -540,8 +556,8 @@ tr.row-done td{transition:background .3s}
 
               <!-- 기관명 -->
               <td class="td-name">
-                {% if category == '전체' %}<span class="cat-tag">{{ row.category }}</span>{% endif %}
-                {{ row.name }}
+                <span class="cat-tag {% if category != '전체' %}cat-tag-dup{% endif %}" data-cat="{{ row.category }}">{{ row.category }}</span>
+                <span class="td-org">{{ row.name }}</span>
                 {% if row.any_changed %}<span class="bell" title="확인" onclick="acknowledge('{{ row.name }}')">🔔</span>{% endif %}
                 {% if row.scrape_status %}
                   {% set sc = row.scrape_status %}
@@ -549,7 +565,7 @@ tr.row-done td{transition:background .3s}
                     {{ sc if '실패' not in sc else '재조회필요' }}
                   </span>
                 {% endif %}
-                {% if row.final %}<div class="mo-final">최종 : {{ row.final }}</div>{% endif %}
+                <div class="mo-final">최종 : {{ row.final or '—' }}</div>
               </td>
 
               <!-- 나이스 -->
