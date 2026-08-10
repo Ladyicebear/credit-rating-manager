@@ -282,7 +282,7 @@ tr.row-done td{transition:background .3s}
 /* ── 휴대폰(앱형) 반응형 : 데스크톱 웹 형태는 그대로, 모바일만 재구성 ── */
 @media(max-width:768px){
   body{font-size:12.5px;background:#fff}   /* 앱 배경 회색 → 흰색 */
-  .hdr{padding:9px 13px 0}
+  .hdr{padding:9px 13px 0;background:#fff}   /* 헤더 하단 회색 → 흰색 */
   /* 헤더: 제목·Goun로고·로그아웃을 한 줄에(제목 축소로 맞춤) */
   /* 로고: 넓은 폰은 .74rem, 좁아지면 글씨만 줄여 항상 1줄 유지(System 안 내려가게) */
   .brand-logo{font-size:clamp(8.5px,calc(3vw - 1px),.74rem);letter-spacing:-.4px;white-space:nowrap}
@@ -343,7 +343,8 @@ tr.row-done td{transition:background .3s}
   th.th-agency,td.td-agency{text-align:center}
   .th-name{cursor:pointer;user-select:none}
   .rsort-arrow{margin-left:3px;font-size:.9em;color:#9AA2AE;font-weight:800}
-  .main thead th{position:sticky;top:0;z-index:3}   /* 6행 스크롤 시 헤더 고정 */
+  .main thead th{position:sticky;top:0;z-index:3}   /* 5행 스크롤 시 헤더 고정 */
+  .legend .lg-mo-hide{display:none}   /* 하단 변경/하향/상향 범례: 모바일 숨김 */
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
   .main{padding:10px 10px 44px}
@@ -522,7 +523,7 @@ tr.row-done td{transition:background .3s}
           </colgroup>
           <thead>
             <tr>
-              <th class="th-name" rowspan="2" onclick="sortRatingName()">기관명 <span class="rsort-arrow">↕</span></th>
+              <th class="th-name" rowspan="2" onclick="sortRatingName()">기관명 <span class="rsort-arrow">▼</span></th>
               <th class="th-agency th-grp-nice">나이스신용평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
               <th class="th-agency th-grp-kr">한국기업평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
               <th class="th-agency th-grp-kis">한국신용평가<br><span style="font-weight:400;font-size:.67rem">등급 · 유형 · 평가일</span></th>
@@ -676,9 +677,9 @@ tr.row-done td{transition:background .3s}
         <span><span class="ag-type-badge type-ICR">기업신용등급</span></span>
         <span><span class="ag-type-badge type-SB">회사채 선순위</span></span>
         <span><span class="ag-type-badge type-IFS">보험지급능력</span></span>
-        <span style="margin-left:8px"><strong>변경:</strong></span>
-        <span><span class="chg-tag chg-down">AA ▼ AA-</span> 하향</span>
-        <span><span class="chg-tag chg-up">AA- ▲ AA</span> 상향</span>
+        <span class="lg-mo-hide" style="margin-left:8px"><strong>변경:</strong></span>
+        <span class="lg-mo-hide"><span class="chg-tag chg-down">AA ▼ AA-</span> 하향</span>
+        <span class="lg-mo-hide"><span class="chg-tag chg-up">AA- ▲ AA</span> 상향</span>
         <span class="admin-mark">admin.Goun</span>
       </div>
     </div><!-- card -->
@@ -948,16 +949,16 @@ function switchSuper(which){
 
 /* ── Tabs ── */
 let ratingSortDir=0;   /* 0=기본, 1=오름, -1=내림 */
-/* 신용등급표: 모바일에서 최대 6행만 보이고, 초과 시 표 안에서만 스크롤(헤더 고정) */
+/* 신용등급표: 모바일에서 최대 5행만 보이고, 초과 시 표 안에서만 스크롤(헤더 고정) */
 function fitRatingTable(){
   document.querySelectorAll('.tbl-wrap').forEach(w=>{ w.style.maxHeight=''; w.style.overflowY=''; });
   if(window.innerWidth>768) return;
   const w=document.querySelector('.panel.active .tbl-wrap'); if(!w) return;
   const table=w.querySelector('table'); const thead=table&&table.querySelector('thead'); if(!thead) return;
   const vis=[...table.querySelectorAll('tbody tr')].filter(r=>r.style.display!=='none');
-  if(vis.length<=6) return;
+  if(vis.length<=5) return;
   let h=thead.getBoundingClientRect().height;
-  for(let i=0;i<6;i++) h+=vis[i].getBoundingClientRect().height;
+  for(let i=0;i<5;i++) h+=vis[i].getBoundingClientRect().height;
   w.style.maxHeight=Math.ceil(h)+3+'px'; w.style.overflowY='auto';
 }
 window.addEventListener('load', fitRatingTable);
@@ -970,7 +971,7 @@ function sortRatingName(){
     rows.sort((a,b)=> ratingSortDir*String(a.dataset.name||'').localeCompare(String(b.dataset.name||''),'ko'));
     rows.forEach(r=>tb.appendChild(r));
   }
-  document.querySelectorAll('.rsort-arrow').forEach(el=>el.textContent = ratingSortDir===1?'↑':'↓');
+  document.querySelectorAll('.rsort-arrow').forEach(el=>el.textContent = ratingSortDir===1?'▲':'▼');
   fitRatingTable();
 }
 function switchTab(cat){
