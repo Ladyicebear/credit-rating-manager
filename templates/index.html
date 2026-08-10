@@ -933,6 +933,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-visitors'), visit);
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
+  if(credit) fitRatingTable();   // .main 표시 후 신용등급표 5행 고정 재계산
   setAct(document.getElementById('stab-pension'),  pen);
   setAct(document.getElementById('stab-credit'),   credit);
   setAct(document.getElementById('stab-proposal'), prop);
@@ -954,11 +955,13 @@ function fitRatingTable(){
   document.querySelectorAll('.tbl-wrap').forEach(w=>{ w.style.maxHeight=''; w.style.overflowY=''; });
   if(window.innerWidth>768) return;
   const w=document.querySelector('.panel.active .tbl-wrap'); if(!w) return;
+  if(w.offsetParent===null) return;   // 표가 화면에 없으면(탭 숨김) 건드리지 않음 → 0높이 클리핑 방지
   const table=w.querySelector('table'); const thead=table&&table.querySelector('thead'); if(!thead) return;
   const vis=[...table.querySelectorAll('tbody tr')].filter(r=>r.style.display!=='none');
   if(vis.length<=5) return;
   let h=thead.getBoundingClientRect().height;
   for(let i=0;i<5;i++) h+=vis[i].getBoundingClientRect().height;
+  if(h<=20) return;   // 레이아웃 미완료(높이 0) 시 적용 안 함
   w.style.maxHeight=Math.ceil(h)+3+'px'; w.style.overflowY='auto';
 }
 window.addEventListener('load', fitRatingTable);
