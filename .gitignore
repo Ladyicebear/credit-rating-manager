@@ -17,6 +17,9 @@ env/
 # 로그
 *.log
 
+# 배포 진행상태(런타임 파일 — 커밋 금지)
+deploy_status.json
+
 # OS
 .DS_Store
 Thumbs.db

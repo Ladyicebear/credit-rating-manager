@@ -887,20 +887,47 @@ function doDeploy(){
   if(ok){ ok.disabled=true; ok.textContent='배포 중…'; }
   if(m) m.textContent='서버에 배포 요청을 보내는 중…';
   fetch('/admin/deploy',{method:'POST'}).then(r=>r.json()).then(d=>{
-    if(d.success){
-      if(m) m.textContent=(d.message||'배포를 시작했습니다.')+' 잠시 후 새로고침됩니다.';
-      showToast('서버 배포를 시작했습니다','ok');
-      setTimeout(()=>location.reload(), 25000);
-    } else {
+    if(!d.success){
       if(m) m.textContent=d.message||'배포 실패';
       if(ok){ ok.disabled=false; ok.textContent='배포'; }
       showToast(d.message||'배포 실패','err');
+      return;
     }
-  }).catch(()=>{
-    /* 재시작으로 응답이 끊길 수 있음 → 진행 중으로 안내 후 새로고침 */
-    if(m) m.textContent='배포 요청됨(서버 재시작 중). 잠시 후 새로고침됩니다.';
-    setTimeout(()=>location.reload(), 25000);
-  });
+    pollDeploy();               // 요청 성공 → 실제 진행상태 폴링
+  }).catch(()=>{ pollDeploy(); });  // 트리거 직후 재시작으로 응답이 끊겨도 폴링으로 확인
+}
+/* 배포 진행상태를 폴링해 성공/실패/변경없음을 실제로 표시(재시작 중 응답 끊김도 견딤) */
+function pollDeploy(){
+  const m=document.getElementById('deploy-msg'), ok=document.getElementById('deploy-ok');
+  const TERMINAL={success:1,'no-change':1,'merge-failed':1,'restart-failed':1,error:1};
+  const LABEL={queued:'⏳ 배포 요청됨…',running:'⏳ 배포 진행 중…',restarting:'🔄 서비스 재시작 중…',
+    success:'✅ 배포 완료','no-change':'ℹ️ 변경 없음 (이미 최신)','merge-failed':'❌ 병합 실패 — 수동 확인 필요',
+    'restart-failed':'⚠️ 코드는 반영·재시작 실패 — 수동 확인','error':'❌ 배포 오류'};
+  const started=Date.now();
+  (function tick(){
+    fetch('/admin/deploy_status',{cache:'no-store'}).then(r=>r.json()).then(d=>{
+      const st=d.state||'running';
+      if(m) m.textContent=(LABEL[st]||st)+(d.message?(' · '+d.message):'');
+      if(TERMINAL[st]){
+        if(st==='success'||st==='no-change'){
+          showToast(st==='success'?'배포 완료':'변경 없음(이미 최신)','ok');
+          if(ok){ ok.disabled=false; ok.textContent='배포'; }
+          if(st==='success') setTimeout(()=>location.reload(), 1500);
+        } else {
+          if(ok){ ok.disabled=false; ok.textContent='배포'; }
+          showToast(LABEL[st]||'배포 실패','err');
+        }
+        return;
+      }
+      if(Date.now()-started>90000){ if(m) m.textContent='⏱ 시간 초과 — 서버 로그를 확인하세요'; if(ok){ok.disabled=false;ok.textContent='배포';} return; }
+      setTimeout(tick, 2000);
+    }).catch(()=>{
+      /* 재시작 중이라 응답이 끊길 수 있음 → 계속 폴링 */
+      if(m) m.textContent='🔄 서비스 재시작 중… 잠시만 기다려 주세요';
+      if(Date.now()-started>90000){ if(m) m.textContent='⏱ 시간 초과 — 새로고침 후 확인하세요'; if(ok){ok.disabled=false;ok.textContent='배포';} return; }
+      setTimeout(tick, 2000);
+    });
+  })();
 }
 {% endif %}
 /* ── 상위 통합 탭 (원리금보장상품 금리 / 신용등급관리) ── */

@@ -84,7 +84,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
     'api_add_institution', 'api_delete_institution',   # 기관 추가/삭제
     'admin_visitors', 'api_visit_stats', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
-    'admin_deploy',              # 서버 배포(연금컨설팅팀 전용)
+    'admin_deploy', 'admin_deploy_status',   # 서버 배포/상태(연금컨설팅팀 전용)
 }
 
 
@@ -1755,20 +1755,51 @@ def download_visit_stats():
 # ── 서버 배포 (웹 「서버배포」 버튼 → VM이 코드 pull+재시작) ─────────────
 #   credit-deploy.service(oneshot)를 비동기(--no-block)로 트리거만 한다.
 #   실제 pull/재시작은 auto_deploy.sh가 수행(코드만, 데이터 미변경).
+#   진행상태는 auto_deploy.sh가 deploy_status.json에 단계별로 기록 → 프런트가 /admin/deploy_status 폴링.
 #   최초 1회 VM 설치(deploy/install_deploy.sh) 후 동작. sudoers로 이 명령만 무비번 허용.
+DEPLOY_STATUS_FILE = os.path.join(BASE_DIR, 'deploy_status.json')
+
+
+def _write_deploy_status(state, message=''):
+    try:
+        with open(DEPLOY_STATUS_FILE, 'w', encoding='utf-8') as f:
+            json.dump({'state': state, 'message': message,
+                       'ts': datetime.now().strftime('%Y-%m-%d %H:%M:%S')},
+                      f, ensure_ascii=False)
+    except Exception:
+        logger.exception('deploy_status 기록 실패')
+
+
+def _read_deploy_status():
+    try:
+        with open(DEPLOY_STATUS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {'state': 'idle', 'message': '', 'ts': ''}
+
+
 @app.route('/admin/deploy', methods=['POST'])
 def admin_deploy():
     # systemd 서비스 환경은 PATH가 제한적이라 sudo/systemctl을 절대경로로 호출
     sudo = shutil.which('sudo') or '/usr/bin/sudo'
     systemctl = shutil.which('systemctl') or '/usr/bin/systemctl'
+    # 이전 배포의 종료상태가 남아 프런트가 즉시 '완료'로 오인하지 않도록 먼저 비종료 상태로 초기화
+    _write_deploy_status('queued', '배포 요청됨 — 곧 시작합니다')
     try:
         subprocess.Popen([sudo, systemctl, '--no-block', 'start', 'credit-deploy.service'])
     except Exception as e:
         logger.exception('배포 트리거 실패')
+        _write_deploy_status('error', '배포 시작 실패(서버 설정 확인)')
         return jsonify({'success': False,
                         'message': '배포 시작 실패(서버 설정 확인): %s' % e}), 500
     return jsonify({'success': True,
-                    'message': '배포를 시작했습니다. 20~30초 후 반영됩니다.'})
+                    'message': '배포를 시작했습니다.'})
+
+
+@app.route('/admin/deploy_status')
+def admin_deploy_status():
+    """배포 진행 상태 조회(프런트 폴링용). state: idle|queued|running|restarting|success|no-change|merge-failed|restart-failed|error"""
+    return jsonify(_read_deploy_status())
 
 
 @app.route('/api/export.xlsx')
