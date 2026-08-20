@@ -85,6 +85,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'api_add_institution', 'api_delete_institution',   # 기관 추가/삭제
     'admin_visitors', 'api_visit_stats', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
     'admin_deploy', 'admin_deploy_status',   # 서버 배포/상태(연금컨설팅팀 전용)
+    'admin_refresh_bond_rates',  # 시장금리 수동 갱신(연금컨설팅팀 전용)
 }
 
 
@@ -1090,6 +1091,95 @@ def api_bond_rates():
             return jsonify(json.load(f))
     except Exception:
         return jsonify(_BOND_DEFAULT)
+
+
+ECOS_KEY_FILE = os.path.join(BASE_DIR, 'ecos_key.txt')
+
+
+def _ecos_key():
+    k = (os.environ.get('ECOS_API_KEY') or '').strip()
+    if k:
+        return k
+    try:
+        with open(ECOS_KEY_FILE, encoding='utf-8') as f:
+            return f.read().strip()
+    except Exception:
+        return ''
+
+
+def fetch_bond_rates():
+    """ECOS 817Y002(시장금리 일별)에서 국고채1·3년/회사채AA-/CD91일 최신값 → bond_rates.json 갱신.
+    항목은 코드가 아니라 ITEM_NAME1(국고채+1년 등)으로 매칭해 코드 변경에 견고하게 처리."""
+    import datetime as _dt
+    import requests as _rq
+    key = _ecos_key()
+    if not key:
+        logger.warning('ECOS_API_KEY 미설정 — 시장금리 갱신 건너뜀(ecos_key.txt 또는 환경변수)')
+        return False
+    end = _dt.date.today()
+    start = end - _dt.timedelta(days=14)
+    url = ('https://ecos.bok.or.kr/api/StatisticSearch/%s/json/kr/1/700/817Y002/D/%s/%s'
+           % (key, start.strftime('%Y%m%d'), end.strftime('%Y%m%d')))
+    try:
+        j = _rq.get(url, timeout=20).json()
+    except Exception:
+        logger.exception('ECOS 요청 실패')
+        return False
+    rows = (j.get('StatisticSearch') or {}).get('row') or []
+    if not rows:
+        logger.warning('ECOS 응답에 데이터 없음(키/파라미터 확인): %s', str(j)[:200])
+        return False
+
+    def pick(pred):
+        cand = []
+        for x in rows:
+            if pred(x.get('ITEM_NAME1', '')):
+                try:
+                    cand.append((x.get('TIME', ''), float(x['DATA_VALUE'])))
+                except Exception:
+                    continue
+        if not cand:
+            return None
+        cand.sort()
+        return round(cand[-1][1], 3), cand[-1][0]
+
+    targets = {
+        'ktb1':   lambda n: '국고채' in n and '1년' in n,
+        'ktb3':   lambda n: '국고채' in n and '3년' in n,
+        'corpAA': lambda n: '회사채' in n and 'AA-' in n,
+        'cd91':   lambda n: 'CD' in n and '91' in n,
+    }
+    rates, latest = {}, ''
+    for k, pred in targets.items():
+        got = pick(pred)
+        if got:
+            rates[k] = got[0]
+            latest = max(latest, got[1])
+    if not rates:
+        logger.warning('ECOS 항목 매칭 실패(ITEM_NAME1 확인)')
+        return False
+    date_str = '%s-%s-%s' % (latest[:4], latest[4:6], latest[6:8]) if len(latest) == 8 else ''
+    out = {'date': date_str, 'rates': rates,
+           'updated': _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    try:
+        with open(BOND_RATES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False)
+        logger.info('시장금리 갱신 완료: %s', out)
+        return True
+    except Exception:
+        logger.exception('bond_rates 저장 실패')
+        return False
+
+
+@app.route('/admin/refresh_bond_rates', methods=['POST'])
+def admin_refresh_bond_rates():
+    if fetch_bond_rates():
+        try:
+            with open(BOND_RATES_FILE, encoding='utf-8') as f:
+                return jsonify({'success': True, 'data': json.load(f)})
+        except Exception:
+            return jsonify({'success': True})
+    return jsonify({'success': False, 'message': 'ECOS 갱신 실패 — 서버 로그/키 확인'}), 500
 
 
 @app.route('/api/cpi')
@@ -2204,6 +2294,10 @@ def scheduled_job():
             req.post(f'http://localhost:{PORT}/api/refresh', timeout=300)
         except Exception:
             logger.exception('스케줄 실행 오류')
+        try:
+            fetch_bond_rates()   # 시장금리 4종(ECOS) 갱신
+        except Exception:
+            logger.exception('시장금리(ECOS) 갱신 오류')
 
 
 if __name__ == '__main__':
@@ -2219,6 +2313,11 @@ if __name__ == '__main__':
         logger.info('스케줄러 시작: 매일 오전 8시 자동 조회')
     except ImportError:
         logger.warning('APScheduler 미설치')
+
+    try:   # 시작 직후 시장금리 1회 갱신(키 있으면)
+        threading.Thread(target=fetch_bond_rates, daemon=True).start()
+    except Exception:
+        logger.exception('시장금리 시작갱신 실패')
 
     from waitress import serve
     serve(app, host='0.0.0.0', port=PORT)

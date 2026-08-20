@@ -76,3 +76,6 @@ _*.xlsx
 백업/
 *_backup_*.py
 *_backup_*.html
+
+# ECOS API 키(비밀 — 커밋 금지)
+ecos_key.txt
