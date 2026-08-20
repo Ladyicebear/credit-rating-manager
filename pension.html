@@ -369,6 +369,13 @@
     .mind-title .i{width:15px;height:15px;border-radius:50%;background:#C7CFDD;color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:800}
     .mind{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
     .mind-c{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:12px 6px 11px;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:0 2px 8px rgba(16,24,40,.04)}
+    /* 순환 카드(국고채1·3년/회사채AA-/CD91일 10초 전환) */
+    .mind-bond{position:relative;overflow:hidden}
+    .mbond-inner{transition:opacity .28s ease, transform .28s ease;width:100%}
+    .mbond-inner .mind-l{white-space:nowrap;font-size:11.5px}
+    .mbond-dots{display:flex;gap:4px;justify-content:center;margin-top:9px}
+    .mbond-dots i{width:5px;height:5px;border-radius:50%;background:#D5DBE4;transition:all .25s}
+    .mbond-dots i.on{background:#F58220;width:15px;border-radius:3px}
     .mind-l{font-size:11px;color:#5A6474;font-weight:700;letter-spacing:-.4px;white-space:nowrap}
     .mind-v{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:-.8px;margin-top:8px;line-height:1;font-variant-numeric:tabular-nums}
     .mind-d{font-size:10px;color:#8A92A0;font-weight:600;margin-top:7px;white-space:nowrap;letter-spacing:-.3px}
@@ -540,7 +547,10 @@
     <div class="mind">
       <div class="mind-c"><div class="mind-l">한국은행 기준금리</div><div class="mind-v" id="mBok">–</div><div class="mind-d" id="mBokWhen">–</div><button class="mind-b" onclick="showBaseRateGraph()">그래프 보기</button></div>
       <div class="mind-c"><div class="mind-l">물가상승률</div><div class="mind-v" id="mCpi">–</div><div class="mind-d" id="mCpiWhen">–</div><button class="mind-b" onclick="showCpiGraph()">그래프 보기</button></div>
-      <div class="mind-c"><div class="mind-l">국고채 금리1년</div><div class="mind-v">3.37%</div><div class="mind-d">2026년 08월 07일</div></div>
+      <div class="mind-c mind-bond" id="mBondCard">
+        <div class="mbond-inner" id="mBondInner"><div class="mind-l" id="mBondL">국고채 금리 1년</div><div class="mind-v" id="mBondV">–</div><div class="mind-d" id="mBondD">–</div></div>
+        <div class="mbond-dots" id="mBondDots"></div>
+      </div>
     </div>
   </div>
 
@@ -2287,5 +2297,31 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   fetch('/api/cpi').then(r=>r.json()).then(d=>{ cpiData=d; if(curRows.length) renderSummary(); }).catch(()=>{});
   fetch('/api/rate_history').then(r=>r.json()).then(d=>{ try{ baseRateRows=d.sheets.Sheet2.rows; if(curRows.length) renderSummary(); }catch(e){} }).catch(()=>{});
   fetch('/api/issue_suspension').then(r=>r.json()).then(d=>{ issueSuspension=d||{}; }).catch(()=>{});
+})();
+/* ── 이달의 주요지표: 시장금리 4종 10초 순환 카드(국고채1·3년/회사채AA-/CD91일) ── */
+(function(){
+  const KEYS=[['ktb1','국고채 금리 1년'],['ktb3','국고채 금리 3년'],['corpAA','회사채(무보증3년) AA-'],['cd91','CD수익률 91일']];
+  let idx=0, data=null, started=false;
+  function paint(){
+    const inner=document.getElementById('mBondInner'); if(!inner||!data) return;
+    const k=KEYS[idx][0], label=KEYS[idx][1];
+    const v=data.rates ? data.rates[k] : null;
+    inner.style.opacity='0'; inner.style.transform='translateY(-10px)';
+    setTimeout(function(){
+      const L=document.getElementById('mBondL'),V=document.getElementById('mBondV'),D=document.getElementById('mBondD');
+      if(L)L.textContent=label;
+      if(V)V.textContent=(v!=null)?Number(v).toFixed(2)+'%':'–';
+      if(D)D.textContent=data.date?String(data.date).replace(/-/g,'.'):'';
+      const dots=document.getElementById('mBondDots');
+      if(dots)dots.innerHTML=KEYS.map(function(_,i){return '<i class="'+(i===idx?'on':'')+'"></i>';}).join('');
+      inner.style.opacity='1'; inner.style.transform='translateY(0)';
+    },260);
+  }
+  function start(){
+    if(started) return; started=true;
+    fetch('/api/bond_rates').then(function(r){return r.json();}).then(function(d){data=d;idx=0;paint();}).catch(function(){});
+    setInterval(function(){ idx=(idx+1)%KEYS.length; paint(); },10000);
+  }
+  if(document.readyState!=='loading') start(); else document.addEventListener('DOMContentLoaded',start);
 })();
 </script>

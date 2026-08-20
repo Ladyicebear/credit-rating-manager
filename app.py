@@ -1075,6 +1075,23 @@ def _cpi_graph_points(d):
     return pts
 
 
+# ── 시장금리 4종(국고채1·3년·회사채AA-·CD91일) — 주요지표 순환 카드용 ──
+#   data/bond_rates.json 을 매일 갱신(스케줄러/스크래퍼). 파일 없으면 기본값 반환.
+BOND_RATES_FILE = os.path.join(DATA_DIR, 'bond_rates.json')
+_BOND_DEFAULT = {'date': '2026-08-20',
+                 'rates': {'ktb1': 3.404, 'ktb3': 3.811, 'corpAA': 4.504, 'cd91': 2.90},
+                 'updated': ''}
+
+
+@app.route('/api/bond_rates')
+def api_bond_rates():
+    try:
+        with open(BOND_RATES_FILE, encoding='utf-8') as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify(_BOND_DEFAULT)
+
+
 @app.route('/api/cpi')
 def cpi_rate():
     """지표누리 e-나라지표 소비자물가지수에서 최신월 소비자물가 상승률(전년동월비)과 전월대비 변동을 반환."""
