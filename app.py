@@ -1183,10 +1183,18 @@ def admin_refresh_bond_rates():
     return jsonify({'success': False, 'message': 'ECOS 갱신 실패 — 서버 로그/키 확인'}), 500
 
 
-# ── 약관·상품설명서 관리 (상품제공기관별 PDF) ─────────────────────────
+# ── 약관·상품설명서 관리 (상품제공기관별 PDF · 종류별 다중 파일) ─────────
 DOC_DIR = os.path.join(BASE_DIR, 'doc_files')
 DOCS_META_FILE = os.path.join(DATA_DIR, 'docs_meta.json')
 DOC_KINDS = ('약관', '상품설명서')
+# ZIP/업로드 기관명 → 시스템 등록명 별칭
+_DOC_ALIAS = {
+    'SC은행': 'SC제일은행', 'DB저축은행': '디비저축은행', 'IBK저축은행': '아이비케이저축은행',
+    'JT친애저축은행': '제이티친애저축은행', 'NH저축은행': '엔에이치저축은행',
+    'IBK연금보험': '아이비케이연금보험', '우정사업본부': '우체국',
+}
+# 신용등급 목록엔 없지만 상품설명서용으로 추가하는 상품제공기관
+_EXTRA_DOC_ORGS = [('증권', '우리투자증권'), ('기타', '우체국')]
 
 
 def _load_docs_meta():
@@ -1204,7 +1212,12 @@ def _save_docs_meta(m):
 
 
 def _org_key(name):
-    return re.sub(r'[\/:*?"<>|]+', '_', str(name)).strip() or '_'
+    return re.sub(r'[\\/:*?"<>|]+', '_', str(name)).strip() or '_'
+
+
+def _safe_fname(fn):
+    fn = re.sub(r'[\\/:*?"<>|]+', '_', os.path.basename(str(fn))).strip()
+    return fn or 'file.pdf'
 
 
 def _all_institutions():
@@ -1212,7 +1225,25 @@ def _all_institutions():
     for cat, items in load_institutions().items():
         for it in items:
             out.append((cat, it['name'] if isinstance(it, dict) else it))
+    have = {n for _, n in out}
+    for cat, nm in _EXTRA_DOC_ORGS:
+        if nm not in have:
+            out.append((cat, nm))
+            have.add(nm)
     return out
+
+
+def _doc_add(meta, org, kind, orig_filename, data_bytes):
+    """org/kind 리스트에 파일 추가(동일 저장명은 교체). 실제 파일도 저장."""
+    d = os.path.join(DOC_DIR, _org_key(org), kind)
+    os.makedirs(d, exist_ok=True)
+    stored = _safe_fname(orig_filename)
+    with open(os.path.join(d, stored), 'wb') as out:
+        out.write(data_bytes)
+    lst = meta.setdefault(org, {}).setdefault(kind, [])
+    lst[:] = [x for x in lst if x.get('stored') != stored]
+    lst.append({'filename': os.path.basename(orig_filename), 'stored': stored,
+                'uploaded': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
 
 
 @app.route('/docs')
@@ -1228,9 +1259,9 @@ def api_docs_list():
         e = meta.get(nm, {})
         row = {'org': nm, 'cat': cat}
         for k in DOC_KINDS:
-            info = e.get(k)
-            row[k] = {'filename': info.get('filename'), 'uploaded': info.get('uploaded')} if info else None
-            if info:
+            files = e.get(k) or []
+            row[k] = [{'filename': x.get('filename'), 'stored': x.get('stored')} for x in files]
+            if files:
                 reg[k] += 1
         items.append(row)
     return jsonify({'total': len(items), 'registered': reg, 'items': items})
@@ -1245,12 +1276,8 @@ def api_docs_upload():
         return jsonify({'success': False, 'message': '잘못된 요청'}), 400
     if not f.filename.lower().endswith('.pdf'):
         return jsonify({'success': False, 'message': 'PDF 파일만 업로드할 수 있습니다'}), 400
-    d = os.path.join(DOC_DIR, _org_key(org))
-    os.makedirs(d, exist_ok=True)
-    f.save(os.path.join(d, kind + '.pdf'))
     meta = _load_docs_meta()
-    meta.setdefault(org, {})[kind] = {'filename': f.filename,
-                                      'uploaded': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    _doc_add(meta, org, kind, f.filename, f.read())
     _save_docs_meta(meta)
     return jsonify({'success': True, 'filename': f.filename})
 
@@ -1259,14 +1286,15 @@ def api_docs_upload():
 def api_docs_download():
     org = (request.args.get('org') or '').strip()
     kind = (request.args.get('kind') or '').strip()
+    stored = _safe_fname(request.args.get('stored') or '')
     if kind not in DOC_KINDS:
         return jsonify({'success': False, 'message': '잘못된 요청'}), 400
-    info = _load_docs_meta().get(org, {}).get(kind)
-    path = os.path.join(DOC_DIR, _org_key(org), kind + '.pdf')
+    files = _load_docs_meta().get(org, {}).get(kind) or []
+    info = next((x for x in files if x.get('stored') == stored), None)
+    path = os.path.join(DOC_DIR, _org_key(org), kind, stored)
     if not info or not os.path.exists(path):
         return jsonify({'success': False, 'message': '파일이 없습니다'}), 404
-    return send_file(path, as_attachment=True,
-                     download_name=info.get('filename') or (org + '_' + kind + '.pdf'))
+    return send_file(path, as_attachment=True, download_name=info.get('filename') or stored)
 
 
 @app.route('/api/docs/delete', methods=['POST'])
@@ -1274,17 +1302,21 @@ def api_docs_delete():
     d = request.get_json(silent=True) or {}
     org = (d.get('org') or '').strip()
     kind = (d.get('kind') or '').strip()
+    stored = _safe_fname(d.get('stored') or '')
     if kind not in DOC_KINDS:
         return jsonify({'success': False}), 400
     try:
-        pth = os.path.join(DOC_DIR, _org_key(org), kind + '.pdf')
-        if os.path.exists(pth):
-            os.remove(pth)
+        p = os.path.join(DOC_DIR, _org_key(org), kind, stored)
+        if os.path.exists(p):
+            os.remove(p)
     except Exception:
         logger.exception('문서 삭제 실패')
     meta = _load_docs_meta()
-    if org in meta and kind in meta[org]:
-        del meta[org][kind]
+    lst = (meta.get(org, {}) or {}).get(kind)
+    if lst:
+        meta[org][kind] = [x for x in lst if x.get('stored') != stored]
+        if not meta[org][kind]:
+            del meta[org][kind]
         if not meta[org]:
             del meta[org]
         _save_docs_meta(meta)
@@ -1298,6 +1330,26 @@ def _zip_name(zi):
         return zi.filename.encode('cp437').decode('cp949')
     except Exception:
         return zi.filename
+
+
+def _resolve_org(name, orgs):
+    # 1) 별칭(ZIP 짧은이름 → 시스템 정식명)
+    for zipname, sysname in _DOC_ALIAS.items():
+        if zipname in name:
+            return sysname
+    # 2) 시스템 정식명이 파일경로에 그대로 포함
+    hit = next((o for o in orgs if o in name), None)
+    if hit:
+        return hit
+    # 3) 대괄호/괄호 안 기관명 추출 → 공백 제거 후 양방향 부분매칭
+    m = re.search(r'[\[\(]\s*([^\]\)]+?)\s*[\]\)]', name)
+    if m:
+        bn = m.group(1).replace(' ', '')
+        for o in orgs:
+            on = o.replace(' ', '')
+            if bn and (bn in on or on in bn):
+                return o
+    return None
 
 
 @app.route('/api/docs/bulk', methods=['POST'])
@@ -1321,18 +1373,22 @@ def api_docs_bulk():
         base = os.path.basename(name)
         if not base.lower().endswith('.pdf'):
             continue
-        kind = '약관' if '약관' in name else ('상품설명서' if '설명서' in name else None)
-        org = next((o for o in orgs if o in name), None)
-        if not org or not kind:
+        if '설명서' in name or '셜명서' in name:      # 오타(셜명서) 보정
+            kind = '상품설명서'
+        elif ('약관' in name or '특약' in name):
+            kind = '약관'
+        else:
             unmatched.append(base)
             continue
-        dd = os.path.join(DOC_DIR, _org_key(org))
-        os.makedirs(dd, exist_ok=True)
-        with open(os.path.join(dd, kind + '.pdf'), 'wb') as out:
-            out.write(z.read(zi))
-        meta.setdefault(org, {})[kind] = {'filename': base,
-                                          'uploaded': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        matched.append(org + ' · ' + kind)
+        org = _resolve_org(name, orgs)
+        if not org:
+            unmatched.append(base)
+            continue
+        # SC제일은행: 약관에는 '특약'만 등록(기본약관·거치식약관 제외)
+        if org == 'SC제일은행' and kind == '약관' and '특약' not in name:
+            continue
+        _doc_add(meta, org, kind, base, z.read(zi))
+        matched.append(org + ' · ' + kind + ' · ' + base)
     _save_docs_meta(meta)
     return jsonify({'success': True, 'count': len(matched),
                     'matched': matched, 'unmatched': unmatched})
