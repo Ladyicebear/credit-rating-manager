@@ -284,7 +284,7 @@
   .prop-card{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;
     box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
   .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line)}
-  .prop-head .prop-title{font-size:12.5px;font-weight:800;color:#F58220;letter-spacing:-.3px}  /* ELB 카드 제목과 동일 주황 */
+  .prop-head .prop-title{font-size:12.5px;font-weight:800;color:var(--navy);letter-spacing:-.3px}  /* 네이비 */
   .prop-head .prop-hint{font-size:10.5px;color:var(--muted);font-weight:600;margin-left:auto}
   /* 공지 버튼(모바일 제안카드) */
   .prop-head .prop-notice-btn{background:#E7E9ED;color:#5A6474;border:none;border-radius:7px;
@@ -1170,10 +1170,10 @@ function renderSummary(){
         : `<div class="bok-rate" style="color:#C9CED6">–</div><div class="bok-when">${String(curMonth||'').replace('-','년 ')}월</div>`)+
     `</div>`;
   $('stats').innerHTML=
-    `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DB제도 최고금리</div>${tbl('db')}</div>`+
+    `<div class="sv-box"><div class="sv-title" style="color:#F58220">DB제도 최고금리</div>${tbl('db')}</div>`+
     `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">DC/IRP제도 최고금리</div>${tbl('dc')}</div>`+
     `<div class="sv-col">`+
-      `<div class="sv-box"><div class="sv-title" style="color:var(--navy)">디폴트옵션 최고금리</div>${defTbl}</div>`+
+      `<div class="sv-box"><div class="sv-title" style="color:#F58220">디폴트옵션 최고금리</div>${defTbl}</div>`+
       `<div class="sv-row2">`+bokBox+cpiBox+`</div>`+
     `</div>`;
   renderMobileIndicators();   // 모바일 3카드(이번달 주요 지표) 동기화
