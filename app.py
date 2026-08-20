@@ -1146,7 +1146,7 @@ def fetch_bond_rates():
     targets = {
         'ktb1':   lambda n: '국고채' in n and '1년' in n,
         'ktb3':   lambda n: '국고채' in n and '3년' in n,
-        'corpAA': lambda n: '회사채' in n and 'AA-' in n,
+        'corpAA': lambda n: '회사채' in n and 'AA-' in n and '민평' not in n,  # KOFIA 최종호가(민간평가 제외)
         'cd91':   lambda n: 'CD' in n and '91' in n,
     }
     rates, latest = {}, ''
