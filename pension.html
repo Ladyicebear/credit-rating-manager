@@ -549,12 +549,12 @@
     <div class="elb-head">
       <img class="elb-logo" src="/static/images/mirae_m.png" alt="M">
       <span class="elb-title">미래에셋증권 ELB 금리</span>
-      <span class="elb-asof">2026.08 기준</span>
+      <span class="elb-asof" id="elbAsof">2026.08 기준</span>
     </div>
     <div class="elb-tblwrap">
       <table class="elb-tbl">
         <thead><tr><th>3개월</th><th>1년</th><th>1.5년</th><th>2년</th><th>3년</th></tr></thead>
-        <tbody><tr><td>3.30%</td><td>3.45%</td><td>3.55%</td><td>3.65%</td><td>3.65%</td></tr></tbody>
+        <tbody><tr><td id="elb3">–</td><td id="elb12">–</td><td id="elb18">–</td><td id="elb24">–</td><td id="elb36">–</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1203,6 +1203,7 @@ function render(){
 
   // 이달의 제안 가능 상품(모바일 전용) — 데스크톱에선 숨김
   renderProposalMobile();
+  renderElbCard();               // 미래에셋증권 ELB 금리(금리표 실데이터)
 
   // 앱(모바일): 넓은 그리드 대신 5열 압축표(업권·상품제공기관·상품구분·기간·금리)
   if(isMobileView()){
@@ -1564,6 +1565,19 @@ async function loadProposalData(){
     ]);
     proposalsAll=pr||{}; proposalMeta=mt||{};
   }catch(e){ proposalsAll={}; proposalMeta={}; }
+}
+/* 미래에셋증권 ELB 금리: 금리표 실데이터(curRows)에서 기간별 금리를 가져와 채움 */
+function renderElbCard(){
+  const g = (curRows||[]).find(r=> r && r.sector==='증권' && /미래에셋/.test(r.org||'') && /ELB/.test(r.fam||''));
+  const map = {3:'elb3',12:'elb12',18:'elb18',24:'elb24',36:'elb36'};
+  const rateOf = m => {
+    if(!g) return '–';
+    const v = (g.db && g.db[m]!=null) ? g.db[m] : (g.dc && g.dc[m]!=null ? g.dc[m] : null);
+    return (v!=null) ? Number(v).toFixed(2)+'%' : '–';
+  };
+  Object.keys(map).forEach(m=>{ const el=document.getElementById(map[m]); if(el) el.textContent=rateOf(+m); });
+  const asof=document.getElementById('elbAsof');
+  if(asof && curMonth) asof.textContent = String(curMonth).replace('-','.')+' 기준';
 }
 function renderProposalMobile(){
   const card=$('proposalMobile');
