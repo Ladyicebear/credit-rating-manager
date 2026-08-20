@@ -281,7 +281,17 @@ tr.row-done td{transition:background .3s}
 .ldot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:3px}
 
 /* ── 휴대폰(앱형) 반응형 : 데스크톱 웹 형태는 그대로, 모바일만 재구성 ── */
+.app-tabbar{display:none}   /* 하단 탭바: 데스크톱 숨김 */
 @media(max-width:768px){
+  /* ── 앱형 하단 고정 탭바 ── */
+  .app-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;
+              background:#fff;border-top:1px solid #EAECEF;box-shadow:0 -2px 12px rgba(16,24,40,.06);
+              padding:7px 2px calc(7px + env(safe-area-inset-bottom))}
+  .app-tabbar .tab-item{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;
+              background:none;border:none;font-family:inherit;cursor:pointer;color:#9AA2AE;padding:3px 1px}
+  .app-tabbar .tab-item svg{width:22px;height:22px;flex:0 0 auto}
+  .app-tabbar .tab-item span{font-size:10px;font-weight:700;letter-spacing:-.4px;white-space:nowrap}
+  .app-tabbar .tab-item.active{color:#F58220}
   body{font-size:12.5px;background:#fff}   /* 앱 배경 회색 → 흰색 */
   .hdr{padding:9px 13px 0;background:#fff}   /* 헤더 하단 회색 → 흰색 */
   /* 헤더: 제목·Goun로고·로그아웃을 한 줄에(제목 축소로 맞춤) */
@@ -363,7 +373,7 @@ tr.row-done td{transition:background .3s}
   .main .tbl-wrap{border:1px solid #E5E7EB;border-radius:12px}
   .rating-search{margin-left:0;flex:1 1 120px;min-width:112px;gap:5px}
   .rating-search input{width:auto;flex:1 1 auto;min-width:0;padding:7px 10px;font-size:13px}
-  .main{padding:10px 10px 12px}   /* 하단 패딩 축소: 5행+등급유형 범례가 페이지 스크롤 없이 보이도록 */
+  .main{padding:10px 10px 78px}   /* 하단 탭바 높이만큼 여백 확보 */
   .form-row{grid-template-columns:1fr}
   /* 신용등급 표(모바일): 기관명(+최종등급 주황박스) + 3평가사만, 한 화면 폭에 맞춤(스크롤 없음) */
   table{font-size:.72rem}
@@ -935,7 +945,8 @@ function pollDeploy(){
 function fitPensionFrame(){
   const hdr = document.querySelector('.hdr');
   if(!hdr) return;
-  const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height)) + 'px';
+  const tabbar = (window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? 64 : 0;
+  const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height) - tabbar) + 'px';
   ['pension-frame','proposal-frame','visitors-frame'].forEach(id=>{
     const fr = document.getElementById(id);
     if(fr) fr.style.height = h;
@@ -1352,6 +1363,38 @@ function showToast(msg,type='info',dur=3200){
   if(dur>0)_tt=setTimeout(hideToast,dur);
 }
 function hideToast(){document.getElementById('toast').className=''}
+/* ── 하단 탭바: 홈·금리현황→원리금, 신용등급→신용등급, 약관·마이페이지→준비중 ── */
+function tabbarGo(which, el){
+  document.querySelectorAll('#appTabbar .tab-item').forEach(function(b){ b.classList.remove('active'); });
+  if(el) el.classList.add('active');
+  if(which==='home' || which==='rate'){
+    if(typeof switchSuper==='function') switchSuper('pension');
+    if(which==='home'){ try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); } }
+  } else if(which==='credit'){
+    if(typeof switchSuper==='function') switchSuper('credit');
+  } else {
+    if(typeof showToast==='function') showToast('준비 중입니다','ok');
+  }
+}
 </script>
+
+<!-- ── 앱형 하단 고정 탭바(모바일 전용) ── -->
+<nav class="app-tabbar" id="appTabbar">
+  <button class="tab-item active" data-tab="home" onclick="tabbarGo('home',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.7 12 3l9 7.7"/><path d="M5.2 9.6V20h13.6V9.6"/></svg><span>홈</span>
+  </button>
+  <button class="tab-item" data-tab="rate" onclick="tabbarGo('rate',this)">
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="13" width="4" height="7" rx="1"/><rect x="10" y="9" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg><span>금리현황</span>
+  </button>
+  <button class="tab-item" data-tab="credit" onclick="tabbarGo('credit',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.3v5.4c0 4.6 3.2 7.9 7.5 9.3 4.3-1.4 7.5-4.7 7.5-9.3V5.3L12 2.5Z"/><path d="m8.7 11.9 2.2 2.2 4.4-4.5"/></svg><span>신용등급</span>
+  </button>
+  <button class="tab-item" data-tab="docs" onclick="tabbarGo('docs',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg><span>약관·설명서</span>
+  </button>
+  <button class="tab-item" data-tab="my" onclick="tabbarGo('my',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6.2 8-6.2s8 2.2 8 6.2"/></svg><span>마이페이지</span>
+  </button>
+</nav>
 </body>
 </html>
