@@ -336,6 +336,7 @@
   /* 이번달 주요 지표(모바일 전용 3카드) — 데스크톱 숨김 */
   .mind-wrap{display:none}
   .biz-mobile{display:none}
+  .elb-card{display:none}
 
   @media(max-width:640px){
     /* CI 색상(미래에셋)은 '내가 추가한' 주요지표·사업자금리현황 영역에만 적용
@@ -349,6 +350,21 @@
     .prop-scroll,.sv-scroll,.stats,.biz-list,.biz-mobile{overflow-x:hidden}
     /* 이번달 주요 지표(모바일 3카드) */
     .mind-wrap{display:block;margin:2px 0 12px}
+    /* ── 미래에셋증권 ELB 금리 카드 (모바일 전용) ── */
+    .elb-card{display:block;background:var(--white);border:1px solid var(--line);border-radius:14px;
+              padding:13px 14px 14px;margin:0 0 12px;box-shadow:0 2px 8px rgba(16,24,40,.04)}
+    .elb-head{display:flex;align-items:center;gap:7px;margin-bottom:12px}
+    .elb-logo{width:24px;height:24px;flex:0 0 auto;display:block;object-fit:contain}
+    .elb-title{font-size:13px;font-weight:800;color:#F58220;letter-spacing:-.3px}
+    .elb-asof{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--navy);
+              border:1px solid #C3D0E0;border-radius:12px;padding:3px 10px;white-space:nowrap}
+    .elb-tblwrap{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+    .elb-tbl{width:100%;border-collapse:collapse;table-layout:fixed}
+    .elb-tbl th{background:#F2F4F6;color:#7A828E;font-weight:700;font-size:11.5px;
+                padding:8px 2px;text-align:center;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .elb-tbl td{color:#123E7C;font-weight:800;font-size:13.5px;
+                padding:12px 2px;text-align:center;border-right:1px solid var(--line)}
+    .elb-tbl th:last-child,.elb-tbl td:last-child{border-right:none}
     .mind-title{font-size:12.5px;font-weight:800;color:var(--navy);letter-spacing:-.3px;display:flex;align-items:center;gap:5px;margin:0 2px 10px}
     .mind-title .i{width:15px;height:15px;border-radius:50%;background:#C7CFDD;color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:800}
     .mind{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
@@ -525,6 +541,21 @@
       <div class="mind-c"><div class="mind-l">한국은행 기준금리</div><div class="mind-v" id="mBok">–</div><div class="mind-d" id="mBokWhen">–</div><button class="mind-b" onclick="showBaseRateGraph()">그래프 보기</button></div>
       <div class="mind-c"><div class="mind-l">물가상승률</div><div class="mind-v" id="mCpi">–</div><div class="mind-d" id="mCpiWhen">–</div><button class="mind-b" onclick="showCpiGraph()">그래프 보기</button></div>
       <div class="mind-c"><div class="mind-l">국고채 금리1년</div><div class="mind-v">3.37%</div><div class="mind-d">2026년 08월 07일</div></div>
+    </div>
+  </div>
+
+  <!-- 미래에셋증권 ELB 금리 (모바일 전용, 고정 표기) -->
+  <div class="elb-card" id="elbCard">
+    <div class="elb-head">
+      <img class="elb-logo" src="/static/images/mirae_m.png" alt="M">
+      <span class="elb-title">미래에셋증권 ELB 금리</span>
+      <span class="elb-asof">2026.08 기준</span>
+    </div>
+    <div class="elb-tblwrap">
+      <table class="elb-tbl">
+        <thead><tr><th>3개월</th><th>1년</th><th>1.5년</th><th>2년</th><th>3년</th></tr></thead>
+        <tbody><tr><td>3.30%</td><td>3.45%</td><td>3.55%</td><td>3.65%</td><td>3.65%</td></tr></tbody>
+      </table>
     </div>
   </div>
 
