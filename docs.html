@@ -164,7 +164,10 @@ function bulk(file){
   if(!/\.zip$/i.test(file.name)){ toast('ZIP 파일을 올려주세요','err'); return; }
   const fd=new FormData(); fd.append('file',file);
   toast('ZIP 분석·업로드 중… 잠시만요');
-  fetch('/api/docs/bulk',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+  fetch('/api/docs/bulk',{method:'POST',body:fd}).then(r=>{
+    if(!r.ok) throw new Error('HTTP '+r.status+(r.status===413?' 파일 용량 초과':''));
+    return r.json();
+  }).then(d=>{
     if(!d.success){ toast(d.message||'일괄 업로드 실패','err'); return; }
     const ok=(d.matched||[]).map(m=>`<div class="ml">✓ ${esc(m)}</div>`).join('')||'<div class="ml">등록된 항목 없음</div>';
     const un=(d.unmatched||[]).map(m=>`<div class="ml un">✗ ${esc(m)} — 기관/종류 인식 실패</div>`).join('');
@@ -172,7 +175,7 @@ function bulk(file){
     document.getElementById('resBody').innerHTML=ok+(un?('<hr style="border:none;border-top:1px solid #eee;margin:10px 0">'+un):'');
     document.getElementById('resultOv').classList.add('open');
     load();
-  }).catch(()=>toast('일괄 업로드 실패','err'));
+  }).catch(e=>toast('일괄 업로드 실패: '+(e.message||'네트워크')+' — 큰 zip은 서버 업로드 제한일 수 있어요','err'));
 }
 load();
 </script>

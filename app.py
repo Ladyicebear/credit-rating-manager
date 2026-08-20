@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024   # 업로드 최대 300MB(약관 ZIP 등)
 # 세션 쿠키 서명 키. 배포 시엔 반드시 SECRET_KEY 환경변수로 고정값 지정
 # (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
@@ -1251,6 +1252,11 @@ def docs_page():
     return send_file(os.path.join(BASE_DIR, 'docs.html'))
 
 
+@app.route('/docs_mobile')
+def docs_mobile_page():
+    return send_file(os.path.join(BASE_DIR, 'docs_mobile.html'))
+
+
 @app.route('/api/docs')
 def api_docs_list():
     meta = _load_docs_meta()
@@ -1352,44 +1358,56 @@ def _resolve_org(name, orgs):
     return None
 
 
-@app.route('/api/docs/bulk', methods=['POST'])
-def api_docs_bulk():
+def classify_zip(data_bytes):
+    """ZIP 바이트 → 기관/종류 자동 분류 후 저장. (matched, unmatched) 반환.
+    HTTP 업로드(용량제한)와 무관하게 서버에서 직접 호출할 수도 있음(classify_zip.py)."""
     import zipfile
     import io as _io
-    f = request.files.get('file')
-    if not f or not (f.filename or '').lower().endswith('.zip'):
-        return jsonify({'success': False, 'message': 'ZIP 파일을 올려주세요'}), 400
     orgs = sorted([nm for _, nm in _all_institutions()], key=len, reverse=True)
     meta = _load_docs_meta()
     matched, unmatched = [], []
-    try:
-        z = zipfile.ZipFile(_io.BytesIO(f.read()))
-    except Exception:
-        return jsonify({'success': False, 'message': 'ZIP을 열 수 없습니다'}), 400
+    z = zipfile.ZipFile(_io.BytesIO(data_bytes))
     for zi in z.infolist():
-        if zi.is_dir():
-            continue
-        name = _zip_name(zi)
-        base = os.path.basename(name)
-        if not base.lower().endswith('.pdf'):
-            continue
-        if '설명서' in name or '셜명서' in name:      # 오타(셜명서) 보정
-            kind = '상품설명서'
-        elif ('약관' in name or '특약' in name):
-            kind = '약관'
-        else:
-            unmatched.append(base)
-            continue
-        org = _resolve_org(name, orgs)
-        if not org:
-            unmatched.append(base)
-            continue
-        # SC제일은행: 약관에는 '특약'만 등록(기본약관·거치식약관 제외)
-        if org == 'SC제일은행' and kind == '약관' and '특약' not in name:
-            continue
-        _doc_add(meta, org, kind, base, z.read(zi))
-        matched.append(org + ' · ' + kind + ' · ' + base)
+        try:
+            if zi.is_dir():
+                continue
+            name = _zip_name(zi)
+            base = os.path.basename(name)
+            if not base.lower().endswith('.pdf'):
+                continue
+            if '설명서' in name or '셜명서' in name:      # 오타(셜명서) 보정
+                kind = '상품설명서'
+            elif ('약관' in name or '특약' in name):
+                kind = '약관'
+            else:
+                unmatched.append(base)
+                continue
+            org = _resolve_org(name, orgs)
+            if not org:
+                unmatched.append(base)
+                continue
+            # SC제일은행: 약관에는 '특약'만 등록(기본약관·거치식약관 제외)
+            if org == 'SC제일은행' and kind == '약관' and '특약' not in name:
+                continue
+            _doc_add(meta, org, kind, base, z.read(zi))
+            matched.append(org + ' · ' + kind + ' · ' + base)
+        except Exception:
+            logger.exception('ZIP 파일 처리 실패: %s', getattr(zi, 'filename', ''))
+            unmatched.append(getattr(zi, 'filename', '') or '?')
     _save_docs_meta(meta)
+    return matched, unmatched
+
+
+@app.route('/api/docs/bulk', methods=['POST'])
+def api_docs_bulk():
+    f = request.files.get('file')
+    if not f or not (f.filename or '').lower().endswith('.zip'):
+        return jsonify({'success': False, 'message': 'ZIP 파일을 올려주세요'}), 400
+    try:
+        matched, unmatched = classify_zip(f.read())
+    except Exception as e:
+        logger.exception('일괄 업로드 처리 실패')
+        return jsonify({'success': False, 'message': '처리 실패: %s' % e}), 500
     return jsonify({'success': True, 'count': len(matched),
                     'matched': matched, 'unmatched': unmatched})
 

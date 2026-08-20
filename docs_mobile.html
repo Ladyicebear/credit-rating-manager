@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>약관·상품설명서</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#F4F5F7;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#222}
+.head{background:#fff;padding:14px 15px 12px;border-bottom:1px solid #EEF0F3;position:sticky;top:0;z-index:5}
+.title{font-size:16px;font-weight:800;color:#123E7C}
+.sub{font-size:11px;color:#9aa2ae;margin-top:2px}
+.search{display:flex;align-items:center;gap:7px;border:1.5px solid #E0E3E8;border-radius:11px;padding:9px 12px;background:#fff;margin-top:11px}
+.search input{border:none;outline:none;width:100%;font-size:13.5px;font-family:inherit;background:none}
+.catbar{display:flex;gap:6px;overflow-x:auto;padding:10px 12px 4px}
+.cchip{border:1.5px solid #E0E3E8;background:#fff;color:#6B7280;border-radius:15px;padding:5px 12px;font-size:12px;font-weight:700;white-space:nowrap;flex:0 0 auto}
+.cchip.on{background:#123E7C;color:#fff;border-color:#123E7C}
+.list{padding:6px 12px 24px}
+.cat{font-size:9.5px;font-weight:800;color:#fff;border-radius:5px;padding:2px 7px}
+.row{background:#fff;border:1px solid #EAEDF1;border-radius:13px;padding:12px 13px;margin-bottom:9px;box-shadow:0 1px 5px rgba(16,24,40,.04)}
+.rname{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.oname{font-size:14.5px;font-weight:800;color:#16335B}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dbtn{border:none;border-radius:10px;padding:11px 6px;font-size:13px;font-weight:800;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer}
+.dbtn.yak{background:#EAF0F9;color:#123E7C}
+.dbtn.seol{background:#FEF0E2;color:#CB6015}
+.dbtn.off{background:#F1F3F5;color:#B6BCC4;cursor:default}
+.dbtn .cnt{font-size:10px;font-weight:800;opacity:.75}
+.empty{color:#9aa0a8;font-size:13px;text-align:center;padding:44px 20px}
+/* 바텀시트(파일 여러 개 선택) */
+.sheet-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;align-items:flex-end}
+.sheet-ov.open{display:flex}
+.sheet{background:#fff;width:100%;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto}
+.sheet h4{margin:0 0 4px;font-size:15px;color:#16335B}
+.sheet .sh-sub{font-size:11.5px;color:#9aa2ae;margin-bottom:12px}
+.sfile{display:flex;align-items:center;gap:9px;border:1px solid #E7EBF0;border-radius:10px;padding:11px 12px;margin-bottom:8px;cursor:pointer}
+.sfile .fico{font-size:9px;font-weight:900;color:#fff;background:#E0684C;border-radius:4px;padding:2px 5px;flex:0 0 auto}
+.sfile .fn{font-size:12.5px;color:#33455f;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sfile .go{color:#F58220;font-weight:800;font-size:12px;flex:0 0 auto}
+.sheet-x{width:100%;margin-top:6px;padding:12px;border:none;border-radius:10px;background:#EEF0F3;color:#5A6474;font-weight:800;font-size:14px;font-family:inherit}
+#toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:#16335B;color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:10px;z-index:60;transition:.25s}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style></head><body>
+<div class="head">
+  <div class="title">약관·상품설명서</div>
+  <div class="sub">기관을 찾아 약관·상품설명서를 받으세요</div>
+  <div class="search"><span>🔍</span><input id="q" placeholder="기관명 검색" oninput="render()"></div>
+</div>
+<div class="catbar" id="catbar"></div>
+<div class="list" id="list"></div>
+<div class="empty" id="empty" style="display:none">등록된 자료가 없습니다.</div>
+
+<div class="sheet-ov" id="sheetOv"><div class="sheet">
+  <h4 id="shTitle">파일 선택</h4><div class="sh-sub" id="shSub"></div>
+  <div id="shBody"></div>
+  <button class="sheet-x" onclick="closeSheet()">닫기</button>
+</div></div>
+<div id="toast"></div>
+
+<script>
+const CATC={'증권':'#043B72','시중은행':'#00A9CE','지방은행':'#7EA0C3','저축은행':'#84888B','손해보험':'#AD624E','생명보험':'#CB6015','기타':'#84888B'};
+let DATA=[], curCat='전체';
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(m){const e=document.getElementById('toast');e.textContent=m;e.className='show';clearTimeout(e._t);e._t=setTimeout(()=>e.className='',2000);}
+function load(){
+  fetch('/api/docs').then(r=>r.json()).then(d=>{
+    DATA=(d.items||[]).filter(x=>(x['약관']||[]).length||(x['상품설명서']||[]).length);
+    const cats=['전체',...Array.from(new Set(DATA.map(x=>x.cat)))];
+    document.getElementById('catbar').innerHTML=cats.map(c=>`<span class="cchip${c===curCat?' on':''}" onclick="setCat('${esc(c)}')">${esc(c)}</span>`).join('');
+    render();
+  }).catch(()=>toast('목록을 불러오지 못했습니다'));
+}
+function setCat(c){curCat=c;document.querySelectorAll('.cchip').forEach(e=>e.classList.toggle('on',e.textContent===c));render();}
+function btn(org,kind,files,cls,label){
+  const n=(files||[]).length;
+  if(!n) return `<button class="dbtn off">${label} <span class="cnt">없음</span></button>`;
+  return `<button class="dbtn ${cls}" onclick="tap('${esc(org)}','${kind}')">${label}${n>1?` <span class="cnt">${n}</span>`:''}</button>`;
+}
+function render(){
+  const q=(document.getElementById('q').value||'').trim().toLowerCase();
+  const rows=DATA.filter(x=>(curCat==='전체'||x.cat===curCat)&&(!q||x.org.toLowerCase().includes(q)));
+  document.getElementById('list').innerHTML=rows.map(x=>`<div class="row">
+    <div class="rname"><span class="oname">${esc(x.org)}</span><span class="cat" style="background:${CATC[x.cat]||'#84888B'}">${esc(x.cat)}</span></div>
+    <div class="btns">${btn(x.org,'약관',x['약관'],'yak','📘 약관')}${btn(x.org,'상품설명서',x['상품설명서'],'seol','📗 상품설명서')}</div>
+  </div>`).join('');
+  document.getElementById('empty').style.display=rows.length?'none':'block';
+}
+function dl(org,kind,stored){ window.location='/api/docs/download?org='+encodeURIComponent(org)+'&kind='+encodeURIComponent(kind)+'&stored='+encodeURIComponent(stored); }
+function tap(org,kind){
+  const x=DATA.find(z=>z.org===org); if(!x) return;
+  const files=x[kind]||[];
+  if(files.length===0) return;
+  if(files.length===1){ dl(org,kind,files[0].stored); toast(kind+' 다운로드'); return; }
+  // 여러 개 → 시트
+  document.getElementById('shTitle').textContent=org+' · '+kind;
+  document.getElementById('shSub').textContent='받을 파일을 선택하세요 ('+files.length+'개)';
+  document.getElementById('shBody').innerHTML=files.map(f=>`<div class="sfile" onclick="dl('${esc(org)}','${kind}','${esc(f.stored)}');closeSheet();">
+    <span class="fico">PDF</span><span class="fn">${esc(f.filename)}</span><span class="go">받기 ›</span></div>`).join('');
+  document.getElementById('sheetOv').classList.add('open');
+}
+function closeSheet(){ document.getElementById('sheetOv').classList.remove('open'); }
+document.getElementById('sheetOv').addEventListener('click',e=>{ if(e.target.id==='sheetOv') closeSheet(); });
+load();
+</script>
+</body></html>
