@@ -366,6 +366,7 @@
                 padding:12px 2px;text-align:center;border-right:1px solid var(--line)}
     .elb-tbl th:last-child,.elb-tbl td:last-child{border-right:none}
     .mind-title{font-size:12.5px;font-weight:800;color:var(--navy);letter-spacing:-.3px;display:flex;align-items:center;gap:5px;margin:0 2px 10px}
+    .mind-title .mind-ic{flex:0 0 auto}
     .mind-title .i{width:15px;height:15px;border-radius:50%;background:#C7CFDD;color:#fff;font-size:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:800}
     .mind{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
     .mind-c{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:12px 6px 11px;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:0 2px 8px rgba(16,24,40,.04)}
@@ -543,7 +544,7 @@
 
   <!-- 이번달 주요 지표(모바일 전용 3카드) — ver2 반영 -->
   <div class="mind-wrap" id="mIndWrap">
-    <div class="mind-title"><span class="i">i</span>이번달 주요 지표</div>
+    <div class="mind-title"><svg class="mind-ic" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="3.2" y="13.5" width="3.4" height="6.8" rx="1" fill="#7C848F"/><rect x="8.3" y="10" width="3.4" height="10.3" rx="1" fill="#7C848F"/><rect x="13.4" y="6.2" width="3.4" height="14.1" rx="1" fill="#7C848F"/><path d="M4.5 11.2 9.8 7 13 9.3 19.5 4" fill="none" stroke="#525A66" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.2 4 19.8 4 19.8 7.4" fill="none" stroke="#525A66" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>이번달 주요 지표</div>
     <div class="mind">
       <div class="mind-c"><div class="mind-l">한국은행 기준금리</div><div class="mind-v" id="mBok">–</div><div class="mind-d" id="mBokWhen">–</div><button class="mind-b" onclick="showBaseRateGraph()">그래프 보기</button></div>
       <div class="mind-c"><div class="mind-l">물가상승률</div><div class="mind-v" id="mCpi">–</div><div class="mind-d" id="mCpiWhen">–</div><button class="mind-b" onclick="showCpiGraph()">그래프 보기</button></div>
