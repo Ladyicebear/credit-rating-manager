@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>약관 및 상품설명서 관리</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#EEF1F5;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#222;padding:20px}
+.wrap{max-width:1080px;margin:0 auto}
+.bhead{margin-bottom:14px}
+.btitle{font-size:19px;font-weight:800;color:#123E7C;letter-spacing:-.4px}
+.bsub{font-size:12.5px;color:#8a92a0;margin-top:4px}
+.bulkzone{border:2px dashed #F1B37A;background:#FFF7EF;border-radius:12px;padding:16px 18px;font-size:14px;color:#96703f;margin-bottom:14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s}
+.bulkzone.drag{background:#FCEBD6;border-color:#EA9A4E}
+.bulkzone b{color:#7a5122}
+.btn-zip{background:#F58220;color:#fff;border:none;border-radius:9px;padding:9px 15px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
+.toolbar{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+.search{display:flex;align-items:center;gap:7px;border:1px solid #D5D9E0;border-radius:9px;padding:8px 12px;width:300px;background:#fff}
+.search input{border:none;outline:none;font-size:13.5px;width:100%;font-family:inherit;background:none}
+.tspace{flex:1}
+.prog{font-size:12.5px;color:#5A6474;font-weight:700}.prog b{color:#F58220}
+.catbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.cchip{border:1.5px solid #E0E3E8;background:#fff;color:#6B7280;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer}
+.cchip.on{background:#123E7C;color:#fff;border-color:#123E7C}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.cat{font-size:10.5px;font-weight:800;color:#fff;border-radius:6px;padding:2px 8px;white-space:nowrap}
+.icard{border:1px solid #E5E7EB;border-radius:13px;padding:14px 15px;background:#fff;box-shadow:0 2px 8px rgba(16,24,40,.04)}
+.ic-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.ic-name{font-size:15px;font-weight:800;color:#16335B}
+.st{margin-left:auto;font-size:11.5px;font-weight:800}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slot{border:1px solid #EAEEF2;border-radius:10px;padding:10px;background:#FBFCFD;transition:background .15s,border-color .15s}
+.slot.drag{background:#FFF7EF;border-color:#F1B37A}
+.slot-h{font-size:12px;font-weight:800;color:#5A6474;margin-bottom:8px}
+.ok-b{color:#1c9e6a;font-size:10.5px}.no-b{color:#B0B6BE;font-size:10.5px}
+.fchip{display:flex;align-items:center;gap:7px;background:#F4F7FB;border:1px solid #DCE6F1;border-radius:8px;padding:6px 8px;margin-bottom:8px}
+.fico{font-size:9px;font-weight:900;color:#fff;background:#E0684C;border-radius:4px;padding:2px 4px;flex:0 0 auto}
+.fname{font-size:12px;color:#123E7C;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot-act{display:flex;gap:5px}
+.mini{flex:1;border:none;background:#EAF0F6;color:#123E7C;border-radius:6px;padding:6px 2px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.mini:hover{background:#DCE6F1}
+.mini.del{background:#FCEAEA;color:#C0392B;flex:0 0 42px}
+.drop{border:1.5px dashed #CBD3DE;border-radius:8px;padding:15px 8px;text-align:center;color:#9aa2ae;font-size:12.5px;font-weight:700;cursor:pointer}
+.drop small{font-weight:500;font-size:10.5px;display:block;margin-top:3px}
+.empty-msg{color:#9aa0a8;font-size:13px;text-align:center;padding:40px}
+/* 토스트 */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
+       background:#16335B;color:#fff;font-size:13px;font-weight:700;padding:11px 18px;border-radius:10px;z-index:100;transition:.25s;max-width:90vw}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:#B23A3A}
+/* 일괄 결과 모달 */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:90;align-items:center;justify-content:center;padding:20px}
+.ov.open{display:flex}
+.ovc{background:#fff;border-radius:14px;padding:22px 24px;width:460px;max-width:100%;max-height:80vh;overflow:auto;box-shadow:0 12px 48px rgba(0,0,0,.3)}
+.ovc h3{margin:0 0 12px;font-size:16px;color:#16335B}
+.ovc .ml{font-size:12.5px;color:#333;margin:2px 0}
+.ovc .un{color:#B23A3A}
+.ovc .okbtn{margin-top:16px;width:100%;padding:11px;border:none;border-radius:9px;background:#F58220;color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit}
+</style></head><body>
+<div class="wrap">
+  <div class="bhead"><div class="btitle">약관 및 상품설명서 관리</div>
+    <div class="bsub">상품제공기관별 약관·상품설명서 PDF를 등록/교체/다운로드합니다 · 기관명 검색 지원</div></div>
+
+  <div class="bulkzone" id="bulkzone">📦 <b>ZIP 파일을 여기에 끌어다 놓으세요</b> — 폴더/파일명의 기관명으로 자동 분류(파일명에 '약관'/'상품설명서' 포함)
+    <span style="flex:1"></span><button class="btn-zip" onclick="document.getElementById('zipInput').click()">파일 선택</button></div>
+
+  <div class="toolbar">
+    <div class="search"><span>🔍</span><input id="q" placeholder="기관명 검색" oninput="render()"></div>
+    <div class="tspace"></div>
+    <div class="prog">등록 <b id="progTxt">0</b> / <span id="totTxt">0</span></div>
+  </div>
+  <div class="catbar" id="catbar"></div>
+
+  <div class="cgrid" id="grid"></div>
+  <div class="empty-msg" id="emptyMsg" style="display:none">검색 결과가 없습니다.</div>
+</div>
+
+<input type="file" id="fileInput" accept="application/pdf" style="display:none">
+<input type="file" id="zipInput" accept=".zip" style="display:none">
+<div id="toast"></div>
+<div class="ov" id="resultOv"><div class="ovc"><h3 id="resTitle">일괄 업로드 결과</h3><div id="resBody"></div>
+  <button class="okbtn" onclick="document.getElementById('resultOv').classList.remove('open')">확인</button></div></div>
+
+<script>
+const CATC={'증권':'#043B72','시중은행':'#00A9CE','지방은행':'#7EA0C3','저축은행':'#84888B','손해보험':'#AD624E','생명보험':'#CB6015','기타':'#84888B'};
+let DATA=[], curCat='전체', pending=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='show'+(type==='err'?' err':'');clearTimeout(t._t);t._t=setTimeout(()=>t.className='',2200);}
+
+function load(){
+  fetch('/api/docs').then(r=>r.json()).then(d=>{
+    DATA=d.items||[];
+    document.getElementById('totTxt').textContent=d.total||DATA.length;
+    // 업권 칩
+    const cats=['전체',...Array.from(new Set(DATA.map(x=>x.cat)))];
+    document.getElementById('catbar').innerHTML=cats.map(c=>`<span class="cchip${c===curCat?' on':''}" onclick="setCat('${esc(c)}')">${esc(c)}</span>`).join('');
+    render();
+  }).catch(()=>toast('목록을 불러오지 못했습니다','err'));
+}
+function setCat(c){curCat=c;load._cat=c;document.querySelectorAll('.cchip').forEach(e=>e.classList.toggle('on',e.textContent===c));render();}
+
+function slotHtml(org,kind,info){
+  if(info){
+    return `<div class="slot" data-org="${esc(org)}" data-kind="${kind}">
+      <div class="slot-h">${kind} <b class="ok-b">✓ 등록됨</b></div>
+      <div class="fchip"><span class="fico">PDF</span><span class="fname" title="${esc(info.filename)}">${esc(info.filename)}</span></div>
+      <div class="slot-act">
+        <button class="mini" onclick="dl('${esc(org)}','${kind}')">⬇ 다운로드</button>
+        <button class="mini" onclick="pick('${esc(org)}','${kind}')">↻ 교체</button>
+        <button class="mini del" onclick="del('${esc(org)}','${kind}')">삭제</button>
+      </div></div>`;
+  }
+  return `<div class="slot" data-org="${esc(org)}" data-kind="${kind}">
+    <div class="slot-h">${kind} <b class="no-b">미등록</b></div>
+    <div class="drop" onclick="pick('${esc(org)}','${kind}')">＋ PDF 업로드<small>클릭 또는 드래그</small></div></div>`;
+}
+function render(){
+  const q=(document.getElementById('q').value||'').trim().toLowerCase();
+  let reg=0;
+  const rows=DATA.filter(x=>(curCat==='전체'||x.cat===curCat) && (!q||x.org.toLowerCase().includes(q)));
+  DATA.forEach(x=>{ if(x['약관'])reg++; if(x['상품설명서'])reg++; });
+  document.getElementById('progTxt').textContent=reg;
+  const grid=document.getElementById('grid');
+  grid.innerHTML=rows.map(x=>{
+    const both=x['약관']&&x['상품설명서'], some=x['약관']||x['상품설명서'];
+    const st=both?['완료','#1c9e6a']:(some?['부분','#E08600']:['미등록','#B0B6BE']);
+    return `<div class="icard">
+      <div class="ic-head"><span class="ic-name">${esc(x.org)}</span>
+        <span class="cat" style="background:${CATC[x.cat]||'#84888B'}">${esc(x.cat)}</span>
+        <span class="st" style="color:${st[1]}">● ${st[0]}</span></div>
+      <div class="slots">${slotHtml(x.org,'약관',x['약관'])}${slotHtml(x.org,'상품설명서',x['상품설명서'])}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('emptyMsg').style.display=rows.length?'none':'block';
+  bindSlotDrag();
+}
+function dl(org,kind){ window.location='/api/docs/download?org='+encodeURIComponent(org)+'&kind='+encodeURIComponent(kind); }
+function pick(org,kind){ pending={org,kind}; const fi=document.getElementById('fileInput'); fi.value=''; fi.click(); }
+document.getElementById('fileInput').addEventListener('change',function(){
+  if(!this.files[0]||!pending) return;
+  uploadOne(pending.org,pending.kind,this.files[0]); pending=null;
+});
+function uploadOne(org,kind,file){
+  if(!/\.pdf$/i.test(file.name)){ toast('PDF 파일만 업로드할 수 있습니다','err'); return; }
+  const fd=new FormData(); fd.append('org',org); fd.append('kind',kind); fd.append('file',file);
+  toast(org+' · '+kind+' 업로드 중…');
+  fetch('/api/docs/upload',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    if(d.success){ toast(org+' · '+kind+' 등록 완료'); load(); }
+    else toast(d.message||'업로드 실패','err');
+  }).catch(()=>toast('업로드 실패','err'));
+}
+function del(org,kind){
+  if(!confirm(org+'의 '+kind+' PDF를 삭제할까요?')) return;
+  fetch('/api/docs/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({org,kind})})
+    .then(r=>r.json()).then(d=>{ if(d.success){toast('삭제되었습니다');load();} else toast('삭제 실패','err'); })
+    .catch(()=>toast('삭제 실패','err'));
+}
+/* 슬롯 드래그&드롭 */
+function bindSlotDrag(){
+  document.querySelectorAll('.slot').forEach(sl=>{
+    sl.addEventListener('dragover',e=>{e.preventDefault();sl.classList.add('drag');});
+    sl.addEventListener('dragleave',()=>sl.classList.remove('drag'));
+    sl.addEventListener('drop',e=>{e.preventDefault();sl.classList.remove('drag');
+      const f=e.dataTransfer.files[0]; if(f) uploadOne(sl.dataset.org, sl.dataset.kind, f);});
+  });
+}
+/* ZIP 일괄 */
+const bz=document.getElementById('bulkzone');
+bz.addEventListener('click',e=>{ if(e.target.tagName!=='BUTTON') document.getElementById('zipInput').click(); });
+bz.addEventListener('dragover',e=>{e.preventDefault();bz.classList.add('drag');});
+bz.addEventListener('dragleave',()=>bz.classList.remove('drag'));
+bz.addEventListener('drop',e=>{e.preventDefault();bz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)bulk(f);});
+document.getElementById('zipInput').addEventListener('change',function(){ if(this.files[0]) bulk(this.files[0]); this.value=''; });
+function bulk(file){
+  if(!/\.zip$/i.test(file.name)){ toast('ZIP 파일을 올려주세요','err'); return; }
+  const fd=new FormData(); fd.append('file',file);
+  toast('ZIP 분석·업로드 중… 잠시만요');
+  fetch('/api/docs/bulk',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    if(!d.success){ toast(d.message||'일괄 업로드 실패','err'); return; }
+    const ok=(d.matched||[]).map(m=>`<div class="ml">✓ ${esc(m)}</div>`).join('')||'<div class="ml">등록된 항목 없음</div>';
+    const un=(d.unmatched||[]).map(m=>`<div class="ml un">✗ ${esc(m)} — 기관/종류 인식 실패</div>`).join('');
+    document.getElementById('resTitle').textContent=`일괄 업로드 결과 · ${d.count||0}건 등록`;
+    document.getElementById('resBody').innerHTML=ok+(un?('<hr style="border:none;border-top:1px solid #eee;margin:10px 0">'+un):'');
+    document.getElementById('resultOv').classList.add('open');
+    load();
+  }).catch(()=>toast('일괄 업로드 실패','err'));
+}
+load();
+</script>
+</body></html>

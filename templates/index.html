@@ -317,7 +317,7 @@ tr.row-done td{transition:background .3s}
   .super-tabs{margin-top:9px;gap:0}
   .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
   /* 상품제안관리·방문자 통계는 관리자용 데스크톱 화면 → 모바일에서는 탭 숨김 */
-  #stab-proposal,#stab-visitors{display:none}
+  #stab-proposal,#stab-visitors,#stab-docs{display:none}
   /* ── 모바일 상단 변경(요청): SMART FUTURE 로고 + 원리금/신용등급 알약 탭 ── */
   .brand-logo,.brand-sub{display:none}
   .brand-smart{display:block;line-height:0}
@@ -427,6 +427,7 @@ tr.row-done td{transition:background .3s}
     <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')"><span class="stab-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.3v5.4c0 4.6 3.2 7.9 7.5 9.3 4.3-1.4 7.5-4.7 7.5-9.3V5.3L12 2.5Z"/><path d="m8.7 11.9 2.2 2.2 4.4-4.5"/></svg></span>신용등급관리</button>
     {% if role != 'rm' %}
     <button id="stab-proposal" class="super-tab"       onclick="switchSuper('proposal')">상품제안관리</button>
+    <button id="stab-docs"     class="super-tab"       onclick="switchSuper('docs')">약관·상품설명서</button>
     <button id="stab-visitors" class="super-tab"       onclick="switchSuper('visitors')">방문자 통계</button>
     {% endif %}
   </div>
@@ -445,6 +446,10 @@ tr.row-done td{transition:background .3s}
 <!-- ═══ [통합탭4] 방문자 통계 ═══ (연금컨설팅팀 전용 · RM 미렌더 · 모바일 숨김) -->
 <div id="super-visitors" class="super-panel" style="display:none">
   <iframe id="visitors-frame" class="pension-frame" src="/admin/visitors" title="방문자 통계"></iframe>
+</div>
+
+<div id="super-docs" class="super-panel" style="display:none">
+  <iframe id="docs-frame" class="pension-frame" src="/docs" title="약관·상품설명서 관리"></iframe>
 </div>
 {% endif %}
 
@@ -947,7 +952,7 @@ function fitPensionFrame(){
   if(!hdr) return;
   const tabbar = (window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? 64 : 0;
   const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height) - tabbar) + 'px';
-  ['pension-frame','proposal-frame','visitors-frame'].forEach(id=>{
+  ['pension-frame','proposal-frame','visitors-frame','docs-frame'].forEach(id=>{
     const fr = document.getElementById(id);
     if(fr) fr.style.height = h;
   });
@@ -972,10 +977,11 @@ document.addEventListener('DOMContentLoaded', function(){
 function isProposalHidden(){ try{ return window.matchMedia('(max-width:768px)').matches; }catch(e){ return window.innerWidth<=768; } }
 function switchSuper(which){
   // 상품제안관리·방문자 통계는 모바일/좁은 화면에서 숨김 → 이 탭이 지정되면 원리금으로 대체
-  if((which==='proposal'||which==='visitors') && isProposalHidden()) which='pension';
+  if((which==='proposal'||which==='visitors'||which==='docs') && isProposalHidden()) which='pension';
   const pen = which==='pension';
   const prop = which==='proposal';
   const visit = which==='visitors';
+  const docs = which==='docs';
   const credit = which==='credit';
   // 요소가 없을 수도 있으므로(예: RM은 상품제안관리 패널 미렌더) null-safe로 처리.
   // 이렇게 하지 않으면 중간에서 오류가 나 .main(신용등급 본문)을 숨기는 줄이 실행되지 않아
@@ -985,6 +991,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-pension'),  pen);
   setDisp(document.getElementById('super-proposal'), prop);
   setDisp(document.getElementById('super-visitors'), visit);
+  setDisp(document.getElementById('super-docs'), docs);
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
   if(credit){ fitRatingTable(); setTimeout(fitRatingTable, 80); }   // .main 표시 후 5행 고정(레이아웃 안정 후 재보정)
@@ -992,7 +999,8 @@ function switchSuper(which){
   setAct(document.getElementById('stab-credit'),   credit);
   setAct(document.getElementById('stab-proposal'), prop);
   setAct(document.getElementById('stab-visitors'), visit);
-  if(pen || prop || visit) fitPensionFrame();
+  setAct(document.getElementById('stab-docs'), docs);
+  if(pen || prop || visit || docs) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
 (function initSuper(){

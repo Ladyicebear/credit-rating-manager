@@ -79,3 +79,7 @@ _*.xlsx
 
 # ECOS API 키(비밀 — 커밋 금지)
 ecos_key.txt
+
+# 약관·상품설명서 업로드 파일(런타임 — 커밋 금지)
+doc_files/
+data/docs_meta.json

@@ -86,6 +86,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'admin_visitors', 'api_visit_stats', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
     'admin_deploy', 'admin_deploy_status',   # 서버 배포/상태(연금컨설팅팀 전용)
     'admin_refresh_bond_rates',  # 시장금리 수동 갱신(연금컨설팅팀 전용)
+    'docs_page', 'api_docs_upload', 'api_docs_delete', 'api_docs_bulk',  # 약관·상품설명서 관리(연금컨설팅팀 전용)
 }
 
 
@@ -1180,6 +1181,161 @@ def admin_refresh_bond_rates():
         except Exception:
             return jsonify({'success': True})
     return jsonify({'success': False, 'message': 'ECOS 갱신 실패 — 서버 로그/키 확인'}), 500
+
+
+# ── 약관·상품설명서 관리 (상품제공기관별 PDF) ─────────────────────────
+DOC_DIR = os.path.join(BASE_DIR, 'doc_files')
+DOCS_META_FILE = os.path.join(DATA_DIR, 'docs_meta.json')
+DOC_KINDS = ('약관', '상품설명서')
+
+
+def _load_docs_meta():
+    try:
+        with open(DOCS_META_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_docs_meta(m):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(DOCS_META_FILE, 'w', encoding='utf-8') as f:
+        json.dump(m, f, ensure_ascii=False, indent=2)
+
+
+def _org_key(name):
+    return re.sub(r'[\/:*?"<>|]+', '_', str(name)).strip() or '_'
+
+
+def _all_institutions():
+    out = []
+    for cat, items in load_institutions().items():
+        for it in items:
+            out.append((cat, it['name'] if isinstance(it, dict) else it))
+    return out
+
+
+@app.route('/docs')
+def docs_page():
+    return send_file(os.path.join(BASE_DIR, 'docs.html'))
+
+
+@app.route('/api/docs')
+def api_docs_list():
+    meta = _load_docs_meta()
+    items, reg = [], {'약관': 0, '상품설명서': 0}
+    for cat, nm in _all_institutions():
+        e = meta.get(nm, {})
+        row = {'org': nm, 'cat': cat}
+        for k in DOC_KINDS:
+            info = e.get(k)
+            row[k] = {'filename': info.get('filename'), 'uploaded': info.get('uploaded')} if info else None
+            if info:
+                reg[k] += 1
+        items.append(row)
+    return jsonify({'total': len(items), 'registered': reg, 'items': items})
+
+
+@app.route('/api/docs/upload', methods=['POST'])
+def api_docs_upload():
+    org = (request.form.get('org') or '').strip()
+    kind = (request.form.get('kind') or '').strip()
+    f = request.files.get('file')
+    if not org or kind not in DOC_KINDS or not f or not f.filename:
+        return jsonify({'success': False, 'message': '잘못된 요청'}), 400
+    if not f.filename.lower().endswith('.pdf'):
+        return jsonify({'success': False, 'message': 'PDF 파일만 업로드할 수 있습니다'}), 400
+    d = os.path.join(DOC_DIR, _org_key(org))
+    os.makedirs(d, exist_ok=True)
+    f.save(os.path.join(d, kind + '.pdf'))
+    meta = _load_docs_meta()
+    meta.setdefault(org, {})[kind] = {'filename': f.filename,
+                                      'uploaded': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    _save_docs_meta(meta)
+    return jsonify({'success': True, 'filename': f.filename})
+
+
+@app.route('/api/docs/download')
+def api_docs_download():
+    org = (request.args.get('org') or '').strip()
+    kind = (request.args.get('kind') or '').strip()
+    if kind not in DOC_KINDS:
+        return jsonify({'success': False, 'message': '잘못된 요청'}), 400
+    info = _load_docs_meta().get(org, {}).get(kind)
+    path = os.path.join(DOC_DIR, _org_key(org), kind + '.pdf')
+    if not info or not os.path.exists(path):
+        return jsonify({'success': False, 'message': '파일이 없습니다'}), 404
+    return send_file(path, as_attachment=True,
+                     download_name=info.get('filename') or (org + '_' + kind + '.pdf'))
+
+
+@app.route('/api/docs/delete', methods=['POST'])
+def api_docs_delete():
+    d = request.get_json(silent=True) or {}
+    org = (d.get('org') or '').strip()
+    kind = (d.get('kind') or '').strip()
+    if kind not in DOC_KINDS:
+        return jsonify({'success': False}), 400
+    try:
+        pth = os.path.join(DOC_DIR, _org_key(org), kind + '.pdf')
+        if os.path.exists(pth):
+            os.remove(pth)
+    except Exception:
+        logger.exception('문서 삭제 실패')
+    meta = _load_docs_meta()
+    if org in meta and kind in meta[org]:
+        del meta[org][kind]
+        if not meta[org]:
+            del meta[org]
+        _save_docs_meta(meta)
+    return jsonify({'success': True})
+
+
+def _zip_name(zi):
+    if zi.flag_bits & 0x800:
+        return zi.filename
+    try:
+        return zi.filename.encode('cp437').decode('cp949')
+    except Exception:
+        return zi.filename
+
+
+@app.route('/api/docs/bulk', methods=['POST'])
+def api_docs_bulk():
+    import zipfile
+    import io as _io
+    f = request.files.get('file')
+    if not f or not (f.filename or '').lower().endswith('.zip'):
+        return jsonify({'success': False, 'message': 'ZIP 파일을 올려주세요'}), 400
+    orgs = sorted([nm for _, nm in _all_institutions()], key=len, reverse=True)
+    meta = _load_docs_meta()
+    matched, unmatched = [], []
+    try:
+        z = zipfile.ZipFile(_io.BytesIO(f.read()))
+    except Exception:
+        return jsonify({'success': False, 'message': 'ZIP을 열 수 없습니다'}), 400
+    for zi in z.infolist():
+        if zi.is_dir():
+            continue
+        name = _zip_name(zi)
+        base = os.path.basename(name)
+        if not base.lower().endswith('.pdf'):
+            continue
+        kind = '약관' if '약관' in name else ('상품설명서' if '설명서' in name else None)
+        org = next((o for o in orgs if o in name), None)
+        if not org or not kind:
+            unmatched.append(base)
+            continue
+        dd = os.path.join(DOC_DIR, _org_key(org))
+        os.makedirs(dd, exist_ok=True)
+        with open(os.path.join(dd, kind + '.pdf'), 'wb') as out:
+            out.write(z.read(zi))
+        meta.setdefault(org, {})[kind] = {'filename': base,
+                                          'uploaded': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        matched.append(org + ' · ' + kind)
+    _save_docs_meta(meta)
+    return jsonify({'success': True, 'count': len(matched),
+                    'matched': matched, 'unmatched': unmatched})
 
 
 @app.route('/api/cpi')
