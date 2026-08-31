@@ -74,6 +74,8 @@ _PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password'}
 # (다운로드·조회 GET은 여기 없음 → RM 허용). 서버측 최종 방어선이며 화면 숨김과 별개로 강제된다.
 _ADMIN_ONLY_ENDPOINTS = {
     'pension_store_post',        # 원리금 금리 업로드 저장
+    'pension_month_post',        # 기준월 생성(금리 업로드 없이, 상품제안관리 전용)
+    'pension_month_delete',      # 기준월 삭제(상품제안관리에서 만든 달만)
     'rate_history_append',       # 과거 금리 추이 월간 평균 추가
     'proposal',                  # 상품제안관리 화면
     'proposals_post',            # 이달의 제안상품 등록
@@ -753,6 +755,102 @@ def pension_store_post():
     with open(_PENSION_STORE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False)
     return jsonify({'ok': True, 'months': sorted(data.keys())})
+
+
+_MONTH_RE = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
+
+
+def _blank_rates(row: dict) -> dict:
+    """상품 구성(권역·기관·상품구분·기간)은 그대로 두고 금리만 비운 행을 만든다.
+
+    지난달 금리가 이번 달 금리인 것처럼 보이는 사고를 막기 위한 '구조만 복사'용.
+    기간(db/dc의 키)은 남겨야 상품제안관리 왼쪽 목록에 상품이 뜬다.
+    """
+    out = dict(row)
+    for f in ('db', 'dc'):
+        src = row.get(f)
+        out[f] = {k: None for k in src} if isinstance(src, dict) else {}
+    if 'def' in out:
+        out['def'] = None
+    return out
+
+
+@app.route('/api/pension_month', methods=['POST'])
+def pension_month_post():
+    """금리 엑셀 업로드 없이 기준월을 하나 만든다(상품제안관리 화면 전용).
+
+    금리 파일을 다시 올릴 수 없는 상황에서도 그 달의 '이달의 제안상품'을 입력할 수
+    있게 하기 위한 것. payload:
+      {month:'2026-09', copyFrom:'2026-08'|'', mode:'structure'|'rates'|'empty'}
+        structure : copyFrom의 상품목록만 복사(금리는 비움) — 권장
+        rates     : copyFrom을 금리까지 복사(지난달 금리가 그대로 들어감)
+        empty     : 빈 목록
+    이미 있는 달은 덮어쓰지 않는다(409).
+    """
+    d = request.get_json(force=True, silent=True) or {}
+    month = (d.get('month') or '').strip()
+    copy_from = (d.get('copyFrom') or '').strip()
+    mode = (d.get('mode') or 'structure').strip()
+    if not _MONTH_RE.match(month):
+        return jsonify({'success': False, 'message': '기준월 형식이 올바르지 않습니다(예: 2026-09)'}), 400
+    if mode not in ('structure', 'rates', 'empty'):
+        return jsonify({'success': False, 'message': 'mode 값이 올바르지 않습니다'}), 400
+
+    store = _load_json_file(_PENSION_STORE)
+    if month in store:
+        return jsonify({'success': False, 'message': f'{month} 기준월이 이미 있습니다'}), 409
+
+    rows = []
+    if mode != 'empty':
+        if not _MONTH_RE.match(copy_from):
+            return jsonify({'success': False, 'message': '복사할 기준월을 선택하세요'}), 400
+        src = store.get(copy_from) or {}
+        src_rows = src.get('rows') or []
+        if not src_rows:
+            return jsonify({'success': False, 'message': f'{copy_from}에 복사할 상품목록이 없습니다'}), 400
+        rows = [_blank_rates(r) for r in src_rows] if mode == 'structure' else json.loads(json.dumps(src_rows))
+
+    store[month] = {
+        'rows': rows,
+        'fileName': '(상품제안관리에서 생성)',
+        'uploadedAt': datetime.now().strftime('%y. %m. %d. %H:%M'),
+        'srcRows': len(rows),
+        'baseMonth': month,
+        'createdBy': 'proposal',          # 업로드본이 아님 → 삭제 허용 대상
+        'copiedFrom': copy_from if mode != 'empty' else '',
+        'rateless': mode != 'rates',      # 금리가 비어 있는 달(화면에 '-'로 표시)
+    }
+    os.makedirs(os.path.dirname(_PENSION_STORE), exist_ok=True)
+    with open(_PENSION_STORE, 'w', encoding='utf-8') as f:
+        json.dump(store, f, ensure_ascii=False)
+    logger.info('기준월 생성: %s (mode=%s, copyFrom=%s, rows=%d)', month, mode, copy_from, len(rows))
+    return jsonify({'success': True, 'month': month, 'rows': len(rows), 'rateless': mode != 'rates'})
+
+
+@app.route('/api/pension_month/delete', methods=['POST'])
+def pension_month_delete():
+    """상품제안관리에서 만든 기준월만 삭제한다(업로드된 금리 데이터는 보호).
+
+    payload: {month:'2026-09'}
+    """
+    d = request.get_json(force=True, silent=True) or {}
+    month = (d.get('month') or '').strip()
+    store = _load_json_file(_PENSION_STORE)
+    rec = store.get(month)
+    if not isinstance(rec, dict):
+        return jsonify({'success': False, 'message': f'{month} 기준월이 없습니다'}), 404
+    if rec.get('createdBy') != 'proposal':
+        return jsonify({'success': False,
+                        'message': '금리 엑셀로 업로드된 기준월은 여기서 삭제할 수 없습니다'}), 403
+    store.pop(month, None)
+    with open(_PENSION_STORE, 'w', encoding='utf-8') as f:
+        json.dump(store, f, ensure_ascii=False)
+    props = _load_json_file(_PROPOSALS_FILE)
+    if month in props:                      # 그 달 제안상품도 함께 정리
+        props.pop(month, None)
+        _save_json_file(_PROPOSALS_FILE, props)
+    logger.info('기준월 삭제: %s', month)
+    return jsonify({'success': True, 'month': month})
 
 
 # ── 상품제안관리 ───────────────────────────────────────────────────────

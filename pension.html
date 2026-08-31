@@ -814,17 +814,28 @@ function save(month){
     }))
     .catch(()=>{ toast('서버 저장에 실패했습니다(이 기기에만 저장됨). 네트워크를 확인해주세요.', true); return {ok:false, months:[]}; });
 }
-/* 서버 저장분을 불러와 병합(다른 기기에서 업로드한 데이터도 반영) */
+/* 서버 저장분을 불러와 병합(다른 기기에서 업로드한 데이터도 반영).
+   반대로 '이 브라우저에만 있고 서버에는 없는 달'은 서버로 올려 복구한다.
+   (업로드는 됐지만 서버 저장이 실패했던 달 — 그 달이 상품제안관리·모바일에
+    안 나타나는 상태 — 을 파일 재업로드 없이 되살리기 위한 것) */
 function syncFromServer(){
   fetch('/api/pension_store').then(r=>r.json()).then(srv=>{
-    if(!srv || typeof srv!=='object') return;
-    const keys=Object.keys(srv); if(!keys.length) return;
+    if(!srv || typeof srv!=='object') srv={};
+    const keys=Object.keys(srv);
     const localEmpty = !Object.keys(DB).length;
+    const localOnly = Object.keys(DB).filter(m=>!(m in srv) && DB[m] && (DB[m].rows||[]).length);
     keys.forEach(m=>{ DB[m]=srv[m]; });          // 서버 데이터 반영
     try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
     if(localEmpty || !curMonth || !DB[curMonth]) curMonth = Object.keys(DB).sort().reverse()[0];
     refreshMonthSel();
-    loadMonth(curMonth);
+    if(curMonth) loadMonth(curMonth);
+
+    // 서버에 없는 로컬 전용 월 → 서버로 복구 업로드(조회 전용 계정은 건너뜀)
+    if(localOnly.length && !document.body.classList.contains('role-rm')){
+      save(localOnly[localOnly.length-1]).then(res=>{
+        if(res.ok) toast(`이 기기에만 있던 ${localOnly.map(m=>m.replace('-','년 ')+'월').join(', ')} 데이터를 서버에 저장했습니다(상품제안관리·모바일 반영)`);
+      });
+    }
   }).catch(()=>{});
 }
 function thisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
@@ -1077,8 +1088,10 @@ function refreshMonthSel(){
   const cur=thisMonth();
   const all=[...new Set([cur,...months])].sort().reverse();
   sel.innerHTML=all.map(m=>{
-    const has=DB[m]?' ●':'';
-    return `<option value="${m}">${m.replace('-','년 ')}월${has}</option>`;
+    const rec=DB[m];
+    // 상품제안관리에서 만든 '금리 없는 달'은 금리 데이터가 있는 달과 구분해서 보여준다
+    const tag = !rec ? '' : (rec.rateless ? ' (금리없음)' : ' ●');
+    return `<option value="${m}">${m.replace('-','년 ')}월${tag}</option>`;
   }).join('');
   if(!curMonth) curMonth = months[0]||cur;
   sel.value=curMonth;

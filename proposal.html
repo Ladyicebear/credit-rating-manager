@@ -105,6 +105,44 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
 .btn-ghost{background:#fff;color:#4b5563;border:1px solid #d5d9e0}.btn-ghost:hover{background:#f4f6f8}
 .chk{width:16px;height:16px;cursor:pointer;accent-color:var(--orange)}
 
+/* 기준월 추가/삭제 버튼 */
+.msel-btn{height:32px;border:1px solid #D5D9E0;background:#fff;border-radius:8px;padding:0 10px;
+          font-size:12px;font-weight:700;color:#4B5563;cursor:pointer;font-family:inherit;white-space:nowrap}
+.msel-btn:hover{border-color:var(--orange);color:var(--orange-d)}
+.msel-btn.danger:hover{border-color:#e5b4b4;color:#c0392b}
+
+/* 금리 없는(수기 생성) 기준월 안내 배너 */
+.month-note{display:none;align-items:center;gap:8px;background:#FFF7ED;border:1px solid #F1C99E;
+            border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:12.5px;color:#8a5622;line-height:1.5}
+.month-note.show{display:flex}
+.month-note b{color:#C2410C}
+
+/* 제안목록 금리 직접 입력 */
+input.rate-in{width:78px;height:28px;border:1px solid #D5D9E0;border-radius:6px;padding:0 8px;
+              font-family:inherit;font-size:12.5px;font-weight:700;text-align:right;color:var(--ink);outline:none}
+input.rate-in:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
+input.rate-in.empty{border-color:#f0b8b8;background:#FFF5F5}
+
+/* 모달 */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;
+          align-items:center;justify-content:center;padding:16px}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:430px;box-shadow:0 20px 50px rgba(0,0,0,.28);overflow:hidden}
+.modal h3{margin:0;padding:14px 18px;font-size:14px;color:var(--navy);border-bottom:1px solid var(--line)}
+.modal-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.fld{display:flex;flex-direction:column;gap:5px}
+.fld label{font-size:11.5px;font-weight:700;color:var(--muted)}
+.fld input,.fld select{height:34px;border:1px solid #D5D9E0;border-radius:8px;padding:0 10px;
+                       font-family:inherit;font-size:13px;color:var(--ink);outline:none;background:#fff}
+.fld input:focus,.fld select:focus{border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
+.radio-row{display:flex;flex-direction:column;gap:7px}
+.radio-row label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink);
+                 font-weight:600;cursor:pointer;line-height:1.45}
+.radio-row input{accent-color:var(--orange);margin-top:2px}
+.radio-row .hint{display:block;font-size:11.5px;color:var(--muted);font-weight:500}
+.radio-row .warn{color:#B91C1C}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);background:#FAFBFC}
+
 /* 토스트 */
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);opacity:0;
        background:#16335B;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;
@@ -126,6 +164,8 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
   <div class="topbar">
     <span class="tb-label">기준월</span>
     <select id="monthSel" class="msel"></select>
+    <button class="msel-btn" id="btnAddMonth" onclick="openAddMonth()" title="금리 엑셀 업로드 없이 기준월을 만들어 제안상품을 입력합니다">＋ 기준월 추가</button>
+    <button class="msel-btn danger" id="btnDelMonth" onclick="deleteMonth()" style="display:none" title="상품제안관리에서 만든 기준월을 삭제합니다">기준월 삭제</button>
     <span class="tb-label" style="margin-left:6px">업권</span>
     <div class="chips" id="secChips"></div>
     <div class="search-wrap" style="margin-left:auto">
@@ -138,6 +178,9 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
       </select>
     </div>
   </div>
+
+  <!-- 금리 데이터 없이 만든 기준월 안내 -->
+  <div class="month-note" id="monthNote"></div>
 
   <!-- 2단 레이아웃 -->
   <div class="panes">
@@ -184,6 +227,7 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
         </table>
       </div>
       <div class="foot">
+        <button class="btn btn-ghost" style="margin-right:auto" onclick="openManualAdd()" title="목록에 없는 상품을 직접 입력해 제안목록에 추가">＋ 직접 추가</button>
         <button class="btn btn-ghost" onclick="reloadProposals()" title="저장된 제안 목록 다시 불러오기">수정</button>
         <button class="btn btn-navy" onclick="registerProposals()" title="현재 제안 목록을 이 기준월로 저장">등록</button>
       </div>
@@ -213,6 +257,61 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
     <div class="notice-foot">
       <button class="btn btn-navy" onclick="saveSuspension()">발행정지기간 저장</button>
       <span id="suspUpd" class="notice-upd"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 기준월 추가 모달: 금리 엑셀을 다시 올릴 수 없을 때 그 달을 만들어 제안상품을 입력한다 -->
+<div class="modal-bg" id="addMonthBg">
+  <div class="modal">
+    <h3>기준월 추가</h3>
+    <div class="modal-body">
+      <div class="fld">
+        <label>기준월 (YYYY-MM)</label>
+        <input type="month" id="amMonth">
+      </div>
+      <div class="fld">
+        <label>상품목록 가져올 기준월</label>
+        <select id="amCopyFrom"></select>
+      </div>
+      <div class="fld">
+        <label>가져오는 방식</label>
+        <div class="radio-row">
+          <label><input type="radio" name="amMode" value="structure" checked>
+            <span>상품목록만 가져오기 <span class="hint">금리는 비워 둡니다(권장). 제안목록에서 이 달의 금리를 직접 입력합니다.</span></span></label>
+          <label><input type="radio" name="amMode" value="rates">
+            <span>금리까지 그대로 복사 <span class="hint warn">지난달 금리가 이 달 금리로 표시됩니다. 실제 금리와 다를 수 있으니 주의하세요.</span></span></label>
+          <label><input type="radio" name="amMode" value="empty">
+            <span>빈 목록으로 만들기 <span class="hint">왼쪽 상품목록 없이, 제안상품을 「＋ 직접 추가」로만 입력합니다.</span></span></label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('addMonthBg')">취소</button>
+      <button class="btn btn-navy" onclick="createMonth()">기준월 만들기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 제안상품 직접 입력 모달 -->
+<div class="modal-bg" id="manualBg">
+  <div class="modal">
+    <h3>제안상품 직접 추가</h3>
+    <div class="modal-body">
+      <div class="fld"><label>업권</label>
+        <select id="mnSector"></select></div>
+      <div class="fld"><label>상품제공기관</label>
+        <input type="text" id="mnOrg" placeholder="예: 국민은행"></div>
+      <div class="fld"><label>상품구분</label>
+        <input type="text" id="mnFam" placeholder="예: 정기예금 / ELB / 이율보증형보험"></div>
+      <div class="fld"><label>기간</label>
+        <select id="mnMonths"></select></div>
+      <div class="fld"><label>금리(%)</label>
+        <input type="number" id="mnRate" step="0.01" min="0" placeholder="예: 3.25"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('manualBg')">취소</button>
+      <button class="btn btn-navy" onclick="addManual()">제안목록에 추가</button>
     </div>
   </div>
 </div>
@@ -254,6 +353,7 @@ async function boot(){
   }catch(e){ toast('데이터를 불러오지 못했습니다','err'); return; }
 
   bindFilters();
+  bindModals();
   $('monthSel').onchange=()=>{ selectMonth($('monthSel').value); };
   applyStore({initial:true});
   loadNotice();
@@ -288,6 +388,97 @@ function renderMonthView(){
   renderSecChips();     // 업권별 건수는 월마다 다르므로 함께 갱신
   render();
   renderSuspension();
+  renderMonthNote();
+}
+
+/* 금리 엑셀 없이 만든 기준월이면 안내 배너 + 삭제 버튼 노출 */
+function renderMonthNote(){
+  const e=STORE[curMonth]||{};
+  const note=$('monthNote'), del=$('btnDelMonth');
+  const made = e.createdBy==='proposal';
+  del.style.display = made ? '' : 'none';
+  if(!made){ note.className='month-note'; note.innerHTML=''; return; }
+  let msg;
+  if(e.rateless && e.copiedFrom) msg=`<b>${curMonth}</b>은 금리 엑셀 없이 만든 기준월입니다. 상품목록은 <b>${e.copiedFrom}</b>에서 가져왔고 <b>금리는 비어 있습니다</b> — 제안목록의 금리를 직접 입력해 등록하세요.`;
+  else if(e.rateless)            msg=`<b>${curMonth}</b>은 금리 엑셀 없이 만든 빈 기준월입니다. 제안상품은 「＋ 직접 추가」로 입력하세요.`;
+  else                           msg=`<b>${curMonth}</b>은 금리 엑셀 없이 만든 기준월이고, 금리는 <b>${e.copiedFrom}</b>에서 그대로 복사한 값입니다. 실제 금리와 다를 수 있으니 제안목록의 금리를 확인·수정하세요.`;
+  note.className='month-note show'; note.innerHTML=msg;
+}
+
+/* ---------- 기준월 추가/삭제 (금리 파일을 다시 올릴 수 없을 때) ---------- */
+function closeModal(id){ $(id).classList.remove('show'); }
+function nextMonthOf(m){
+  const t=/^(\d{4})-(\d{2})$/.exec(m||'');
+  const d = t ? new Date(+t[1], +t[2], 1) : new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function openAddMonth(){
+  const months=storeMonths();
+  $('amMonth').value = nextMonthOf(months[months.length-1]||'');
+  $('amCopyFrom').innerHTML = months.length
+    ? months.slice().reverse().map(m=>`<option value="${m}">${m}</option>`).join('')
+    : '<option value="">(가져올 기준월 없음)</option>';
+  $('amCopyFrom').disabled=!months.length;
+  const radios=[...document.querySelectorAll('input[name=amMode]')];
+  radios.forEach(r=>{ r.disabled = !months.length && r.value!=='empty'; });
+  (months.length ? radios[0] : radios[2]).checked=true;
+  $('addMonthBg').classList.add('show');
+  setTimeout(()=>$('amMonth').focus(),50);
+}
+async function createMonth(){
+  const month=($('amMonth').value||'').trim();
+  const mode=(document.querySelector('input[name=amMode]:checked')||{}).value||'structure';
+  const copyFrom=mode==='empty'?'':$('amCopyFrom').value;
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)){ toast('기준월을 YYYY-MM 형식으로 입력하세요','err'); return; }
+  if(STORE[month]){ toast(`${month} 기준월이 이미 있습니다`,'err'); return; }
+  if(mode!=='empty' && !copyFrom){ toast('상품목록을 가져올 기준월을 선택하세요','err'); return; }
+  try{
+    const d=await fetch('/api/pension_month',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month,copyFrom,mode})}).then(r=>r.json());
+    if(!d.success){ toast(d.message||'기준월 생성 실패','err'); return; }
+    closeModal('addMonthBg');
+    await reloadStore({force:month});
+    toast(`${month} 기준월을 만들었습니다 (상품 ${d.rows}건). 제안상품을 입력한 뒤 「등록」을 누르세요.`);
+  }catch(e){ toast('서버와 통신하지 못했습니다','err'); }
+}
+async function deleteMonth(){
+  const e=STORE[curMonth]||{};
+  if(e.createdBy!=='proposal'){ toast('금리 엑셀로 업로드된 기준월은 삭제할 수 없습니다','err'); return; }
+  if(!confirm(`${curMonth} 기준월과 그 달에 등록된 제안상품을 삭제합니다. 계속할까요?`)) return;
+  try{
+    const d=await fetch('/api/pension_month/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:curMonth})}).then(r=>r.json());
+    if(!d.success){ toast(d.message||'삭제 실패','err'); return; }
+    delete PROPOSALS[curMonth]; selected=[]; curMonth='';
+    await reloadStore();
+    toast(`${d.month} 기준월을 삭제했습니다`);
+  }catch(e){ toast('서버와 통신하지 못했습니다','err'); }
+}
+
+/* ---------- 제안상품 직접 입력 ---------- */
+function openManualAdd(){
+  if(!curMonth){ toast('먼저 기준월을 만들거나 선택하세요','err'); return; }
+  $('mnSector').innerHTML=SECTOR_ORDER.map(s=>`<option value="${s}">${s}</option>`).join('');
+  $('mnMonths').innerHTML=MONTHS.map(m=>`<option value="${m}">${MONTH_LABEL[m]}</option>`).join('');
+  $('mnMonths').value='12';
+  $('mnOrg').value=''; $('mnFam').value=''; $('mnRate').value='';
+  $('manualBg').classList.add('show');
+  setTimeout(()=>$('mnOrg').focus(),50);
+}
+function addManual(){
+  const org=$('mnOrg').value.trim(), fam=$('mnFam').value.trim();
+  if(!org){ toast('상품제공기관을 입력하세요','err'); return; }
+  if(!fam){ toast('상품구분을 입력하세요','err'); return; }
+  const months=+$('mnMonths').value;
+  const rv=$('mnRate').value.trim();
+  const rate = rv===''? null : Math.round(parseFloat(rv)*100)/100;
+  const item={sector:$('mnSector').value, org, fam, months, period:MONTH_LABEL[months],
+              rate:(rate!=null&&isNaN(rate))?null:rate, manual:true};
+  if(selected.some(sx=>rowKey(sx)===rowKey(item))){ toast('이미 제안목록에 있는 상품입니다','err'); return; }
+  selected.push(item);
+  closeModal('manualBg');
+  render();
+  toast(`${org} ${fam} ${item.period}을(를) 제안목록에 추가했습니다`);
 }
 
 /* 저장된 제안목록과 현재 작업목록이 다르면 '작업 중'(등록 전) */
@@ -301,9 +492,13 @@ function applyStore(opt){
   const months=storeMonths();
   const empty=$('leftBody');
   if(!months.length){
-    curMonth=''; refreshMonthSel();
-    if(empty) empty.innerHTML='<tr class="none-row"><td colspan="9">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>';
+    curMonth=''; refreshMonthSel(); renderMonthNote();
+    if(empty) empty.innerHTML='<tr class="none-row"><td colspan="9">업로드된 원리금 금리 데이터가 없습니다. 금리 화면에서 엑셀을 업로드하거나, 위 「＋ 기준월 추가」로 기준월을 만들어 제안상품을 직접 입력하세요.</td></tr>';
     return;
+  }
+  // 기준월을 새로 만든 직후 등 그 달로 바로 전환해야 할 때
+  if(opt.force && STORE[opt.force]){
+    curMonth=opt.force; refreshMonthSel(); renderMonthView(); return;
   }
   const latest=months[months.length-1];
   const isNew = !!curMonth && latest!==curMonth && !opt.initial;
@@ -321,13 +516,13 @@ function applyStore(opt){
   if(isNew) toast(`${latest.replace('-','년 ')}월 금리가 업로드되어 기준월을 ${latest}(으)로 변경했습니다`);
 }
 
-/* 서버의 전체 금리 데이터를 다시 받아 반영 */
-async function reloadStore(){
+/* 서버의 전체 금리 데이터를 다시 받아 반영. opt.force 를 주면 그 기준월로 바로 전환 */
+async function reloadStore(opt){
   try{
     const ps=await fetch('/api/pension_store',{cache:'no-store'}).then(r=>r.json());
     if(!ps || typeof ps!=='object') return;
     STORE=ps;
-    applyStore();
+    applyStore(opt);
   }catch(e){ /* 통신 실패 시 다음 주기에 재시도 */ }
 }
 
@@ -413,11 +608,14 @@ function saveSuspension(){
 function buildDbRows(){
   dbRows=[];
   const e=STORE[curMonth]; if(!e||!Array.isArray(e.rows)) return;
+  const rateless=!!e.rateless;   // 금리 없이 상품목록만 만든 달 → 금리는 '-'로 두고 상품은 표시
   for(const r of e.rows){
     const db=r.db||{};
     for(const m of MONTHS){
-      const v=db[m]; if(v==null) continue;
-      dbRows.push({sector:r.sector,org:r.org,fam:r.fam,months:m,period:MONTH_LABEL[m],rate:v});
+      const has=Object.prototype.hasOwnProperty.call(db,m)||Object.prototype.hasOwnProperty.call(db,String(m));
+      const v=db[m];
+      if(v==null && !(rateless && has)) continue;
+      dbRows.push({sector:r.sector,org:r.org,fam:r.fam,months:m,period:MONTH_LABEL[m],rate:(v==null?null:v)});
     }
   }
   dbRows.sort((a,b)=>{
@@ -453,6 +651,15 @@ function renderSecChips(){
   h+=SECTOR_ORDER.map(s=>`<button class="chip ${filterSec===s?'on':''}" data-sec="${s}">${s}<span class="n">${cnt[s]||0}</span></button>`).join('');
   $('secChips').innerHTML=h;
   $('secChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ filterSec=b.dataset.sec; renderSecChips(); render(); });
+}
+function bindModals(){
+  ['addMonthBg','manualBg'].forEach(id=>{
+    const el=$(id);
+    el.addEventListener('mousedown', e=>{ if(e.target===el) closeModal(id); });
+  });
+  document.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){ closeModal('addMonthBg'); closeModal('manualBg'); }
+  });
 }
 function bindFilters(){
   $('search').addEventListener('input',()=>{ searchTxt=$('search').value; render(); });
@@ -503,14 +710,24 @@ function renderLeft(){
 }
 function renderRight(){
   $('rightSub').textContent=selected.length+'건';
-  if(!selected.length){ $('rightBody').innerHTML='<tr class="none-row"><td colspan="5">왼쪽에서 상품을 선택하고 ▶ 를 누르세요.</td></tr>'; return; }
+  if(!selected.length){ $('rightBody').innerHTML='<tr class="none-row"><td colspan="5">왼쪽에서 상품을 선택하고 ▶ 를 누르거나, 아래 「＋ 직접 추가」로 입력하세요.</td></tr>'; return; }
+  // 금리는 직접 수정 가능(금리 데이터 없이 만든 기준월·수기 입력 상품을 위해)
   $('rightBody').innerHTML=selected.map((r,i)=>`<tr>
     <td class="l org">${htmlEsc(r.org)}</td>
     <td class="l">${htmlEsc(r.fam)}</td>
-    <td>${htmlEsc(r.period)}</td>
-    <td class="rate">${fmtRate(r.rate)}</td>
+    <td>${htmlEsc(r.period||MONTH_LABEL[r.months]||'')}</td>
+    <td class="rate"><input class="rate-in${r.rate==null?' empty':''}" type="number" step="0.01" min="0"
+        value="${r.rate==null?'':r.rate}" data-i="${i}" placeholder="입력" title="이 달의 실제 금리를 입력하세요"></td>
     <td class="del" title="제거" onclick="removeSelected(${i})">✕</td>
   </tr>`).join('');
+  $('rightBody').querySelectorAll('.rate-in').forEach(inp=>{
+    inp.onchange=inp.onblur=()=>{
+      const i=+inp.dataset.i, v=inp.value.trim();
+      selected[i].rate = v===''? null : Math.round(parseFloat(v)*100)/100;
+      if(isNaN(selected[i].rate)) selected[i].rate=null;
+      inp.classList.toggle('empty', selected[i].rate==null);
+    };
+  });
 }
 
 /* ---------- 선택 → 제안 이동 ---------- */
@@ -534,6 +751,9 @@ function removeSelected(i){ selected.splice(i,1); render(); }
 function loadProposalsForMonth(){ selected=(PROPOSALS[curMonth]||[]).map(x=>Object.assign({},x)); }
 function reloadProposals(){ loadProposalsForMonth(); render(); toast('저장된 제안 목록을 불러왔습니다'); }
 async function registerProposals(){
+  if(!curMonth){ toast('기준월이 없습니다. 「＋ 기준월 추가」로 먼저 만들어주세요','err'); return; }
+  const blanks=selected.filter(r=>r.rate==null).length;
+  if(blanks && !confirm(`금리가 비어 있는 항목이 ${blanks}건 있습니다. 모바일 화면에 '-'로 표시됩니다. 그대로 등록할까요?`)) return;
   try{
     const res=await fetch('/api/proposals',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({month:curMonth,items:selected})});

@@ -215,7 +215,11 @@ async function boot(){
   }catch(e){ toast('데이터를 불러오지 못했습니다'); }
   months=Object.keys(STORE).sort();
   curMonth=months[months.length-1]||'';
-  $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('') || `<option>-</option>`;
+  // 금리 데이터 없이 제안상품만 등록된 달은 라벨로 구분(금리표가 비어 보이는 이유)
+  $('monthSel').innerHTML=months.map(m=>{
+    const t=(STORE[m]&&STORE[m].rateless)?' (금리 미등록)':'';
+    return `<option value="${m}">${ymLabel(m)}${t}</option>`;
+  }).join('') || `<option>-</option>`;
   $('monthSel').value=curMonth;
   render();
 }
