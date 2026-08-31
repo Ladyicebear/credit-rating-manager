@@ -789,10 +789,30 @@ let baseRateRows = null;   // 과거 금리 추이 Sheet2 rows (한국은행 기
 
 /* ---------- storage ---------- */
 function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
-function save(){
+/* 다른 화면(상품제안관리)에 '이 기준월이 새로 저장됐다'고 알리는 신호.
+   같은 브라우저의 다른 탭은 storage 이벤트로 즉시 받고, 다른 기기는 서버 폴링으로 받는다. */
+const UPLOAD_SIGNAL_KEY='pension_store_updated';
+function signalStoreUpdated(month){
+  try{ localStorage.setItem(UPLOAD_SIGNAL_KEY, JSON.stringify({month, ts:Date.now()})); }catch(e){}
+}
+/* localStorage + 서버 저장. 서버 저장 결과를 반환하므로 호출부에서 실패를 감지할 수 있다.
+   (예전에는 fetch 결과를 버려서 서버 저장이 실패해도 화면엔 '업로드 완료'로 보였고,
+    그 달이 상품제안관리 기준월 목록에 나타나지 않는 원인이 됐다.) */
+function save(month){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
-  // 서버에도 저장 → 휴대폰/다른 브라우저에서도 조회 가능
-  try{ fetch('/api/pension_store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)}); }catch(e){}
+  // 서버에도 저장 → 휴대폰/다른 브라우저·상품제안관리 화면에서도 조회 가능
+  return fetch('/api/pension_store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)})
+    .then(r=>r.json().catch(()=>({})).then(d=>{
+      if(!r.ok || !d.ok){
+        const msg = r.status===403 ? '서버 저장 권한이 없습니다(조회 전용 계정). 이 기기에만 저장됐습니다.'
+                                   : '서버 저장에 실패했습니다(이 기기에만 저장됨). 다시 시도해주세요.';
+        toast(msg, true);
+        return {ok:false, months:[]};
+      }
+      signalStoreUpdated(month||curMonth||'');
+      return {ok:true, months:d.months||[]};
+    }))
+    .catch(()=>{ toast('서버 저장에 실패했습니다(이 기기에만 저장됨). 네트워크를 확인해주세요.', true); return {ok:false, months:[]}; });
 }
 /* 서버 저장분을 불러와 병합(다른 기기에서 업로드한 데이터도 반영) */
 function syncFromServer(){
@@ -1906,17 +1926,29 @@ $('fileInput').onchange=e=>{
     try{
       const {raw, baseMonth}=readWorkbook(ev.target.result);
       const rows=buildGroups(raw);
-      const m = baseMonth || curMonth || thisMonth();   // 파일의 기준년월 우선, 없으면 선택월
+      // 기준년월은 저장 키다. 파일에 없을 때 조용히 '선택월'로 저장하면 9월 파일이 8월에
+      // 덮여 저장돼(→ 상품제안관리 기준월에 9월이 안 생김) 반드시 확인받는다.
+      let m = baseMonth;
+      if(!m){
+        const def = curMonth || thisMonth();
+        const ans = prompt('파일에 기준년월(A1)이 없습니다. 저장할 기준년월을 YYYY-MM 형식으로 입력하세요.', def);
+        if(ans===null){ toast('업로드를 취소했습니다(기준년월 미입력)', true); $('fileInput').value=''; return; }
+        m = String(ans).trim();
+        if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(m)){ toast('기준년월 형식이 올바르지 않습니다(예: 2026-09). 업로드를 중단합니다.', true); $('fileInput').value=''; return; }
+      }
       const prevOv = DB[m] && DB[m].overrides;           // 같은 달 재업로드 시 수기값 승계
       DB[m]={ rows, raw, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length, baseMonth:m, baseFromFile:!!baseMonth };
       if(prevOv){ DB[m].overrides=prevOv; pruneOverrides(DB[m]); }   // 새 업로드가 채운 칸은 업로드값으로 대체
-      save();
       curMonth=m; refreshMonthSel(); loadMonth(m);
-      if(baseMonth){
-        toast(`업로드 완료 · 기준년월 ${m.replace('-','년 ')}월 · 원본 ${raw.length}행 → 관리 ${rows.length}건`);
-      }else{
-        toast(`기준년월이 파일에 없어 선택월(${m.replace('-','년 ')}월)로 저장했습니다. 양식 A1에 기준년월을 넣어주세요.`, true);
-      }
+      // 서버 저장이 끝나야 상품제안관리(서버 데이터 기준) 기준월 목록에 이 달이 생긴다.
+      save(m).then(res=>{
+        if(!res.ok) return;   // 실패 토스트는 save()가 이미 띄움
+        if(baseMonth){
+          toast(`업로드 완료 · 기준년월 ${m.replace('-','년 ')}월 · 원본 ${raw.length}행 → 관리 ${rows.length}건 · 상품제안관리 기준월에도 반영됐습니다`);
+        }else{
+          toast(`입력하신 기준년월 ${m.replace('-','년 ')}월로 저장했습니다(상품제안관리 반영). 다음부터는 양식 A1에 기준년월을 넣어주세요.`, true);
+        }
+      });
       // 업로드 시 자동으로 '과거 금리 추이 이력 추가' 모달 열기(기준금리만 확인·입력 → 추가). 연금컨설팅팀 전용.
       if(!document.body.classList.contains('role-rm')) setTimeout(openHistAppend, 600);
     }catch(err){ console.error(err); toast('업로드 실패: '+err.message,true); }

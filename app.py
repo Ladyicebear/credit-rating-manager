@@ -713,6 +713,36 @@ def pension_store_get():
     return jsonify({})
 
 
+@app.route('/api/pension_months', methods=['GET'])
+def pension_months_get():
+    """업로드된 기준월 목록만 가볍게 반환(상품제안관리 화면의 자동 갱신용).
+
+    전체 금리 데이터(pension_store.json)는 수백 KB라 폴링에 부적합하므로
+    월 키와 업로드 시각만 추려서 준다. 응답 예:
+      {"months":[{"month":"2026-09","uploadedAt":"26. 8. 31. 오후 5:10","rows":256}, ...],
+       "latest":"2026-09"}
+    """
+    store = {}
+    if os.path.exists(_PENSION_STORE):
+        try:
+            with open(_PENSION_STORE, encoding='utf-8') as f:
+                store = json.load(f) or {}
+        except Exception:
+            logger.exception('pension_store.json 읽기 실패')
+            store = {}
+    months = []
+    for m in sorted(store.keys()):
+        rec = store.get(m) or {}
+        if not isinstance(rec, dict):
+            rec = {}
+        months.append({
+            'month': m,
+            'uploadedAt': rec.get('uploadedAt') or '',
+            'rows': len(rec.get('rows') or []),
+        })
+    return jsonify({'months': months, 'latest': months[-1]['month'] if months else ''})
+
+
 @app.route('/api/pension_store', methods=['POST'])
 def pension_store_post():
     """월별 금리 데이터(DB)를 서버에 저장 → 다른 기기에서도 조회 가능."""

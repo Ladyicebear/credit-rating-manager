@@ -253,20 +253,106 @@ async function boot(){
     STORE=ps||{}; META=mt||{}; PROPOSALS=pr||{};
   }catch(e){ toast('데이터를 불러오지 못했습니다','err'); return; }
 
-  const months=Object.keys(STORE).sort();
-  if(!months.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="9">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>'; return; }
-  $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${m}</option>`).join('');
-  curMonth=months[months.length-1];
-  $('monthSel').value=curMonth;
-  $('monthSel').onchange=()=>{ curMonth=$('monthSel').value; buildDbRows(); loadProposalsForMonth(); render(); renderSuspension(); };
-
-  buildDbRows();
-  loadProposalsForMonth();
-  renderSecChips();
   bindFilters();
-  render();
+  $('monthSel').onchange=()=>{ selectMonth($('monthSel').value); };
+  applyStore({initial:true});
   loadNotice();
   loadSuspension();
+  watchNewUploads();
+}
+
+/* ---------- 기준월 목록 / 자동 반영 ----------
+   기준월 선택지는 서버에 저장된 금리 데이터(pension_store)의 월 키에서 만든다.
+   → 금리 화면에서 그 달 엑셀을 업로드하면 여기 기준월도 자동으로 생기고, 그 달로 전환된다. */
+function storeMonths(){ return Object.keys(STORE).sort(); }
+
+function refreshMonthSel(){
+  const months=storeMonths();
+  $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  $('monthSel').value=curMonth;
+  $('monthSel').disabled=!months.length;
+}
+
+/* 기준월 전환(사용자 선택 / 자동 전환 공통) */
+function selectMonth(m){
+  if(!m || m===curMonth) return;
+  curMonth=m;
+  $('monthSel').value=m;
+  renderMonthView();
+}
+
+/* 선택된 기준월 기준으로 화면 전체(상품목록·업권칩·제안목록·발행정지) 다시 그림 */
+function renderMonthView(){
+  buildDbRows();
+  loadProposalsForMonth();
+  renderSecChips();     // 업권별 건수는 월마다 다르므로 함께 갱신
+  render();
+  renderSuspension();
+}
+
+/* 저장된 제안목록과 현재 작업목록이 다르면 '작업 중'(등록 전) */
+function hasUnsavedWork(){
+  return JSON.stringify(selected)!==JSON.stringify(PROPOSALS[curMonth]||[]);
+}
+
+/* STORE를 화면에 반영. 새 기준월이 생겼으면 그 달로 자동 전환한다. */
+function applyStore(opt){
+  opt=opt||{};
+  const months=storeMonths();
+  const empty=$('leftBody');
+  if(!months.length){
+    curMonth=''; refreshMonthSel();
+    if(empty) empty.innerHTML='<tr class="none-row"><td colspan="9">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>';
+    return;
+  }
+  const latest=months[months.length-1];
+  const isNew = !!curMonth && latest!==curMonth && !opt.initial;
+
+  // 등록 전 작업 내용이 있으면 임의로 달을 바꾸지 않는다(작업분 유실 방지). 목록에만 추가하고 알림.
+  if(isNew && hasUnsavedWork()){
+    refreshMonthSel();
+    toast(`${latest.replace('-','년 ')}월 금리가 업로드됐습니다. 작업 중인 제안목록이 있어 기준월은 그대로 둡니다(기준월에서 선택).`);
+    return;
+  }
+
+  if(!curMonth || !STORE[curMonth] || isNew) curMonth=latest;
+  refreshMonthSel();
+  renderMonthView();
+  if(isNew) toast(`${latest.replace('-','년 ')}월 금리가 업로드되어 기준월을 ${latest}(으)로 변경했습니다`);
+}
+
+/* 서버의 전체 금리 데이터를 다시 받아 반영 */
+async function reloadStore(){
+  try{
+    const ps=await fetch('/api/pension_store',{cache:'no-store'}).then(r=>r.json());
+    if(!ps || typeof ps!=='object') return;
+    STORE=ps;
+    applyStore();
+  }catch(e){ /* 통신 실패 시 다음 주기에 재시도 */ }
+}
+
+/* 새 기준월 업로드 감지
+   1) 같은 브라우저의 금리 화면 탭에서 업로드 → storage 이벤트로 즉시
+   2) 다른 기기/사람이 업로드 → 가벼운 /api/pension_months 폴링(60초, 화면이 보일 때만)
+   3) 탭을 다시 열거나 창에 포커스가 돌아올 때 즉시 확인 */
+function watchNewUploads(){
+  let known=storeMonths().join(',');
+
+  async function checkMonths(){
+    if(document.hidden) return;
+    try{
+      const d=await fetch('/api/pension_months',{cache:'no-store'}).then(r=>r.json());
+      const sig=(d&&d.months||[]).map(x=>x.month).sort().join(',');
+      if(sig && sig!==known){ known=sig; await reloadStore(); }
+    }catch(e){}
+  }
+
+  window.addEventListener('storage', e=>{
+    if(e.key==='pension_store_updated') reloadStore().then(()=>{ known=storeMonths().join(','); });
+  });
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkMonths(); });
+  window.addEventListener('focus', checkMonths);
+  setInterval(checkMonths, 60000);
 }
 
 /* ---------- 공지사항 ---------- */
