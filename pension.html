@@ -773,9 +773,11 @@ const MONTHS = [3,6,12,18,24,30,36,48,60];
 const MONTH_LABEL = {3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
 const SECTOR_ORDER = ['은행','저축은행','생명보험','손해보험','증권','기타'];
 const STORE_KEY = 'pension_rate_mgmt_v1';
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;   /* 기준월 키 형식(YYYY-MM) */
 
 let DB = load();            // { "YYYY-MM": { rows:[...], fileName, uploadedAt } }
 let curMonth = null;
+let userPickedMonth = false;   /* 사용자가 월 선택을 직접 바꿨는가(서버 동기화 후 최신월 자동선택 여부 판단) */
 let curRows = [];
 let filterSec = 'ALL';
 let prodFilter = 'ALL';    // 상품구분 필터(이율보증형보험/정기예금/ELB·DLB)
@@ -788,21 +790,42 @@ let cpiData = null;        // 소비자물가지수 최신월 상승률(/api/cpi
 let baseRateRows = null;   // 과거 금리 추이 Sheet2 rows (한국은행 기준금리 표시용)
 
 /* ---------- storage ---------- */
-function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ return {}; } }
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+    /* 기준월(YYYY-MM) 키만 남긴다 — 예전에 로그인 만료 응답({success,message,...})이
+       그대로 병합돼 화면이 '데이터 없음'으로 보이던 흔적을 열 때 자동 정리 */
+    Object.keys(d).forEach(k=>{ if(!MONTH_KEY.test(k) || !d[k] || typeof d[k]!=='object') delete d[k]; });
+    return d;
+  }catch(e){ return {}; }
+}
+/* DB에 실제로 데이터가 있는 기준월(최신순) */
+function dbMonths(){ return Object.keys(DB).filter(m=>MONTH_KEY.test(m)).sort().reverse(); }
 function save(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
-  // 서버에도 저장 → 휴대폰/다른 브라우저에서도 조회 가능
-  try{ fetch('/api/pension_store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)}); }catch(e){}
+  // 서버에도 저장 → 휴대폰/다른 브라우저에서도 조회 가능.
+  // 서버는 기준월 단위로 병합하므로 이 POST가 다른 달을 지우지 않는다.
+  // 저장 실패(로그인 만료·권한·네트워크)를 조용히 삼키면 "업로드했는데 없어졌다"가 되므로 반드시 알린다.
+  return fetch('/api/pension_store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(DB)})
+    .then(r=>r.json().catch(()=>({})).then(d=>({ok:r.ok && d && d.ok!==false, d:d||{}})))
+    .then(({ok,d})=>{
+      if(!ok){ toast('서버 저장 실패 — 이 브라우저에만 저장됐습니다'+(d.message?' ('+d.message+')':''), true); return false; }
+      return true;
+    })
+    .catch(()=>{ toast('서버 저장 실패(네트워크) — 이 브라우저에만 저장됐습니다', true); return false; });
 }
 /* 서버 저장분을 불러와 병합(다른 기기에서 업로드한 데이터도 반영) */
 function syncFromServer(){
-  fetch('/api/pension_store').then(r=>r.json()).then(srv=>{
-    if(!srv || typeof srv!=='object') return;
-    const keys=Object.keys(srv); if(!keys.length) return;
-    const localEmpty = !Object.keys(DB).length;
+  fetch('/api/pension_store').then(r=> r.ok ? r.json() : Promise.reject(new Error('HTTP '+r.status))).then(srv=>{
+    if(!srv || typeof srv!=='object' || Array.isArray(srv)) return;
+    // 기준월(YYYY-MM) 키만 반영 — 로그인 만료 시 오는 {success,message,login_required}가
+    // DB에 섞여 들어가 화면이 '데이터 없음'으로 보이던 문제 방지
+    const keys=Object.keys(srv).filter(m=>MONTH_KEY.test(m) && srv[m] && typeof srv[m]==='object');
+    if(!keys.length) return;
     keys.forEach(m=>{ DB[m]=srv[m]; });          // 서버 데이터 반영
     try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
-    if(localEmpty || !curMonth || !DB[curMonth]) curMonth = Object.keys(DB).sort().reverse()[0];
+    // 사용자가 월을 직접 고르기 전이라면, 서버에 새로 올라온 달(예: 9월)을 자동으로 연다
+    if(!userPickedMonth || !curMonth || !DB[curMonth]) curMonth = dbMonths()[0] || curMonth;
     refreshMonthSel();
     loadMonth(curMonth);
   }).catch(()=>{});
@@ -1053,7 +1076,7 @@ const $=id=>document.getElementById(id);
 function toast(msg,err){ const t=$('toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',2600); }
 
 function refreshMonthSel(){
-  const sel=$('monthSel'); const months=Object.keys(DB).sort().reverse();
+  const sel=$('monthSel'); const months=dbMonths();
   const cur=thisMonth();
   const all=[...new Set([cur,...months])].sort().reverse();
   sel.innerHTML=all.map(m=>{
@@ -1910,13 +1933,13 @@ $('fileInput').onchange=e=>{
       const prevOv = DB[m] && DB[m].overrides;           // 같은 달 재업로드 시 수기값 승계
       DB[m]={ rows, raw, fileName:f.name, uploadedAt:new Date().toLocaleString('ko-KR',{dateStyle:'short',timeStyle:'short'}), srcRows:raw.length, baseMonth:m, baseFromFile:!!baseMonth };
       if(prevOv){ DB[m].overrides=prevOv; pruneOverrides(DB[m]); }   // 새 업로드가 채운 칸은 업로드값으로 대체
-      save();
-      curMonth=m; refreshMonthSel(); loadMonth(m);
-      if(baseMonth){
-        toast(`업로드 완료 · 기준년월 ${m.replace('-','년 ')}월 · 원본 ${raw.length}행 → 관리 ${rows.length}건`);
-      }else{
-        toast(`기준년월이 파일에 없어 선택월(${m.replace('-','년 ')}월)로 저장했습니다. 양식 A1에 기준년월을 넣어주세요.`, true);
-      }
+      curMonth=m; userPickedMonth=true; refreshMonthSel(); loadMonth(m);
+      if(!baseMonth) toast(`기준년월이 파일에 없어 선택월(${m.replace('-','년 ')}월)로 저장했습니다. 양식 A1에 기준년월을 넣어주세요.`, true);
+      // 서버 저장이 확인된 뒤에 '업로드 완료'를 알린다. 서버에 올라가야 상품제안관리 기준월에도 뜬다.
+      save().then(ok=>{
+        if(!ok) return;                      // 실패 사유는 save()가 토스트로 알린다
+        if(baseMonth) toast(`업로드 완료 · 기준년월 ${m.replace('-','년 ')}월 서버 저장 · 원본 ${raw.length}행 → 관리 ${rows.length}건 · 상품제안관리에서 ${m.replace('-','년 ')}월 선택 가능`);
+      });
       // 업로드 시 자동으로 '과거 금리 추이 이력 추가' 모달 열기(기준금리만 확인·입력 → 추가). 연금컨설팅팀 전용.
       if(!document.body.classList.contains('role-rm')) setTimeout(openHistAppend, 600);
     }catch(err){ console.error(err); toast('업로드 실패: '+err.message,true); }
@@ -2254,7 +2277,7 @@ $('btnAllExport').onclick=function(){
 };
 
 /* ---------- events ---------- */
-$('monthSel').onchange=e=>loadMonth(e.target.value);
+$('monthSel').onchange=e=>{ userPickedMonth=true; loadMonth(e.target.value); };
 /* 검색: 입력 중에는 실행 안 함, 돋보기 버튼/Enter로 실행 */
 function doSearch(){ searchTxt=$('search').value; render(); }
 $('search').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doSearch(); } });

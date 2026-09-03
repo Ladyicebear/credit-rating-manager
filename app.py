@@ -701,7 +701,40 @@ def pension():
 
 
 # ── 퇴직연금 금리 데이터 서버 저장(모든 기기/브라우저 공유) ──
+#   pension_store.json = { "YYYY-MM": {rows, raw, fileName, uploadedAt, overrides...} }
+#   이 파일의 기준월 키가 곧 상품제안관리(proposal.html)의 '기준월' 목록이 된다.
+#   → 9월 금리를 업로드하면 여기에 "2026-09"가 생기고, 상품제안관리에서 9월을 고를 수 있다.
 _PENSION_STORE = os.path.join(BASE_DIR, 'data', 'pension_store.json')
+_PENSION_STORE_LOCK = threading.Lock()
+_MONTH_KEY_RE = re.compile(r'^\d{4}-(0[1-9]|1[0-2])$')
+_PENSION_BAK_KEEP = 10          # 저장 직전 백업본 보관 개수
+
+
+def _read_pension_store() -> dict:
+    """서버에 저장된 월별 금리 데이터. 파일이 없거나 손상됐으면 빈 dict."""
+    if not os.path.exists(_PENSION_STORE):
+        return {}
+    try:
+        with open(_PENSION_STORE, encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('pension_store.json 읽기 실패')
+        return {}
+
+
+def _backup_pension_store():
+    """덮어쓰기 직전 스냅샷을 남긴다(최근 _PENSION_BAK_KEEP개만 보관). 실패해도 저장은 진행."""
+    if not os.path.exists(_PENSION_STORE):
+        return
+    d = os.path.dirname(_PENSION_STORE)
+    try:
+        shutil.copy2(_PENSION_STORE, '%s.bak_%d' % (_PENSION_STORE, int(time.time() * 1000)))
+        baks = sorted(f for f in os.listdir(d) if f.startswith('pension_store.json.bak_'))
+        for old in baks[:-_PENSION_BAK_KEEP]:
+            os.remove(os.path.join(d, old))
+    except Exception:
+        logger.exception('pension_store 백업 실패(저장은 계속 진행)')
 
 
 @app.route('/api/pension_store', methods=['GET'])
@@ -715,14 +748,44 @@ def pension_store_get():
 
 @app.route('/api/pension_store', methods=['POST'])
 def pension_store_post():
-    """월별 금리 데이터(DB)를 서버에 저장 → 다른 기기에서도 조회 가능."""
+    """월별 금리 데이터(DB)를 서버에 저장 → 다른 기기에서도 조회 가능.
+
+    **기준월 단위로 병합**한다. 예전에는 클라이언트 localStorage 전체로 파일을 통째로
+    덮어썼기 때문에, 그 달이 없는 브라우저(다른 PC·시크릿창·캐시 삭제 후)가 업로드나
+    금리 편집을 하는 순간 서버의 다른 달(예: 새로 올린 9월)이 통째로 사라졌다.
+    이제 보내온 달만 갱신하고 나머지 달은 서버 값을 그대로 유지하며, 덮어쓰기 전
+    백업본을 남긴다. 브라우저에만 남아 있는 달은 그대로 올라와 복구도 된다.
+    """
     data = request.get_json(force=True, silent=True)
     if not isinstance(data, dict):
-        return jsonify({'error': 'invalid'}), 400
-    os.makedirs(os.path.dirname(_PENSION_STORE), exist_ok=True)
-    with open(_PENSION_STORE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False)
-    return jsonify({'ok': True, 'months': sorted(data.keys())})
+        return jsonify({'ok': False, 'error': 'invalid',
+                        'message': '요청 형식 오류'}), 400
+
+    # 기준월(YYYY-MM) 형식의 정상 레코드만 수용.
+    # (로그인 만료 시 돌아가는 {success, message, login_required} 같은 잡키 차단)
+    incoming = {m: v for m, v in data.items()
+                if _MONTH_KEY_RE.match(str(m)) and isinstance(v, dict)}
+    if not incoming:
+        return jsonify({'ok': False, 'error': 'no-month',
+                        'message': '저장할 기준월 데이터가 없습니다'}), 400
+
+    with _PENSION_STORE_LOCK:
+        cur = _read_pension_store()
+        os.makedirs(os.path.dirname(_PENSION_STORE), exist_ok=True)
+        if cur:
+            _backup_pension_store()
+        merged = dict(cur)
+        merged.update(incoming)                 # 보내온 달만 갱신 · 나머지 달은 유지
+        tmp = _PENSION_STORE + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(merged, f, ensure_ascii=False)
+        os.replace(tmp, _PENSION_STORE)         # 원자적 교체(저장 중 중단돼도 파일 안 깨짐)
+
+    added = sorted(set(incoming) - set(cur))
+    logger.info('pension_store 저장 · 갱신 %s · 신규 %s · 보관 %s',
+                sorted(incoming), added, sorted(merged))
+    return jsonify({'ok': True, 'months': sorted(merged.keys()),
+                    'saved': sorted(incoming.keys()), 'added': added})
 
 
 # ── 상품제안관리 ───────────────────────────────────────────────────────

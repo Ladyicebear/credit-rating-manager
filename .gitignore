@@ -62,6 +62,11 @@ data/issue_suspension.json
 # 과거 금리 추이 백업본(로컬 생성물)
 data/rate_history_backup_*
 
+# 저장 직전 자동 백업 스냅샷(런타임 생성물 — 커밋 금지)
+data/pension_store.json.bak_*
+data/pension_store.json.tmp
+data/rate_history.json.bak_*
+
 # 자동배포 로그
 auto_deploy.log
 
