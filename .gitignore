@@ -67,6 +67,19 @@ data/pension_store.json.bak_*
 data/pension_store.json.tmp
 data/rate_history.json.bak_*
 
+# ── 런타임 데이터(서버가 직접 쓰는 파일 — 커밋 금지) ──────────────────
+#   웹 화면에서 저장·업로드·스크래핑으로 서버가 갱신하는 파일들.
+#   git에 추적돼 있으면 배포(git pull / checkout / reset)가 실서버의 살아있는
+#   데이터를 커밋 시점으로 되돌려버린다(2026-09 금리 유실 사고 원인 중 하나).
+#   새 서버를 처음 띄울 때는 기존 서버의 data/ 백업본을 복사해 넣을 것.
+#   (data/overrides.json, data/cpi_history.xlsx 는 서버가 쓰지 않는 seed라 추적 유지)
+data/pension_store.json
+data/rate_history.json
+data/rate_history.xlsx
+data/ratings.json
+data/institutions.json
+data/cpi_history.json
+
 # 자동배포 로그
 auto_deploy.log
 
