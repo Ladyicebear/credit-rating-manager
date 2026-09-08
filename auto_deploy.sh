@@ -36,7 +36,19 @@ fi
 echo "$(now) 업데이트 감지 ${LOCAL:0:7} -> ${REMOTE:0:7}" >>"$LOG"
 put running "새 코드 반영 중 ${LOCAL:0:7} → ${REMOTE:0:7}"
 
-# ── 런타임 데이터 보호: data/ 로컬 변경을 잠시 치워 ff-only 충돌 방지 ──
+# ── 런타임 데이터 보호 ① 무조건 스냅샷부터 ──
+#   아래 stash/merge/stash pop 중 어디서 꼬여도 되돌릴 수 있게, 손대기 전에 data/ 를 통째로
+#   복사해 둔다(최근 5벌 보관). 2026-09 금리가 배포 과정에서 사라진 사고의 재발 방지책.
+if [ -d "$REPO/data" ]; then
+  BAK="$REPO/.data_backups/$(date '+%Y%m%d-%H%M%S')"
+  mkdir -p "$BAK" && cp -a "$REPO/data/." "$BAK/" 2>>"$LOG" \
+    && echo "$(now) data/ 스냅샷 $BAK" >>"$LOG" \
+    || echo "$(now) data/ 스냅샷 실패(배포는 계속)" >>"$LOG"
+  ls -1d "$REPO"/.data_backups/*/ 2>/dev/null | head -n -5 | xargs -r rm -rf
+fi
+
+# ── 런타임 데이터 보호 ② data/ 로컬 변경을 잠시 치워 ff-only 충돌 방지 ──
+#   추적 중인 파일만 대상이다(운영 데이터는 .gitignore 로 추적 제외 → 애초에 여기 안 걸린다).
 STASHED=0
 if [ -n "$(git status --porcelain -- data/)" ]; then
   git stash push -q -- data/ >>"$LOG" 2>&1 && STASHED=1
@@ -54,7 +66,9 @@ if [ "$STASHED" = 1 ]; then
     echo "$(now) stash pop 충돌 — VM 데이터 우선 보존" >>"$LOG"
     git checkout --theirs -- data/ >>"$LOG" 2>&1
     git reset -q -- data/ >>"$LOG" 2>&1
-    git stash drop -q >>"$LOG" 2>&1
+    # stash 는 지우지 않는다. 여기서 drop 하면 복구 실패 시 라이브 데이터가 영영 사라진다.
+    # (스냅샷도 있지만, git stash 에도 남겨 두는 편이 되돌리기 쉽다.)
+    echo "$(now) stash 유지 — 필요 시 'git stash list' / 'git stash pop' 로 복구" >>"$LOG"
   }
 fi
 

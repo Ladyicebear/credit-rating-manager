@@ -268,10 +268,12 @@
 
 <div id="toast"></div>
 
+<!-- 금리관리·상품제안관리와 동일한 상품·금리 파생 로직(공용) -->
+<script src="/static/pension_rows.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let STORE={}, months=[], curMonth='', baseRows=null, proposals={};
-const MONTH_LABEL={3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
+/* MONTHS / MONTH_LABEL / SECTOR_ORDER 는 static/pension_rows.js 가 정의한다. */
 
 let _tt;
 function toast(m){ const el=$('toast'); el.textContent=m; el.classList.add('on'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('on'),2000); }
@@ -317,8 +319,10 @@ function render(){
   const br=currentBaseRate();
   if(br&&br.rate!=null){ $('bokVal').textContent=br.rate.toFixed(2)+'%'; $('bokWhen').textContent=br.year+'년 '+br.month+'월'; }
   else { $('bokVal').textContent='–'; $('bokWhen').textContent='-'; }
-  // 제안상품
-  const list=(proposals[curMonth]||[]).slice().sort((a,b)=>{
+  // 제안상품 — 등록 당시 금리 스냅샷이 아니라 그 기준월의 **현재 금리**로 맞춰서 보여준다.
+  // (연금컨설팅팀이 금리를 수기로 고치면 제안카드도 같이 바뀌어야 한다)
+  const priced=reprice(proposals[curMonth]||[], flattenDbRows(derivePensionRows(STORE[curMonth]))).items;
+  const list=priced.slice().sort((a,b)=>{
     const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra;
   });
   const el=$('propList');
@@ -365,128 +369,12 @@ function openNotice(){
 function closeNotice(){ $('noticeModal').classList.remove('open'); }
 
 /* ═══════════════ 금리현황 화면 (ver1 데이터 파이프라인 이식) ═══════════════ */
-const MONTHS=[3,6,12,18,24,30,36,48,60];
-const SECTOR_ORDER=['은행','저축은행','생명보험','손해보험','증권','기타'];
 let proposalMeta=null, rateMonth='', rateTab='best';
 
-function parseRate(v){ if(v==null) return null; let s=String(v).trim();
-  if(s===''||s==='-'||s==='0'||s==='0.0'||s.toUpperCase()==='N/A') return null;
-  s=s.split('~')[0].trim(); const f=parseFloat(s); if(isNaN(f)||f===0) return null; return f; }
-function normFamily(prod){ if(!prod) return '(미지정)'; let parts=String(prod).split('/');
-  if(parts.length>1) parts=parts.slice(1); let p=parts.join('/');
-  p=p.replace(/\(디폴트옵션[^)]*\)/g,''); p=p.replace(/디폴트옵션(전용|용)?\s*/g,'');
-  let segs=p.split('/');
-  while(segs.length>1){ const last=segs[segs.length-1].trim();
-    const isMat=/^\d+\s*년(\s*\d+\s*개월)?$/.test(last)||/^\d+\s*개월$/.test(last)||/\d+\s*(일|개월|년).*(~|미만|이상|초과)/.test(last)||/^\d+년\s*~/.test(last);
-    if(isMat) segs.pop(); else break; }
-  p=segs.join('/').replace(/\s+/g,' ').trim(); return p||String(prod); }
-function parseMaturities(mat){ if(mat==null) return [];
-  if(typeof mat==='number'){ const m=Math.round(mat); return [MONTHS.includes(m)?m:null]; }
-  return String(mat).split('/').map(t=>{ t=t.trim(); if(/^\d+$/.test(t)){ const m=parseInt(t,10); return MONTHS.includes(m)?m:null; } return null; }); }
-function rateList(v,n){ if(v==null) return Array(n).fill(null); const s=String(v);
-  if(s.indexOf('/')>=0){ const t=s.split('/').map(parseRate); while(t.length<n)t.push(null); return t; }
-  return Array(n).fill(parseRate(s)); }
-function isRateLinkedProd(prod){ return /금리연동형/.test(String(prod||'')); }
-function isRangeMat(mat){ return (typeof mat==='string')&&/(~|미만|이상|초과)/.test(mat); }
-
-/* raw(원본 엑셀행) → 기관·제도별 그룹행 (ver1 buildGroups 그대로) */
-function buildGroups(raw){
-  const groups=new Map();
-  for(const r of raw){
-    if(!r.org) continue;
-    const prod = r.prod ? String(r.prod) : '';
-    if(isRateLinkedProd(prod) || isRangeMat(r.mat)) continue;
-    const sec = r.sector==='기타' ? '은행' : r.sector;
-    const isDefault = prod.indexOf('디폴트옵션')>=0;
-    let fam, monthsOverride=null, depVariant=false;
-    const isDeposit = prod.indexOf('정기예금')>=0 && !isDefault && sec!=='증권' && prod.indexOf('발행어음')<0;
-    if(isDeposit){
-      const rest = prod.split('/').slice(1).join('/');
-      if(/일단위|월단위/.test(rest)){
-        if(r.org==='국민은행' && /\(일단위\)\/C$/.test(rest)){ fam='정기예금'; monthsOverride=[3,6]; }
-        else continue;
-      } else { fam='정기예금'; if(/\([^)]*\)/.test(rest)) depVariant=true; }
-    } else { fam = normFamily(prod); }
-    const key=[sec,r.org,fam].join('||');
-    let g=groups.get(key);
-    if(!g){ g={sector:sec,org:r.org,fam:fam,db:{},dc:{},def:null,srcCount:0,names:[],dbBase:new Set(),dcBase:new Set()}; groups.set(key,g); }
-    g.srcCount++; if(prod) g.names.push(prod);
-    let months, n, dbR, dcR, irpR;
-    if(monthsOverride){
-      months=monthsOverride; n=months.length;
-      const dbv=parseRate(r.db), dcv=parseRate(r.dc), irpv=parseRate(r.irp);
-      dbR=Array(n).fill(dbv); dcR=Array(n).fill(dcv); irpR=Array(n).fill(irpv);
-    } else {
-      months=parseMaturities(r.mat); n=months.length;
-      dbR=rateList(r.db,n); dcR=rateList(r.dc,n); irpR=rateList(r.irp,n);
-    }
-    for(let i=0;i<n;i++){
-      const m=months[i]; if(m===null) continue;
-      const dcv = dcR[i]!=null ? dcR[i] : irpR[i];
-      if(isDefault){ if(m===36 && dcv!=null){ g.def=dcv; } }
-      else {
-        if(dbR[i]!=null){ if(depVariant){ if(!g.dbBase.has(m)) g.db[m]=dbR[i]; } else { g.db[m]=dbR[i]; if(isDeposit) g.dbBase.add(m); } }
-        if(dcv!=null){ if(depVariant){ if(!g.dcBase.has(m)) g.dc[m]=dcv; } else { g.dc[m]=dcv; if(isDeposit) g.dcBase.add(m); } }
-      }
-    }
-    if(isDefault && g.def===null){
-      for(let i=0;i<n;i++){ const dcv=dcR[i]!=null?dcR[i]:irpR[i]; if(dcv!=null){ g.def=dcv; break; } }
-      if(g.def===null){ const v=parseRate(r.dc)??parseRate(r.irp); if(v!=null) g.def=v; }
-    }
-  }
-  const rows=[...groups.values()];
-  const prodRank=(fam)=>{ const f=String(fam); if(/ELB/.test(f)) return 0; if(/DLB/.test(f)) return 1; if(/RP|환매조건부/.test(f)) return 2; return 3; };
-  rows.sort((a,b)=>{
-    const sa=SECTOR_ORDER.indexOf(a.sector), sb=SECTOR_ORDER.indexOf(b.sector);
-    if(sa!==sb) return (sa<0?99:sa)-(sb<0?99:sb);
-    if(a.org!==b.org) return String(a.org).localeCompare(b.org,'ko');
-    const ra=prodRank(a.fam), rb=prodRank(b.fam);
-    if(ra!==rb) return ra-rb;
-    return String(a.fam).localeCompare(b.fam,'ko');
-  });
-  return rows;
-}
-function isDepositFam(r){ const f=String(r.fam); return f.indexOf('정기예금')>=0 && r.sector!=='증권' && f.indexOf('발행어음')<0; }
-function normalizeDepositRows(rows){
-  const out=[]; const merged=new Map();
-  for(const r of rows){
-    if(!isDepositFam(r)){ out.push(r); continue; }
-    if(/일단위|월단위/.test(String(r.fam))) continue;
-    const key=r.sector+'||'+r.org;
-    let m=merged.get(key);
-    if(!m){ m={sector:r.sector,org:r.org,fam:'정기예금',db:{},dc:{},def:null,srcCount:0,names:[]}; merged.set(key,m); out.push(m); }
-    m.srcCount++; if(r.names) m.names.push(...r.names);
-    for(const k in r.db){ if(m.db[k]==null && r.db[k]!=null) m.db[k]=r.db[k]; }
-    for(const k in r.dc){ if(m.dc[k]==null && r.dc[k]!=null) m.dc[k]=r.dc[k]; }
-    if(m.def==null && r.def!=null) m.def=r.def;
-  }
-  return out;
-}
-function isExcludedProduct(r){
-  const t=String(r.fam)+' '+((r.names||[]).join(' '));
-  if(/실버연금예금/.test(t)) return true;
-  if((r.sector==='생명보험'||r.sector==='손해보험') && /이율변동형|금리혼합형/.test(t)) return true;
-  return false;
-}
-function penRowKey(r){ return [r.sector,r.org,r.fam].join('||'); }
-function applyOverrides(rows, ov){
-  rows.forEach(r=>{ r.manual={db:{},dc:{},def:false}; });
-  if(!ov) return;
-  rows.forEach(r=>{
-    const o=ov[penRowKey(r)]; if(!o) return;
-    if(o.db) for(const k in o.db){ const v=o.db[k]; if(v!=null){ r.db[+k]=v; r.manual.db[+k]=true; } }
-    if(o.dc) for(const k in o.dc){ const v=o.dc[k]; if(v!=null){ r.dc[+k]=v; r.manual.dc[+k]=true; } }
-    if(o.def!=null){ r.def=o.def; r.manual.def=true; }
-  });
-}
-/* 기준월의 정규화된 관리행 (ver1 loadMonth와 동일 경로) */
-function rateRowsFor(m){
-  const rec=STORE[m];
-  const base = rec ? (rec.raw ? buildGroups(rec.raw) : (rec.rows||[])) : [];
-  const rows = normalizeDepositRows(base).filter(r=>!isExcludedProduct(r));
-  applyOverrides(rows, rec && rec.overrides);
-  return rows;
-}
+/* 금리 파생 로직(parseRate·buildGroups·normalizeDepositRows·applyOverrides 등)은
+   static/pension_rows.js 공용 모듈에 있다 — 금리관리 화면과 결과가 어긋나지 않도록 한 곳에서만 관리. */
+/* 기준월의 정규화된 관리행 — 금리관리·상품제안관리와 동일한 공용 로직 */
+function rateRowsFor(m){ return derivePensionRows(STORE[m]); }
 /* 판매여부(미설정=판매가능) */
 function sellableOf(t, field){
   const key=[t.sector,t.org,t.fam,t.months].join('|')+'|'+field;

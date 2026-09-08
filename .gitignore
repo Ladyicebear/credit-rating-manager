@@ -101,3 +101,6 @@ ecos_key.txt
 # 약관·상품설명서 업로드 파일(런타임 — 커밋 금지)
 doc_files/
 data/docs_meta.json
+
+# 배포 전 data/ 자동 스냅샷(런타임 생성물 — 커밋 금지)
+.data_backups/

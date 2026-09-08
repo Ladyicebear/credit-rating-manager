@@ -50,5 +50,9 @@ sudo systemctl daemon-reload
 - 운영 데이터(`data/pension_store.json`, `data/rate_history.*`, `data/ratings.json`,
   `data/visit_stats.json` 등)는 커밋하지 않는다. 배포는 코드만 가져오고, 병합 전 `data/`를
   자동 stash 하므로 서버 데이터는 유지된다.
+- 그래도 만약을 대비해, 배포 스크립트는 **코드를 건드리기 전에 `data/` 전체를
+  `.data_backups/<날짜-시각>/` 로 복사**해 둔다(최근 5벌 보관). 금리가 사라진 것 같으면
+  `ls ~/credit-rating-manager/.data_backups/` 에서 직전 스냅샷을 찾아 되돌리면 된다.
+  stash 되돌리기가 충돌하면 stash 를 지우지 않고 남겨 두므로 `git stash list` 로도 복구 가능.
 - 리포지토리 인증은 VM에 이미 설정된 것(수동 `git pull`이 되던 그 설정)을 그대로 사용한다.
 - 🚀 서버배포 버튼은 연금컨설팅팀에게만 보이며, RM 계정은 서버에서 차단된다.

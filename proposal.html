@@ -4,6 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>상품제안관리</title>
+<!-- 금리관리와 동일한 상품·금리 파생 로직(공용) -->
+<script src="/static/pension_rows.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--orange:#F68121;--orange-d:#d65f0f;--orange-l:rgba(246,129,33,.15);
@@ -117,6 +119,10 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
   .arrow-col{flex-direction:row;padding:4px 0}
   .arrow-btn{transform:rotate(90deg)}
 }
+  /* 제안목록 자동 승계 / 금리 갱신 안내 */
+  .prop-note{margin:0 10px 6px;padding:7px 10px;border-radius:6px;font-size:11.5px;line-height:1.5;
+             background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412}
+  .prop-note.warn{background:#FEF2F2;border-color:#FCA5A5;color:#991B1B}
 </style>
 </head>
 <body>
@@ -183,7 +189,9 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
           <tbody id="rightBody"></tbody>
         </table>
       </div>
+      <div id="propNote" class="prop-note" hidden></div>
       <div class="foot">
+        <button class="btn btn-ghost" onclick="carryFromPrevMonth()" title="직전 달 제안목록을 이 기준월 금리로 불러오기">지난달 불러오기</button>
         <button class="btn btn-ghost" onclick="reloadProposals()" title="저장된 제안 목록 다시 불러오기">수정</button>
         <button class="btn btn-navy" onclick="registerProposals()" title="현재 제안 목록을 이 기준월로 저장">등록</button>
       </div>
@@ -221,9 +229,7 @@ td.del{cursor:pointer;color:#c0392b;font-weight:800}
 
 <script>
 const $=id=>document.getElementById(id);
-const MONTHS=[3,6,12,18,24,30,36,48,60];
-const MONTH_LABEL={3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
-const SECTOR_ORDER=['은행','저축은행','생명보험','손해보험','증권','기타'];
+/* MONTHS / MONTH_LABEL / SECTOR_ORDER 는 static/pension_rows.js 가 정의한다(금리관리와 공용). */
 
 let STORE={};          // pension_store 전체 {month:{rows,...}}
 let META={};           // 상품키 -> {universe,sellable}
@@ -239,8 +245,8 @@ function htmlEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;
 function toast(m,t){const el=$('toast');el.textContent=m;el.className='show'+(t?' '+t:'');clearTimeout(el._t);el._t=setTimeout(()=>el.className='',2600);}
 function fmtRate(v){return (typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);}
 
-/* app.py 주석의 상품키 규칙과 동일해야 함: sector|org|fam|months */
-function rowKey(r){return [r.sector,r.org,r.fam,r.months].join('|');}
+/* 상품키 규칙(sector|org|fam|months)은 공용 모듈의 proposalRowKey()를 쓴다. */
+function rowKey(r){ return proposalRowKey(r); }
 
 /* ---------- 초기 로드 ---------- */
 async function boot(){
@@ -253,20 +259,46 @@ async function boot(){
     STORE=ps||{}; META=mt||{}; PROPOSALS=pr||{};
   }catch(e){ toast('데이터를 불러오지 못했습니다','err'); return; }
 
+  // 기준월 목록 = 서버(pension_store)에 저장된 달. 여기에 안 뜨면 금리 업로드가 서버까지
+  // 저장되지 않은 것이다 → 추측하지 않게 실제 서버 상태를 화면에 그대로 알려준다.
   const months=Object.keys(STORE).sort();
-  if(!months.length){ $('leftBody').innerHTML='<tr class="none-row"><td colspan="9">업로드된 원리금 금리 데이터가 없습니다. 먼저 원리금보장상품 금리 화면에서 엑셀을 업로드하세요.</td></tr>'; return; }
+  if(!months.length){
+    $('leftBody').innerHTML='<tr class="none-row"><td colspan="9">서버에 저장된 원리금 금리 데이터가 없습니다. 원리금보장상품 금리 화면에서 엑셀을 업로드하세요(업로드 후 「서버 저장」 완료 메시지를 확인).</td></tr>';
+    return;
+  }
   $('monthSel').innerHTML=months.map(m=>`<option value="${m}">${m}</option>`).join('');
   curMonth=months[months.length-1];
   $('monthSel').value=curMonth;
-  $('monthSel').onchange=()=>{ curMonth=$('monthSel').value; buildDbRows(); loadProposalsForMonth(); render(); renderSuspension(); };
+  $('monthSel').onchange=async()=>{ curMonth=$('monthSel').value; buildDbRows(); renderSuspension(); await loadProposalsForMonth(); render(); };
 
   buildDbRows();
-  loadProposalsForMonth();
   renderSecChips();
   bindFilters();
-  render();
   loadNotice();
   loadSuspension();
+
+  // 이번 달(오늘 기준) 금리가 아직 서버에 없으면 눈에 띄게 알린다.
+  // ('업로드했는데 9월이 안 뜬다' = 브라우저에만 저장되고 서버 저장이 실패한 경우를 바로 구분)
+  const tm=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  if(!STORE[tm]){
+    monthWarn=`이번 달(${tm}) 금리가 서버에 없습니다. 서버에 저장된 기준월: ${months.join(', ')} — 금리 화면에서 다시 업로드하고 「서버 저장」 완료 메시지를 확인하세요.`;
+  }
+
+  await loadProposalsForMonth();   // 최초 진입 시 이달의 제안상품 자동 승계까지 수행
+  render();
+}
+
+/* 오른쪽 패널 안내 배너.
+   monthWarn(이번 달 금리가 서버에 없음)은 항상 맨 위에 남긴다 — '9월이 안 뜬다'의 원인을
+   화면에서 바로 알 수 있어야 하므로 다른 안내에 밀려 사라지면 안 된다. */
+let monthWarn='';
+function note(msg, warn){
+  const el=$('propNote'); if(!el) return;
+  const parts=[monthWarn, msg].filter(Boolean);
+  if(!parts.length){ el.hidden=true; el.textContent=''; return; }
+  el.hidden=false;
+  el.className='prop-note'+((warn||monthWarn)?' warn':'');
+  el.innerHTML=parts.map(htmlEsc).join('<br>');
 }
 
 /* ---------- 공지사항 ---------- */
@@ -323,23 +355,13 @@ function saveSuspension(){
     }).catch(()=>toast('서버 통신 실패','err'));
 }
 
-/* ---------- DB제도 상품 평탄화(만기별 1행) ---------- */
+/* ---------- DB제도 상품 평탄화(만기별 1행) ----------
+   금리관리 화면과 **똑같은** 파생 규칙(공용 모듈)을 쓴다.
+   예전에는 저장된 rows를 그대로 펼쳐서, 금리관리에서 감춘 상품(판매중단 실버연금예금,
+   생·손보 이율변동형/금리혼합형, 정기예금 일단위·월단위 코호트)이 제안 후보로 뜨고
+   수기로 고친 금리(overrides)도 반영되지 않았다. */
 function buildDbRows(){
-  dbRows=[];
-  const e=STORE[curMonth]; if(!e||!Array.isArray(e.rows)) return;
-  for(const r of e.rows){
-    const db=r.db||{};
-    for(const m of MONTHS){
-      const v=db[m]; if(v==null) continue;
-      dbRows.push({sector:r.sector,org:r.org,fam:r.fam,months:m,period:MONTH_LABEL[m],rate:v});
-    }
-  }
-  dbRows.sort((a,b)=>{
-    const s=SECTOR_ORDER.indexOf(a.sector)-SECTOR_ORDER.indexOf(b.sector);
-    if(s!==0) return s;
-    const o=String(a.org).localeCompare(b.org,'ko'); if(o!==0) return o;
-    return a.months-b.months;
-  });
+  dbRows = flattenDbRows(derivePensionRows(STORE[curMonth]));
 }
 
 /* ---------- 필터 ---------- */
@@ -444,18 +466,63 @@ function addSelected(){
 }
 function removeSelected(i){ selected.splice(i,1); render(); }
 
-/* ---------- 등록 / 수정 ---------- */
-function loadProposalsForMonth(){ selected=(PROPOSALS[curMonth]||[]).map(x=>Object.assign({},x)); }
-function reloadProposals(){ loadProposalsForMonth(); render(); toast('저장된 제안 목록을 불러왔습니다'); }
-async function registerProposals(){
+/* ---------- 등록 / 수정 / 자동 승계 ---------- */
+/* 이 기준월의 제안목록을 화면에 올린다.
+   ① 이미 등록된 달  → 등록본을 불러오되, 그 사이 바뀐 금리(수기 편집 등)를 반영하고
+                       그 달에 없어진 상품은 빼서 알린다.
+   ② 아직 등록 전인 달(예: 9월 금리를 새로 올린 직후)
+                     → 직전에 제안목록이 있던 달에서 상품을 그대로 승계하고
+                       금리만 이 달 값으로 바꿔 **자동 등록**한다. */
+async function loadProposalsForMonth(){
+  note('');
+  const saved=PROPOSALS[curMonth];
+  if(Array.isArray(saved)){
+    const r=reprice(saved, dbRows);
+    selected=r.items;
+    if(r.changed){
+      const parts=[];
+      if(r.updated) parts.push(`${r.updated}건을 ${curMonth} 현재 금리로 갱신`);
+      if(r.dropped.length) parts.push(`이 달에 없는 상품 ${r.dropped.length}건 제외(${r.dropped.map(x=>x.org+' '+x.fam).join(', ')})`);
+      note((parts.join(' · ')||'등록본을 현재 금리에 맞춰 정리했습니다')+' — 확인 후 [등록]을 눌러 저장하세요.');
+    }
+    return;
+  }
+  const c=carryOverProposals(STORE, PROPOSALS, curMonth);
+  if(!c){ selected=[]; return; }          // 승계할 이전 달이 없으면 빈 목록에서 시작
+  selected=c.items;
+  const ok=await saveProposals(true);     // 자동 등록(모바일 제안카드에 바로 반영)
+  const tail=c.dropped.length ? ` · 이 달에 없는 상품 ${c.dropped.length}건 제외(${c.dropped.map(x=>x.org+' '+x.fam).join(', ')})` : '';
+  note(`${c.from} 제안목록을 ${curMonth} 금리로 이어받아 ${c.items.length}건 ${ok?'자동 등록했습니다':'불러왔습니다(자동 저장 실패 — [등록]을 눌러주세요)'}${tail}`, !ok);
+}
+
+/* '지난달 불러오기' 버튼 — 이미 등록된 달에서도 직전 달 목록을 다시 가져온다(저장은 [등록]으로). */
+function carryFromPrevMonth(){
+  const prevOnly={}; Object.keys(PROPOSALS).forEach(m=>{ if(m<curMonth) prevOnly[m]=PROPOSALS[m]; });
+  const c=carryOverProposals(STORE, prevOnly, curMonth);
+  if(!c){ toast('가져올 지난달 제안목록이 없습니다','err'); return; }
+  selected=c.items; render();
+  const tail=c.dropped.length ? ` · 없어진 상품 ${c.dropped.length}건 제외` : '';
+  note(`${c.from} 제안목록 ${c.items.length}건을 ${curMonth} 금리로 불러왔습니다${tail} — [등록]을 눌러 저장하세요.`);
+}
+
+async function reloadProposals(){ await loadProposalsForMonth(); render(); toast('저장된 제안 목록을 불러왔습니다'); }
+
+/* 현재 제안 목록을 서버에 저장. silent=true면 토스트 없이(자동 승계용). */
+async function saveProposals(silent){
   try{
     const res=await fetch('/api/proposals',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({month:curMonth,items:selected})});
     const d=await res.json();
-    if(d.success){ PROPOSALS[curMonth]=selected.map(x=>Object.assign({},x)); toast(`${curMonth} 제안상품 ${d.count}건을 등록했습니다`); }
-    else toast(d.message||'등록 실패','err');
-  }catch(e){ toast('서버와 통신하지 못했습니다','err'); }
+    if(d.success){
+      PROPOSALS[curMonth]=selected.map(x=>Object.assign({},x));
+      if(!silent) toast(`${curMonth} 제안상품 ${d.count}건을 등록했습니다`);
+      return true;
+    }
+    if(!silent) toast(d.message||'등록 실패','err');
+  }catch(e){ if(!silent) toast('서버와 통신하지 못했습니다','err'); }
+  return false;
 }
+async function registerProposals(){ if(await saveProposals(false)) note(''); }
 
 boot();
 </script>
