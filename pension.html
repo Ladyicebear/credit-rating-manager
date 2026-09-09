@@ -701,7 +701,7 @@
         </div>
         <div class="biz-acc-bd">
           <div class="biz-chips-row" id="bizGradeChips"></div>
-          <div class="biz-acc-hint">고른 등급 <b>이상</b>인 상품제공기관의 상품만 보여줍니다.<br>신용등급이 없는 기관(우체국 등)은 제외됩니다.</div>
+          <div class="biz-acc-hint">고른 등급 <b>이상</b>인 상품제공기관의 상품만 보여줍니다.<br>우체국은 국가전액보장이라 <b>AAA</b>로 보고 항상 포함하며, 그 밖에 신용등급이 없는 기관은 제외됩니다.</div>
         </div>
       </div>
       <!-- 기간(만기) 필터(접는 박스) -->
@@ -713,7 +713,7 @@
         </div>
         <div class="biz-acc-bd">
           <div class="biz-chips-row" id="bizTermChips"></div>
-          <div class="biz-acc-hint">만기가 정해지지 않은 상품(금리연동형·기간식)은 기간을 고르면 제외됩니다.</div>
+          <div class="biz-acc-hint">여러 개 고를 수 있습니다(다시 누르면 해제).<br>만기가 정해지지 않은 상품(금리연동형·기간식)은 기간을 고르면 제외됩니다.</div>
         </div>
       </div>
       <button class="biz-search-btn" onclick="doBizSearch()">검색하기</button>
@@ -1221,7 +1221,7 @@ function renderMobileTable(){
    ============================================================ */
 let bizProd='ALL', bizPlan='all', bizSearch='', bizSort='desc', bizExpanded=false;
 let bizGrade='ALL';    // 신용등급 하한(이 등급 이상만) — 저장값 기준('AA','A','BBB'는 화면에 AA0/A0/BBB0)
-let bizTerm='ALL';     // 기간(개월). 숫자면 그 만기만
+let bizTerms=[];       // 기간(개월) 다건 선택. 빈 배열이면 전체
 function onBizSearch(v){ bizSearch=v; }                 // 입력만 반영(적용은 검색하기/Enter)
 function doBizSearch(){ bizExpanded=false; renderBizCards(); }
 function setBizProd(v,el){ bizProd=v; bizExpanded=false;
@@ -1256,8 +1256,8 @@ function renderBizFilterChips(){
   }
   const t=$('bizTermChips');
   if(t && !t.children.length){
-    t.innerHTML=`<button class="biz-fchip on" onclick="setBizTerm('ALL',this)">전체</button>`+
-      MONTHS.map(m=>`<button class="biz-fchip" onclick="setBizTerm(${m},this)">${MONTH_LABEL[m]}</button>`).join('');
+    t.innerHTML=`<button class="biz-fchip on" data-m="ALL" onclick="setBizTerm('ALL')">전체</button>`+
+      MONTHS.map(m=>`<button class="biz-fchip" data-m="${m}" onclick="setBizTerm(${m})">${MONTH_LABEL[m]}</button>`).join('');
   }
 }
 function _bizChipOn(wrapId, el){
@@ -1273,24 +1273,49 @@ function setBizGrade(v,el){
   if(v!=='ALL' && !penRatingMap){ loadPenRatings().then(()=>renderBizCards()); return; }
   renderBizCards();
 }
-function setBizTerm(v,el){
-  bizTerm=v; bizExpanded=false;
-  _bizChipOn('bizTermChips', el);
-  const lab=$('bizTermVal');
-  if(lab){ lab.textContent = (v==='ALL') ? '전체' : MONTH_LABEL[v]; lab.classList.toggle('on', v!=='ALL'); }
+/* 기간은 다건 선택 — 칩을 누를 때마다 켜고 끈다. '전체'는 선택을 모두 지운다.
+   마지막 하나를 끄면 자동으로 전체가 된다. */
+function setBizTerm(v){
+  if(v==='ALL') bizTerms=[];
+  else {
+    const i=bizTerms.indexOf(v);
+    if(i>=0) bizTerms.splice(i,1); else bizTerms.push(v);
+    bizTerms.sort((a,b)=>a-b);
+  }
+  bizExpanded=false;
+  syncBizTermChips();
   renderBizCards();
+}
+/* 선택 상태를 칩과 머리글에 반영 */
+function syncBizTermChips(){
+  document.querySelectorAll('#bizTermChips .biz-fchip').forEach(b=>{
+    const d=b.dataset.m;
+    b.classList.toggle('on', d==='ALL' ? !bizTerms.length : bizTerms.indexOf(+d)>=0);
+  });
+  const lab=$('bizTermVal'); if(!lab) return;
+  lab.textContent = !bizTerms.length ? '전체'
+    : (bizTerms.length<=2 ? bizTerms.map(m=>MONTH_LABEL[m]).join(' · ')
+                          : bizTerms.length+'개 선택');
+  lab.classList.toggle('on', bizTerms.length>0);
+}
+/* 등급 필터에 쓰는 순위. 우체국은 신용등급이 없지만 국가전액보장이라 AAA(0)로 본다
+   → 'AAA 이상'을 포함한 모든 등급 필터에서 함께 보인다. */
+function bizEffRank(r){
+  if(isGovGuaranteed(r&&r.org)) return 0;
+  return bizRatingRank(penRatingOf(penRatingMap,r));
 }
 /* 신용등급 하한 통과 여부. 등급을 모르는 기관은 기준 충족을 확인할 수 없어 제외한다. */
 function bizGradeMatch(r){
   if(bizGrade==='ALL') return true;
-  const rank=bizRatingRank(penRatingOf(penRatingMap,r));
+  const rank=bizEffRank(r);
   if(rank<0) return false;
   return rank<=bizRatingRank(bizGrade);
 }
-/* 기간(만기) 일치 여부. 만기가 없는 상품(금리연동형·기간식)은 특정 기간 선택 시 제외. */
+/* 기간(만기) 일치 여부 — 다건 선택(빈 배열=전체).
+   만기가 없는 상품(금리연동형·기간식)은 기간을 하나라도 고르면 제외된다. */
 function bizTermMatch(r){
-  if(bizTerm==='ALL') return true;
-  return r.months===bizTerm;
+  if(!bizTerms.length) return true;
+  return bizTerms.indexOf(r.months)>=0;
 }
 /* 상품구분 칩 필터(전체/정기예금/ELB/이율보증형) */
 function bizProdMatch(fam){
@@ -1339,8 +1364,10 @@ function bizRows(){
 }
 let bizCurRows=[];
 /* 예금자보호 여부: 우체국=국가전액보장 / ELB·DLB=N / DB(우체국제외)=N / DC·IRP(정기예금·이율보증형·금리연동형)=Y */
+/* 우체국은 예금자보호 대신 국가가 전액 보장한다 — 등급 필터에서도 최상위로 본다. */
+function isGovGuaranteed(org){ return /우체국/.test(String(org||'')); }
 function depProtect(org,fam,plan){
-  if(/우체국/.test(String(org||''))) return '국가전액보장';
+  if(isGovGuaranteed(org)) return '국가전액보장';
   if(/ELB|DLB/.test(String(fam||''))) return 'N';
   if(plan==='DB') return 'N';
   return 'Y';
@@ -1354,7 +1381,7 @@ function renderBizCards(){
   if(!rows.length){
     const on=[];
     if(bizGrade!=='ALL') on.push('신용등급 '+bizGradeLabel(bizGrade)+' 이상');
-    if(bizTerm!=='ALL') on.push('기간 '+MONTH_LABEL[bizTerm]);
+    if(bizTerms.length) on.push('기간 '+bizTerms.map(m=>MONTH_LABEL[m]).join('·'));
     const why = on.length ? `<div class="biz-none-sub">${htmlEsc(on.join(' · '))} 조건을 넓혀보세요.</div>` : '';
     list.innerHTML=`<div class="biz-none">조건에 맞는 상품이 없습니다.${why}</div>`;
     list.style.maxHeight=''; list.style.overflowY='visible';
