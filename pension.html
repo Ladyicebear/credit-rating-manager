@@ -431,6 +431,7 @@
     .biz-chip .dep-y{color:#F58220} .biz-chip .dep-n{color:#C0392B}
     .biz-chip-gov{color:#043B72;background:#E7EFF8}
     .biz-none{padding:34px 10px;text-align:center;color:var(--muted);font-size:13px}
+    .biz-none-sub{margin-top:7px;font-size:12px;color:#9AA2AF;font-weight:600}
     .biz-more{width:100%;margin-top:12px;background:var(--white);border:1px solid var(--line);border-radius:12px;
         font-family:inherit;font-size:13.5px;font-weight:700;color:var(--muted);padding:12px;cursor:pointer}
     .biz-more:active{background:#F3F5F9}
@@ -440,6 +441,19 @@
         padding:14px 8px;cursor:pointer;letter-spacing:-.3px}
     .biz-dl-btn svg{width:17px;height:17px}
     .biz-dl-btn:active{background:#DDE7F2}
+    /* 접는 필터(신용등급·기간) — 닫혀 있어도 머리글에 현재 선택값이 보인다 */
+    .biz-acc{border:1.5px solid var(--line);border-radius:12px;background:var(--white);margin-bottom:14px}
+    .biz-acc-hd{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;-webkit-user-select:none;user-select:none}
+    .biz-acc-hd .t{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.3px}
+    .biz-acc-hd .v{margin-left:auto;font-size:12.5px;font-weight:800;color:var(--muted);letter-spacing:-.3px}
+    .biz-acc-hd .v.on{color:var(--orange)}
+    .biz-acc-hd .cv{width:12px;height:12px;color:var(--muted);flex:0 0 auto;transition:transform .2s ease}
+    .biz-acc.open .biz-acc-hd .cv{transform:rotate(180deg)}
+    .biz-acc-bd{display:none;padding:2px 12px 13px}
+    .biz-acc.open .biz-acc-bd{display:block}
+    .biz-acc .biz-chips-row{margin-bottom:0}
+    .biz-acc .biz-fchip{padding:7px 13px;font-size:12.5px}
+    .biz-acc-hint{font-size:11.5px;line-height:1.55;color:var(--muted);font-weight:600;margin-top:10px;letter-spacing:-.2px}
     .topbar{height:48px;padding:0 14px}
     .topbar .sys-title{font-size:15px}
     .topbar .env{display:none}
@@ -677,6 +691,30 @@
         <label><input type="radio" name="bizPlan" value="all" checked onchange="setBizPlan('all')">전체</label>
         <label><input type="radio" name="bizPlan" value="db" onchange="setBizPlan('db')">DB</label>
         <label><input type="radio" name="bizPlan" value="dc" onchange="setBizPlan('dc')">DC/IRP</label>
+      </div>
+      <!-- 신용등급 필터(접는 박스) — 고른 등급 '이상'만 표시 -->
+      <div class="biz-acc" id="bizGradeAcc">
+        <div class="biz-acc-hd" onclick="toggleBizAcc('bizGradeAcc')">
+          <span class="t">신용등급</span>
+          <span class="v" id="bizGradeVal">전체</span>
+          <svg class="cv" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+        </div>
+        <div class="biz-acc-bd">
+          <div class="biz-chips-row" id="bizGradeChips"></div>
+          <div class="biz-acc-hint">고른 등급 <b>이상</b>인 상품제공기관의 상품만 보여줍니다.<br>신용등급이 없는 기관(우체국 등)은 제외됩니다.</div>
+        </div>
+      </div>
+      <!-- 기간(만기) 필터(접는 박스) -->
+      <div class="biz-acc" id="bizTermAcc">
+        <div class="biz-acc-hd" onclick="toggleBizAcc('bizTermAcc')">
+          <span class="t">기간</span>
+          <span class="v" id="bizTermVal">전체</span>
+          <svg class="cv" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>
+        </div>
+        <div class="biz-acc-bd">
+          <div class="biz-chips-row" id="bizTermChips"></div>
+          <div class="biz-acc-hint">만기가 정해지지 않은 상품(금리연동형·기간식)은 기간을 고르면 제외됩니다.</div>
+        </div>
       </div>
       <button class="biz-search-btn" onclick="doBizSearch()">검색하기</button>
       </div><!-- /biz-panel -->
@@ -1182,6 +1220,8 @@ function renderMobileTable(){
    기본 3개 표시 · 더보기 시 7개(고정높이 내부 스크롤)
    ============================================================ */
 let bizProd='ALL', bizPlan='all', bizSearch='', bizSort='desc', bizExpanded=false;
+let bizGrade='ALL';    // 신용등급 하한(이 등급 이상만) — 저장값 기준('AA','A','BBB'는 화면에 AA0/A0/BBB0)
+let bizTerm='ALL';     // 기간(개월). 숫자면 그 만기만
 function onBizSearch(v){ bizSearch=v; }                 // 입력만 반영(적용은 검색하기/Enter)
 function doBizSearch(){ bizExpanded=false; renderBizCards(); }
 function setBizProd(v,el){ bizProd=v; bizExpanded=false;
@@ -1189,6 +1229,69 @@ function setBizProd(v,el){ bizProd=v; bizExpanded=false;
   if(el) el.classList.add('on'); renderBizCards(); }
 function setBizPlan(v){ bizPlan=v; bizExpanded=false; renderBizCards(); }
 function setBizSort(v){ bizSort=v; renderBizCards(); }
+
+/* ── 신용등급 · 기간 접는 필터 ──────────────────────────────────────
+   신용등급은 '선택 등급 이상'(상위 등급 포함)으로 거른다.
+   화면 표기는 실무 표기(AA0·A0·BBB0)를 쓰고, 비교는 저장된 등급값(AA·A·BBB)으로 한다. */
+const BIZ_GRADES=[                       // {v: 저장값, t: 화면표기}
+  {v:'AAA',t:'AAA'},{v:'AA+',t:'AA+'},{v:'AA',t:'AA0'},{v:'AA-',t:'AA-'},
+  {v:'A+',t:'A+'},{v:'A',t:'A0'},{v:'A-',t:'A-'},
+  {v:'BBB+',t:'BBB+'},{v:'BBB',t:'BBB0'},{v:'BBB-',t:'BBB-'},
+];
+/* app.py RATING_SCALE과 같은 순서(상위 → 하위). 인덱스가 작을수록 상위 등급.
+   BB+ 이하까지 넣어야 'BBB- 이상' 필터에서 그 아래 등급이 제대로 걸러진다. */
+const BIZ_RATING_SCALE=['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-',
+  'BB+','BB','BB-','B+','B','B-','CCC+','CCC','CCC-','CC','C','D'];
+function bizRatingRank(g){ return BIZ_RATING_SCALE.indexOf(String(g==null?'':g).trim()); }
+function bizGradeLabel(v){ const g=BIZ_GRADES.find(x=>x.v===v); return g?g.t:v; }
+
+function toggleBizAcc(id){ const el=$(id); if(el) el.classList.toggle('open'); }
+
+/* 필터 칩 그리기(최초 1회) — 상품구분 칩과 같은 모양 */
+function renderBizFilterChips(){
+  const g=$('bizGradeChips');
+  if(g && !g.children.length){
+    g.innerHTML=`<button class="biz-fchip on" onclick="setBizGrade('ALL',this)">전체</button>`+
+      BIZ_GRADES.map(x=>`<button class="biz-fchip" onclick="setBizGrade('${x.v}',this)">${x.t}</button>`).join('');
+  }
+  const t=$('bizTermChips');
+  if(t && !t.children.length){
+    t.innerHTML=`<button class="biz-fchip on" onclick="setBizTerm('ALL',this)">전체</button>`+
+      MONTHS.map(m=>`<button class="biz-fchip" onclick="setBizTerm(${m},this)">${MONTH_LABEL[m]}</button>`).join('');
+  }
+}
+function _bizChipOn(wrapId, el){
+  document.querySelectorAll('#'+wrapId+' .biz-fchip').forEach(b=>b.classList.remove('on'));
+  if(el) el.classList.add('on');
+}
+function setBizGrade(v,el){
+  bizGrade=v; bizExpanded=false;
+  _bizChipOn('bizGradeChips', el);
+  const lab=$('bizGradeVal');
+  if(lab){ lab.textContent = (v==='ALL') ? '전체' : (bizGradeLabel(v)+' 이상'); lab.classList.toggle('on', v!=='ALL'); }
+  // 등급 맵이 아직 없으면 먼저 불러온다(없는 상태로 거르면 전부 빠져버린다)
+  if(v!=='ALL' && !penRatingMap){ loadPenRatings().then(()=>renderBizCards()); return; }
+  renderBizCards();
+}
+function setBizTerm(v,el){
+  bizTerm=v; bizExpanded=false;
+  _bizChipOn('bizTermChips', el);
+  const lab=$('bizTermVal');
+  if(lab){ lab.textContent = (v==='ALL') ? '전체' : MONTH_LABEL[v]; lab.classList.toggle('on', v!=='ALL'); }
+  renderBizCards();
+}
+/* 신용등급 하한 통과 여부. 등급을 모르는 기관은 기준 충족을 확인할 수 없어 제외한다. */
+function bizGradeMatch(r){
+  if(bizGrade==='ALL') return true;
+  const rank=bizRatingRank(penRatingOf(penRatingMap,r));
+  if(rank<0) return false;
+  return rank<=bizRatingRank(bizGrade);
+}
+/* 기간(만기) 일치 여부. 만기가 없는 상품(금리연동형·기간식)은 특정 기간 선택 시 제외. */
+function bizTermMatch(r){
+  if(bizTerm==='ALL') return true;
+  return r.months===bizTerm;
+}
 /* 상품구분 칩 필터(전체/정기예금/ELB/이율보증형) */
 function bizProdMatch(fam){
   if(bizProd==='ALL') return true;
@@ -1223,7 +1326,7 @@ function bizRows(){
   // 특수상품(금리연동형/기간식)은 '전체' 상품구분에서만 노출
   (curSpecial.rateLinked||[]).forEach(r=>{ if(r.rate!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:'',period:'-',months:null,rate:r.rate}); });
   (curSpecial.period||[]).forEach(r=>{ const v=(r.db??r.dc??r.irp); if(v!=null) out.push({sector:r.sector,org:r.org,fam:r.fam,plan:(r.db!=null?'DB':'DC/IRP'),period:r.mat,months:null,rate:v}); });
-  let rows=out.filter(r=>bizProdMatch(r.fam));
+  let rows=out.filter(r=>bizProdMatch(r.fam) && bizGradeMatch(r) && bizTermMatch(r));
   const q=bizSearch.trim().toLowerCase();
   if(q) rows=rows.filter(r=>(String(r.org)+' '+String(r.fam)).toLowerCase().indexOf(q)>=0);
   const dir = bizSort==='asc' ? 1 : -1;
@@ -1244,11 +1347,16 @@ function depProtect(org,fam,plan){
 }
 function renderBizCards(){
   const list=$('bizList'); if(!list) return;
+  renderBizFilterChips();                 // 신용등급·기간 칩(최초 1회)
   const rows=bizRows(); bizCurRows=rows;
   const more=$('bizMore');
   if(!penRatingMap){ loadPenRatings().then(()=>{ if(isMobileView()) renderBizCards(); }); }   // 신용등급 1회 로드 후 재렌더
   if(!rows.length){
-    list.innerHTML=`<div class="biz-none">조건에 맞는 상품이 없습니다.</div>`;
+    const on=[];
+    if(bizGrade!=='ALL') on.push('신용등급 '+bizGradeLabel(bizGrade)+' 이상');
+    if(bizTerm!=='ALL') on.push('기간 '+MONTH_LABEL[bizTerm]);
+    const why = on.length ? `<div class="biz-none-sub">${htmlEsc(on.join(' · '))} 조건을 넓혀보세요.</div>` : '';
+    list.innerHTML=`<div class="biz-none">조건에 맞는 상품이 없습니다.${why}</div>`;
     list.style.maxHeight=''; list.style.overflowY='visible';
     if(more) more.style.display='none';
     return;
