@@ -4,7 +4,7 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#EEF1F5;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#222;padding:20px}
-.wrap{max-width:1120px;margin:0 auto}
+.wrap{max-width:1320px;margin:0 auto}
 .bhead{margin-bottom:14px}
 .btitle{font-size:19px;font-weight:800;color:#123E7C;letter-spacing:-.4px}
 .bsub{font-size:12.5px;color:#8a92a0;margin-top:4px}
@@ -20,27 +20,31 @@ body{margin:0;background:#EEF1F5;font-family:'Malgun Gothic','Apple SD Gothic Ne
 .catbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .cchip{border:1.5px solid #E0E3E8;background:#fff;color:#6B7280;border-radius:16px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer}
 .cchip.on{background:#123E7C;color:#fff;border-color:#123E7C}
-.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
-.cat{font-size:10.5px;font-weight:800;color:#fff;border-radius:6px;padding:2px 8px;white-space:nowrap}
-.icard{border:1px solid #E5E7EB;border-radius:13px;padding:14px 15px;background:#fff;box-shadow:0 2px 8px rgba(16,24,40,.04)}
-.ic-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.ic-name{font-size:15px;font-weight:800;color:#16335B}
-.st{margin-left:auto;font-size:11.5px;font-weight:800}
-.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.slot{border:1px solid #EAEEF2;border-radius:10px;padding:10px;background:#FBFCFD;transition:background .15s,border-color .15s}
-.slot.drag{background:#FFF7EF;border-color:#F1B37A}
-.slot-h{font-size:12px;font-weight:800;color:#5A6474;margin-bottom:8px;display:flex;align-items:center;gap:5px}
-.cnt{color:#1c9e6a;font-size:10.5px}
-.frow{display:flex;align-items:center;gap:6px;background:#F4F7FB;border:1px solid #DCE6F1;border-radius:8px;padding:5px 7px;margin-bottom:6px}
+.cat{font-size:10.5px;font-weight:800;color:#fff;border-radius:6px;padding:2px 8px;white-space:nowrap;display:inline-block}
+.tblwrap{background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(16,24,40,.04)}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+.tbl th{background:#F7F9FC;border-bottom:1px solid #E5E7EB;text-align:left;padding:10px 12px;font-size:11px;font-weight:800;color:#5A6474;letter-spacing:.03em;white-space:nowrap;position:sticky;top:0;z-index:2}
+.tbl td{border-bottom:1px solid #F0F3F7;padding:6px 12px;vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:nth-child(even) td{background:#FCFDFE}
+.tbl tbody tr:hover td{background:#F7FAFE}
+.org{font-size:13px;font-weight:800;color:#16335B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font-size:11.5px;font-weight:800;white-space:nowrap}
+.cell{border-radius:8px;padding:2px 3px;transition:background .15s,box-shadow .15s}
+.cell.drag{background:#FFF7EF;box-shadow:inset 0 0 0 1.5px #F1B37A}
+.frow{display:flex;align-items:center;gap:5px;padding:2px 0}
+.frow.hide{display:none}
+.cell.open .frow.hide{display:flex}
 .fico{font-size:9px;font-weight:900;color:#fff;background:#E0684C;border-radius:4px;padding:2px 4px;flex:0 0 auto}
-.fname{font-size:11.5px;color:#123E7C;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.fbtn{border:none;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:12px;flex:0 0 auto}
+.fname{font-size:11.5px;color:#123E7C;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.fbtn{border:none;border-radius:6px;width:22px;height:22px;cursor:pointer;font-size:11px;flex:0 0 auto;font-family:inherit}
 .fbtn.dl{background:#E7EEF7;color:#123E7C}
 .fbtn.del{background:#FCEAEA;color:#C0392B}
-.addbtn{width:100%;border:1.5px dashed #CBD3DE;background:#fff;color:#8a92a0;border-radius:8px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
-.addbtn:hover{border-color:#F1B37A;color:#CB6015}
-.drop{border:1.5px dashed #CBD3DE;border-radius:8px;padding:15px 8px;text-align:center;color:#9aa2ae;font-size:12.5px;font-weight:700;cursor:pointer}
-.drop small{font-weight:500;font-size:10.5px;display:block;margin-top:3px}
+.fbtn.add{background:#F4F6F9;color:#7A8494;font-weight:800}
+.fbtn.add:hover{background:#FEF0E2;color:#CB6015}
+.more{border:none;background:#E9F7F1;color:#1c9e6a;font-size:10.5px;font-weight:800;border-radius:4px;padding:3px 6px;cursor:pointer;font-family:inherit;flex:0 0 auto}
+.fnone{border:1.5px dashed #D8DEE7;background:#fff;color:#B6BCC4;font-size:11.5px;font-weight:700;border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit}
+.fnone:hover{border-color:#F1B37A;color:#CB6015}
 .empty-msg{color:#9aa0a8;font-size:13px;text-align:center;padding:40px}
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:#16335B;color:#fff;font-size:13px;font-weight:700;padding:11px 18px;border-radius:10px;z-index:100;transition:.25s;max-width:90vw}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -66,7 +70,18 @@ body{margin:0;background:#EEF1F5;font-family:'Malgun Gothic','Apple SD Gothic Ne
     <div class="prog">등록 기관 <b id="progTxt">0</b> / <span id="totTxt">0</span></div>
   </div>
   <div class="catbar" id="catbar"></div>
-  <div class="cgrid" id="grid"></div>
+  <div class="tblwrap" id="tblwrap">
+    <table class="tbl">
+      <thead><tr>
+        <th style="width:170px">기관</th>
+        <th style="width:88px">업권</th>
+        <th>📘 약관</th>
+        <th>📗 상품설명서</th>
+        <th style="width:78px">상태</th>
+      </tr></thead>
+      <tbody id="grid"></tbody>
+    </table>
+  </div>
   <div class="empty-msg" id="emptyMsg" style="display:none">검색 결과가 없습니다.</div>
 </div>
 
@@ -78,7 +93,7 @@ body{margin:0;background:#EEF1F5;font-family:'Malgun Gothic','Apple SD Gothic Ne
 
 <script>
 const CATC={'증권':'#043B72','시중은행':'#00A9CE','지방은행':'#7EA0C3','저축은행':'#84888B','손해보험':'#AD624E','생명보험':'#CB6015','기타':'#84888B'};
-let DATA=[], curCat='전체', pending=null;
+let DATA=[], curCat='전체', pending=null, CELLOPEN={};
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function toast(m,t){const e=document.getElementById('toast');e.textContent=m;e.className='show'+(t==='err'?' err':'');clearTimeout(e._t);e._t=setTimeout(()=>e.className='',2400);}
 function load(){
@@ -91,21 +106,28 @@ function load(){
   }).catch(()=>toast('목록을 불러오지 못했습니다','err'));
 }
 function setCat(c){curCat=c;document.querySelectorAll('.cchip').forEach(e=>e.classList.toggle('on',e.textContent===c));render();}
-function fileRow(org,kind,f){
-  return `<div class="frow"><span class="fico">PDF</span><span class="fname" title="${esc(f.filename)}">${esc(f.filename)}</span>
+function fileRow(org,kind,f,i,n){
+  return `<div class="frow${i?' hide':''}"><span class="fico">PDF</span><span class="fname" title="${esc(f.filename)}">${esc(f.filename)}</span>
+    ${(i===0&&n>1)?`<button class="more" title="파일 ${n}개 모두 보기" onclick="toggleCell(this)">${CELLOPEN[org+'|'+kind]?'접기':'+'+(n-1)}</button>`:''}
     <button class="fbtn dl" title="다운로드" onclick="dl('${esc(org)}','${kind}','${esc(f.stored)}')">⬇</button>
-    <button class="fbtn del" title="삭제" onclick="del('${esc(org)}','${kind}','${esc(f.stored)}','${esc(f.filename)}')">🗑</button></div>`;
+    <button class="fbtn del" title="삭제" onclick="del('${esc(org)}','${kind}','${esc(f.stored)}','${esc(f.filename)}')">🗑</button>
+    ${(i===0)?`<button class="fbtn add" title="파일 추가(클릭 또는 드래그)" onclick="pick('${esc(org)}','${kind}')">＋</button>`:''}</div>`;
 }
-function slotHtml(org,kind,files){
+function cellHtml(org,kind,files){
   const n=(files||[]).length;
-  const head=`<div class="slot-h">${kind}${n?` <b class="cnt">✓ ${n}개</b>`:''}</div>`;
+  const open=CELLOPEN[org+'|'+kind]?' open':'';
   if(!n){
-    return `<div class="slot" data-org="${esc(org)}" data-kind="${kind}">${head}
-      <div class="drop" onclick="pick('${esc(org)}','${kind}')">＋ PDF 업로드<small>클릭 또는 드래그(여러 개 가능)</small></div></div>`;
+    return `<div class="cell" data-org="${esc(org)}" data-kind="${kind}">
+      <button class="fnone" title="클릭 또는 PDF 드래그" onclick="pick('${esc(org)}','${kind}')">＋ PDF 등록</button></div>`;
   }
-  return `<div class="slot" data-org="${esc(org)}" data-kind="${kind}">${head}
-    ${files.map(f=>fileRow(org,kind,f)).join('')}
-    <button class="addbtn" onclick="pick('${esc(org)}','${kind}')">＋ 파일 추가</button></div>`;
+  return `<div class="cell${open}" data-org="${esc(org)}" data-kind="${kind}">
+    ${files.map((f,i)=>fileRow(org,kind,f,i,n)).join('')}</div>`;
+}
+function toggleCell(b){
+  const c=b.closest('.cell'), on=!c.classList.contains('open');
+  c.classList.toggle('open',on);
+  CELLOPEN[c.dataset.org+'|'+c.dataset.kind]=on;
+  b.textContent=on?'접기':'+'+(c.querySelectorAll('.frow').length-1);
 }
 function render(){
   const q=(document.getElementById('q').value||'').trim().toLowerCase();
@@ -116,12 +138,14 @@ function render(){
   document.getElementById('grid').innerHTML=rows.map(x=>{
     const a=(x['약관']||[]).length, s=(x['상품설명서']||[]).length;
     const st=(a&&s)?['완료','#1c9e6a']:((a||s)?['부분','#E08600']:['미등록','#B0B6BE']);
-    return `<div class="icard"><div class="ic-head"><span class="ic-name">${esc(x.org)}</span>
-      <span class="cat" style="background:${CATC[x.cat]||'#84888B'}">${esc(x.cat)}</span>
-      <span class="st" style="color:${st[1]}">● ${st[0]}</span></div>
-      <div class="slots">${slotHtml(x.org,'약관',x['약관'])}${slotHtml(x.org,'상품설명서',x['상품설명서'])}</div></div>`;
+    return `<tr><td class="org" title="${esc(x.org)}">${esc(x.org)}</td>
+      <td><span class="cat" style="background:${CATC[x.cat]||'#84888B'}">${esc(x.cat)}</span></td>
+      <td>${cellHtml(x.org,'약관',x['약관'])}</td>
+      <td>${cellHtml(x.org,'상품설명서',x['상품설명서'])}</td>
+      <td><span class="st" style="color:${st[1]}">● ${st[0]}</span></td></tr>`;
   }).join('');
   document.getElementById('emptyMsg').style.display=rows.length?'none':'block';
+  document.getElementById('tblwrap').style.display=rows.length?'':'none';
   bindSlotDrag();
 }
 function dl(org,kind,stored){ window.location='/api/docs/download?org='+encodeURIComponent(org)+'&kind='+encodeURIComponent(kind)+'&stored='+encodeURIComponent(stored); }
@@ -147,7 +171,7 @@ function del(org,kind,stored,filename){
     .then(r=>r.json()).then(d=>{ if(d.success){toast('삭제되었습니다');load();} else toast('삭제 실패','err'); }).catch(()=>toast('삭제 실패','err'));
 }
 function bindSlotDrag(){
-  document.querySelectorAll('.slot').forEach(sl=>{
+  document.querySelectorAll('.cell').forEach(sl=>{
     sl.addEventListener('dragover',e=>{e.preventDefault();sl.classList.add('drag');});
     sl.addEventListener('dragleave',()=>sl.classList.remove('drag'));
     sl.addEventListener('drop',e=>{e.preventDefault();sl.classList.remove('drag');
