@@ -465,7 +465,10 @@
     .toolbar #btnUpload,.toolbar #btnTemplate,.toolbar #btnExport,.toolbar #btnHistory,.toolbar #btnCompare,.toolbar #btnPenEdit,.toolbar #btnHistAppend{display:none}
     /* 순서 변경: 조회(기준월 옆) → 금리현황 다운로드(아래 전체폭) */
     .toolbar #btnView{order:1;flex:0 0 40%;min-width:0;height:42px;justify-content:center;gap:6px}
-    .toolbar #btnReport{order:2;flex:1 1 100%;min-width:0;height:42px;justify-content:center;gap:6px}
+    /* 금리현황 다운로드: 미래에셋 CI 오렌지(#F58220) 채움 — 모바일에서 주 동작임을 드러낸다 */
+    .toolbar #btnReport{order:2;flex:1 1 100%;min-width:0;height:42px;justify-content:center;gap:6px;
+      background:#F58220;border-color:#F58220;color:#fff}
+    .toolbar #btnReport:hover,.toolbar #btnReport:active{background:#DE6F14;border-color:#DE6F14}
     /* 조회 🔍 / 다운로드 ⬇ 아이콘 모바일에서 표시 */
     .toolbar #btnView svg,.toolbar #btnReport svg{display:inline-block;width:17px;height:17px;flex:0 0 auto}
     /* 제도별 요약: 세로로 스택 */
