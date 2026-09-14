@@ -2005,22 +2005,48 @@ $('btnView').onclick=()=>{
   else toast(`${m.replace('-','년 ')}월 데이터가 없습니다. 엑셀을 업로드하세요.`, true);
 };
 
+/* 파일 다운로드 공통 — 숨김 iframe을 대상으로 폼을 전송해 브라우저 기본 다운로드를 태운다.
+   화면 이동 없이 Content-Disposition 응답이 그대로 다운로드된다. */
+function downloadUrl(url){
+  let fr=document.getElementById('dlSink');
+  if(!fr){
+    fr=document.createElement('iframe');
+    fr.id='dlSink'; fr.name='dlSink'; fr.style.display='none';
+    document.body.appendChild(fr);
+  }
+  fr.src=url;
+}
+function submitDownloadForm(action, fields){
+  let fr=document.getElementById('dlSink');
+  if(!fr){
+    fr=document.createElement('iframe');
+    fr.id='dlSink'; fr.name='dlSink'; fr.style.display='none';
+    document.body.appendChild(fr);
+  }
+  const f=document.createElement('form');
+  f.method='POST'; f.action=action; f.target='dlSink'; f.style.display='none';
+  Object.keys(fields).forEach(k=>{
+    const i=document.createElement('input');
+    i.type='hidden'; i.name=k; i.value=fields[k];
+    f.appendChild(i);
+  });
+  document.body.appendChild(f);
+  f.submit();
+  setTimeout(()=>f.remove(), 60000);
+}
+
 /* ---------- 금리현황 레포트(양식) 다운로드 : 서버(Flask)에서 양식 채워 반환 ---------- */
 $('btnReport').onclick=async()=>{
   if(!curRows.length){ toast('레포트를 만들 데이터가 없습니다',true); return; }
   const btn=$('btnReport'); const orig=btn.innerHTML;
   btn.disabled=true; toast('금리현황 레포트 생성 중…');
   try{
-    const res=await fetch('/api/pension_report',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({month:curMonth, rows:curRows})});
-    if(!res.ok){ const t=await res.text().catch(()=>res.status); throw new Error('서버 오류 '+res.status); }
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url;
-    a.download=`퇴직연금 금리정보 현황_${(curMonth||'').replace('-','년 ')}월.xlsx`;
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
-    toast('금리현황 레포트를 다운로드했습니다');
-  }catch(err){ console.error(err); toast('레포트 생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
+    // 폼 전송으로 서버 응답을 그대로 받게 한다(브라우저 기본 다운로드).
+    // blob + <a download> 방식은 모바일 크롬이 iframe 안에서 '다운로드 완료'로 표시하고도
+    // 파일을 남기지 않는 경우가 있어 쓰지 않는다.
+    submitDownloadForm('/api/pension_report', {payload: JSON.stringify({month:curMonth, rows:curRows})});
+    toast('금리현황 레포트를 다운로드합니다');
+  }catch(err){ console.error(err); toast('레포트 요청 실패: '+err.message, true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
 
@@ -2029,14 +2055,8 @@ $('btnHistory').onclick=async()=>{
   const btn=$('btnHistory'); const orig=btn.innerHTML;
   btn.disabled=true; toast('과거 금리 추이 파일 준비 중…');
   try{
-    const res=await fetch('/download/rate_history');
-    if(!res.ok) throw new Error('서버 오류 '+res.status);
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url;
-    a.download='과거 금리 추이.xlsx';
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
-    toast('과거 금리 추이 파일을 다운로드했습니다');
+    downloadUrl('/download/rate_history');
+    toast('과거 금리 추이 파일을 다운로드합니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
@@ -2046,14 +2066,8 @@ $('btnCompare').onclick=async()=>{
   const btn=$('btnCompare'); const orig=btn.innerHTML;
   btn.disabled=true; toast('금리 비교 그래프 생성 중…');
   try{
-    const res=await fetch('/download/rate_compare');
-    if(!res.ok) throw new Error('서버 오류 '+res.status);
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url;
-    a.download='금리 비교.xlsx';
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
-    toast('금리 비교 그래프 엑셀을 다운로드했습니다');
+    downloadUrl('/download/rate_compare');
+    toast('금리 비교 그래프 엑셀을 다운로드합니다');
   }catch(err){ console.error(err); toast('생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
@@ -2095,11 +2109,10 @@ async function submitHistAppend(){
 
 /* ---------- 물가상승률: 과거 파일 다운로드 + 그래프 팝업 ---------- */
 function downloadCpiHistory(){
-  fetch('/download/cpi_history').then(r=>{ if(!r.ok) throw new Error('서버 오류 '+r.status); return r.blob(); }).then(b=>{
-    const url=URL.createObjectURL(b); const a=document.createElement('a'); a.href=url; a.download='과거 물가상승률.xlsx';
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
-    toast('과거 물가상승률 파일을 다운로드했습니다');
-  }).catch(err=>{ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); });
+  try{
+    downloadUrl('/download/cpi_history');
+    toast('과거 물가상승률 파일을 다운로드합니다');
+  }catch(err){ console.error(err); toast('다운로드 실패: '+err.message, true); }
 }
 /* 공지사항 팝업(모바일 제안카드 「공지」 버튼) */
 function openNotice(){
@@ -2221,12 +2234,8 @@ async function postExport(payload, filename, btn){
   const orig=btn?btn.innerHTML:''; if(btn){btn.disabled=true;}
   toast('금리표 생성 중…');
   try{
-    const res=await fetch('/api/pension_export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(!res.ok) throw new Error('서버 오류 '+res.status);
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename;
-    document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 15000);
-    toast('금리표를 다운로드했습니다');
+    submitDownloadForm('/api/pension_export', {payload: JSON.stringify(Object.assign({}, payload, {filename}))});
+    toast('금리표를 다운로드합니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ if(btn){btn.disabled=false; btn.innerHTML=orig;} }
 }

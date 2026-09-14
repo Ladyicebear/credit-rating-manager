@@ -930,14 +930,28 @@ _RATE_HISTORY_XLSX = os.path.join(BASE_DIR, 'data', 'rate_history.xlsx')
 _RATE_HISTORY_JSON = os.path.join(BASE_DIR, 'data', 'rate_history.json')
 
 
+_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
+def _xlsx_attachment(src, fname, ascii_name):
+    """xlsx 첨부 응답. 한글 파일명은 filename*(UTF-8)로 보내고, ASCII 대체 이름을 직접 준다.
+
+    Flask 기본 헤더는 한글을 지운 ASCII 이름을 만들어 '  _2026-08.xlsx'처럼 공백으로
+    시작하는 파일명이 된다. 그 이름을 쓰는 다운로드 관리자(모바일 등)에서 파일을 찾기
+    어려워지므로 읽을 수 있는 ASCII 이름을 함께 싣는다."""
+    resp = send_file(src, as_attachment=True, download_name=fname, mimetype=_XLSX_MIME)
+    resp.headers['Content-Disposition'] = (
+        "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_name, _urlquote(fname))
+    )
+    return resp
+
+
 @app.route('/download/rate_history')
 def download_rate_history():
     """'과거 금리 추이' 버튼 → 내부 보관된 원본 엑셀을 그대로 다운로드."""
     if not os.path.exists(_RATE_HISTORY_XLSX):
         return jsonify({'error': 'rate_history.xlsx not found'}), 404
-    return send_file(_RATE_HISTORY_XLSX, as_attachment=True,
-                     download_name='과거 금리 추이.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_attachment(_RATE_HISTORY_XLSX, '과거 금리 추이.xlsx', 'rate_history.xlsx')
 
 
 @app.route('/api/rate_history')
@@ -1088,8 +1102,7 @@ def download_rate_compare():
     bio = io.BytesIO()
     wb.save(bio)
     bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name='금리 비교.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_attachment(bio, '금리 비교.xlsx', 'rate_compare.xlsx')
 
 
 # ── 소비자물가지수(e-나라지표) 최신월 상승률 ──
@@ -1551,8 +1564,7 @@ def download_cpi_history():
     bio = io.BytesIO()
     wb.save(bio)
     bio.seek(0)
-    return send_file(bio, as_attachment=True, download_name='과거 물가상승률.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_attachment(bio, '과거 물가상승률.xlsx', 'cpi_history.xlsx')
 
 
 @app.route('/api/pension_export', methods=['POST'])
@@ -1562,7 +1574,14 @@ def pension_export():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
-    payload = request.get_json(force=True, silent=True) or {}
+    # 폼 전송(payload=<JSON 문자열>)도 받는다 — 모바일 브라우저 기본 다운로드용
+    if request.form.get('payload'):
+        try:
+            payload = json.loads(request.form['payload'])
+        except Exception:
+            return jsonify({'error': '요청 형식이 올바르지 않습니다'}), 400
+    else:
+        payload = request.get_json(force=True, silent=True) or {}
     months = payload.get('months', [])
     if not months:
         return jsonify({'error': 'no data'}), 400
@@ -1712,8 +1731,7 @@ def pension_export():
     wb.save(bio)
     bio.seek(0)
     fname = payload.get('filename') or '퇴직연금 금리현황.xlsx'
-    return send_file(bio, as_attachment=True, download_name=fname,
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    return _xlsx_attachment(bio, fname, 'pension_rates_table.xlsx')
 
 
 # ── 원리금보장 금리현황 레포트: 양식(pension_report_template.xlsx)에 현재 화면 금리 채워 반환 ──
@@ -1938,9 +1956,19 @@ def _build_pension_report_wb(rows, month):
 
 @app.route('/api/pension_report', methods=['POST'])
 def pension_report():
-    """현재 화면(기준월)의 금리를 레포트 양식에 채워 xlsx로 반환."""
+    """현재 화면(기준월)의 금리를 레포트 양식에 채워 xlsx로 반환.
+
+    JSON 본문과 폼 전송(payload=<JSON 문자열>)을 모두 받는다. 폼 전송을 지원하는 이유는
+    모바일 크롬이 iframe 안에서 blob+<a download> 방식을 '완료'로 표시하고도 파일을
+    남기지 않기 때문 — 폼으로 보내면 브라우저 기본 다운로드가 동작한다."""
     import io as _io
-    payload = request.get_json(force=True) or {}
+    if request.form.get('payload'):
+        try:
+            payload = json.loads(request.form['payload'])
+        except Exception:
+            return jsonify({'error': '요청 형식이 올바르지 않습니다'}), 400
+    else:
+        payload = request.get_json(force=True, silent=True) or {}
     month = payload.get('month', '')
     rows = payload.get('rows', [])
     wb, ws, matched = _build_pension_report_wb(rows, month)
@@ -1949,8 +1977,16 @@ def pension_report():
     bio.seek(0)
     fname = f"퇴직연금 금리정보 현황_{month}.xlsx" if month else "퇴직연금 금리정보 현황.xlsx"
     logger.info('금리현황 레포트 생성: month=%s, 데이터 %d행, 매칭 %d행', month, len(rows), matched)
-    return send_file(bio, as_attachment=True, download_name=fname,
+    resp = send_file(bio, as_attachment=True, download_name=fname,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    # Flask 기본 헤더는 한글을 지운 ASCII 대체 이름을 만들어 "  _2026-08.xlsx"처럼 공백으로
+    # 시작하는 파일명이 된다. 이 이름을 쓰는 다운로드 관리자(모바일 등)에서 파일을 찾기 어려워
+    # 읽을 수 있는 ASCII 이름을 직접 지정한다. 한글 이름은 filename*(UTF-8)로 그대로 전달된다.
+    ascii_name = f"pension_rates_{month}.xlsx" if month else "pension_rates.xlsx"
+    resp.headers['Content-Disposition'] = (
+        "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_name, _urlquote(fname))
+    )
+    return resp
 
 
 # ── 과거 금리 추이: 매월 업권별 DB1년 평균 자동 append ──
