@@ -2010,32 +2010,34 @@ $('btnView').onclick=()=>{
 
 /* 파일 다운로드 공통 — 숨김 iframe을 대상으로 폼을 전송해 브라우저 기본 다운로드를 태운다.
    화면 이동 없이 Content-Disposition 응답이 그대로 다운로드된다. */
+/* 이 화면은 상위 앱(index.html)의 iframe 안에서 열린다. 예전처럼 화면 안의
+   '숨김 iframe(dlSink)'으로 첨부 응답을 받으면 데스크톱은 저장되지만, 모바일
+   브라우저(안드로이드 크롬 · iOS 사파리)는 중첩 iframe 다운로드를 무시해 '완료'
+   토스트만 뜨고 파일이 남지 않는다. 그래서 최상위 브라우징 컨텍스트(_blank 새 탭)로
+   응답을 받아 브라우저 기본 다운로드를 태운다. 첨부(Content-Disposition) 응답이므로
+   새 탭은 다운로드만 받고 스스로 닫히거나 빈 탭으로 남는다. */
+function _topDoc(){
+  // 폼을 최상위 문서에 심어 다운로드가 최상위 컨텍스트에서 시작되게 한다(모바일 안정성).
+  try{ if(window.top && window.top.document) return window.top.document; }catch(e){}
+  return document;
+}
 function downloadUrl(url){
-  let fr=document.getElementById('dlSink');
-  if(!fr){
-    fr=document.createElement('iframe');
-    fr.id='dlSink'; fr.name='dlSink'; fr.style.display='none';
-    document.body.appendChild(fr);
-  }
-  fr.src=url;
+  const w=window.open(url,'_blank');
+  // 팝업 차단 등으로 새 탭을 못 열면 최상위 창을 이동시킨다(첨부라 화면은 유지됨).
+  if(!w){ try{ (window.top||window).location.href=url; }catch(e){ window.location.href=url; } }
 }
 function submitDownloadForm(action, fields){
-  let fr=document.getElementById('dlSink');
-  if(!fr){
-    fr=document.createElement('iframe');
-    fr.id='dlSink'; fr.name='dlSink'; fr.style.display='none';
-    document.body.appendChild(fr);
-  }
-  const f=document.createElement('form');
-  f.method='POST'; f.action=action; f.target='dlSink'; f.style.display='none';
+  const doc=_topDoc();
+  const f=doc.createElement('form');
+  f.method='POST'; f.action=action; f.target='_blank'; f.style.display='none';
   Object.keys(fields).forEach(k=>{
-    const i=document.createElement('input');
+    const i=doc.createElement('input');
     i.type='hidden'; i.name=k; i.value=fields[k];
     f.appendChild(i);
   });
-  document.body.appendChild(f);
+  (doc.body||document.body).appendChild(f);
   f.submit();
-  setTimeout(()=>f.remove(), 60000);
+  setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 60000);
 }
 
 /* ---------- 금리현황 레포트(양식) 다운로드 : 서버(Flask)에서 양식 채워 반환 ---------- */
