@@ -88,7 +88,7 @@
          color:#A0A6A8;cursor:pointer;text-decoration:none}
   .nav-i .ni{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
   .nav-i .ni svg{width:24px;height:24px;display:block}
-  .nav-i .nl{font-size:11px;font-weight:700}
+  .nav-i .nl{font-size:10.5px;font-weight:700;white-space:nowrap}
   .nav-i.on{color:var(--orange)}
 
   /* ── 공지 팝업 ── */
@@ -106,6 +106,47 @@
          color:#fff;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:20px;opacity:0;
          transition:opacity .2s;pointer-events:none;z-index:60;white-space:nowrap}
   #toast.on{opacity:.96}
+
+  /* ── 약관·상품설명서 화면 ── */
+  .docs-view{min-height:100vh}
+  .dv-hdr{padding:calc(env(safe-area-inset-top) + 14px) 16px 11px;border-bottom:1px solid var(--line-2)}
+  .dv-title{font-size:18px;font-weight:800;color:var(--navy);letter-spacing:-.4px;display:flex;align-items:center;gap:7px}
+  .dv-cnt{font-size:11px;font-weight:800;color:var(--orange-d);background:#FEF0E2;border-radius:10px;padding:2px 8px}
+  .dv-desc{font-size:12px;color:#9AA2AE;margin-top:3px}
+  .dv-search{display:flex;align-items:center;gap:7px;border:1.5px solid var(--line);border-radius:11px;padding:10px 13px;margin-top:11px}
+  .dv-search input{border:none;outline:none;width:100%;font-size:13.5px;font-family:inherit;background:none;color:var(--ink)}
+  .dv-chips{display:flex;gap:6px;overflow-x:auto;padding:11px 16px 4px;-webkit-overflow-scrolling:touch}
+  .dv-chip{border:1.5px solid var(--line);background:#fff;color:#6B7280;border-radius:15px;padding:5px 12px;font-size:12px;
+       font-weight:700;white-space:nowrap;flex:0 0 auto;font-family:inherit;cursor:pointer}
+  .dv-chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .dv-card{margin:12px 16px 0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .dv-head{display:flex;align-items:center;padding:8px 13px;background:#F7F9FC;border-bottom:1px solid var(--line-2)}
+  .dv-head .c1{flex:1;font-size:10.5px;font-weight:800;color:#8A93A3}
+  .dv-head .c2,.dv-head .c3{width:84px;text-align:center;font-size:10.5px;font-weight:800;color:#8A93A3}
+  .dv-row{display:flex;align-items:center;gap:6px;padding:10px 13px;border-bottom:1px solid #F2F4F8}
+  .dv-row:last-child{border-bottom:none}
+  .dv-org{flex:1;min-width:0;font-size:13.5px;font-weight:800;color:#16335B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dv-btn{width:84px;border:none;border-radius:9px;font-size:11px;font-weight:800;padding:8px 0;font-family:inherit;position:relative;
+       display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;cursor:pointer}
+  .dv-btn svg{width:14px;height:14px;display:block;flex:0 0 auto}
+  .dv-btn.y{background:#EAF0F9;color:#123E7C}
+  .dv-btn.s{background:#FEF0E2;color:var(--orange-d)}
+  .dv-btn.off{background:#F4F6F8;color:#C3C9D2;cursor:default}
+  .dv-btn .n{position:absolute;top:-5px;right:-5px;background:#1C9E6A;color:#fff;font-size:9px;font-weight:800;border-radius:8px;padding:1px 5px}
+  .dv-empty{color:#9AA0A8;font-size:13px;text-align:center;padding:44px 20px}
+  .dv-sheet-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;align-items:flex-end}
+  .dv-sheet-ov.open{display:flex}
+  .dv-sheet{background:#fff;width:100%;max-width:480px;margin:0 auto;border-radius:18px 18px 0 0;
+       padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto}
+  .dv-sheet h4{margin:0 0 3px;font-size:15px;color:#16335B}
+  .dv-sheet .sub{font-size:12px;color:#9AA2AE;margin-bottom:12px}
+  .dv-file{display:flex;align-items:center;gap:9px;border:1px solid #E7EBF0;border-radius:10px;padding:11px 12px;margin-bottom:8px;
+       cursor:pointer;background:#fff;width:100%;font-family:inherit;text-align:left}
+  .dv-file .ic{font-size:9px;font-weight:900;color:#fff;background:#E0684C;border-radius:4px;padding:2px 5px;flex:0 0 auto}
+  .dv-file .fn{font-size:12.5px;color:#33455F;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dv-file .go{color:var(--orange);font-weight:800;font-size:12px;flex:0 0 auto}
+  .dv-sheet-x{width:100%;margin-top:6px;padding:12px;border:none;border-radius:10px;background:#EEF0F3;color:#5A6474;
+       font-weight:800;font-size:14px;font-family:inherit;cursor:pointer}
 
   /* ── 금리현황 화면 ── */
   .rate-view{min-height:100vh}
@@ -249,12 +290,38 @@
   </div>
 </div>
 
+<!-- 약관·상품설명서 화면 -->
+<div id="docsView" class="docs-view" style="display:none">
+  <div class="dv-hdr">
+    <div class="dv-title">약관·상품설명서 <span class="dv-cnt" id="dvCnt">–</span></div>
+    <div class="dv-desc">기관을 찾아 약관·상품설명서를 받으세요</div>
+    <div class="dv-search"><span>🔍</span><input id="dvQ" placeholder="기관명 검색" oninput="renderDocs()"></div>
+  </div>
+  <div class="dv-chips" id="dvChips"></div>
+  <div class="dv-card" id="dvCard">
+    <div class="dv-head"><span class="c1">기관</span><span class="c2">약관</span><span class="c3">상품설명서</span></div>
+    <div id="dvList"></div>
+  </div>
+  <div class="dv-empty" id="dvEmpty" style="display:none">등록된 자료가 없습니다.</div>
+</div>
+
+<!-- 파일 선택 시트 -->
+<div class="dv-sheet-ov" id="dvSheetOv" onclick="if(event.target===this)closeDocSheet()">
+  <div class="dv-sheet">
+    <h4 id="dvShTitle">파일 선택</h4>
+    <div class="sub" id="dvShSub"></div>
+    <div id="dvShBody"></div>
+    <button class="dv-sheet-x" onclick="closeDocSheet()">닫기</button>
+  </div>
+</div>
+
 <!-- 하단 네비 -->
 <nav class="botnav">
   <button class="nav-i on" id="navHome" onclick="showHome()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></span><span class="nl">홈</span></button>
   <button class="nav-i" onclick="toast('상품조회 준비중')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.6-3.6"/></svg></span><span class="nl">상품조회</span></button>
   <button class="nav-i" id="navRate" onclick="showRate()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="m7 14 3.5-4 3 2.5L20 7"/></svg></span><span class="nl">금리현황</span></button>
   <button class="nav-i" onclick="toast('신용등급 준비중')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="M9 13.5 7.5 21l4.5-2.6L16.5 21 15 13.5"/></svg></span><span class="nl">신용등급</span></button>
+  <button class="nav-i" id="navDocs" onclick="showDocs()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9z"/><path d="M13 3v6h6"/><path d="M8.6 13.4h6.8M8.6 16.9h4.4"/></svg></span><span class="nl">상품설명서</span></button>
 </nav>
 
 <!-- 공지 팝업 -->
@@ -272,6 +339,7 @@
 <script src="/static/pension_rows.js"></script>
 <script>
 const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let STORE={}, months=[], curMonth='', baseRows=null, proposals={};
 /* MONTHS / MONTH_LABEL / SECTOR_ORDER 는 static/pension_rows.js 가 정의한다. */
 
@@ -415,9 +483,9 @@ function renderBest(){
   $('rtDef').innerHTML=bestRowHtml(bestTop(rows, r=>r.def!=null, 'def', 36), '3년', 'def');
 }
 function setNav(id){ document.querySelectorAll('.botnav .nav-i').forEach(n=>n.classList.remove('on')); const el=$(id); if(el) el.classList.add('on'); }
-function showHome(){ $('rateView').style.display='none'; $('homeView').style.display=''; setNav('navHome'); window.scrollTo(0,0); }
+function showHome(){ $('rateView').style.display='none'; $('docsView').style.display='none'; $('homeView').style.display=''; setNav('navHome'); window.scrollTo(0,0); }
 function showRate(){
-  $('homeView').style.display='none'; $('rateView').style.display=''; setNav('navRate');
+  $('homeView').style.display='none'; $('docsView').style.display='none'; $('rateView').style.display=''; setNav('navRate');
   const sel=$('rtMonthSel');
   sel.innerHTML=months.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('') || `<option>-</option>`;
   rateMonth = (rateMonth && months.includes(rateMonth)) ? rateMonth : (curMonth || months[months.length-1] || '');
@@ -428,6 +496,59 @@ function showRate(){
   }
   window.scrollTo(0,0);
 }
+/* ── 약관·상품설명서 ── */
+const DOC_KINDS=['약관','상품설명서'];
+const DOC_ICON={
+  '약관':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9z"/><path d="M13 3v6h6"/><path d="M8.6 13.4h6.8M8.6 16.9h4.4"/></svg>',
+  '상품설명서':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.6" width="14" height="16.4" rx="1.7"/><path d="M9.3 4.6V3.5h5.4v1.1"/><path d="M8.8 10.8h6.4M8.8 14.4h4.4"/></svg>'
+};
+let docsData=null, docsCat='전체';
+function showDocs(){
+  $('homeView').style.display='none'; $('rateView').style.display='none'; $('docsView').style.display=''; setNav('navDocs');
+  window.scrollTo(0,0);
+  if(docsData) return;
+  fetch('/api/docs').then(r=>r.json()).then(d=>{
+    // 약관이나 상품설명서가 하나라도 등록된 기관만 노출한다
+    docsData=(d.items||[]).filter(x=>DOC_KINDS.some(k=>(x[k]||[]).length))
+                          .sort((a,b)=>a.org.localeCompare(b.org,'ko'));
+    const cats=['전체',...Array.from(new Set(docsData.map(x=>x.cat)))];
+    $('dvChips').innerHTML=cats.map(c=>`<button class="dv-chip${c===docsCat?' on':''}" onclick="setDocsCat('${esc(c)}')">${esc(c)}</button>`).join('');
+    $('dvCnt').textContent=docsData.length+'곳';
+    renderDocs();
+  }).catch(()=>{ $('dvEmpty').textContent='목록을 불러오지 못했습니다.'; $('dvEmpty').style.display=''; $('dvCard').style.display='none'; });
+}
+function setDocsCat(c){ docsCat=c; document.querySelectorAll('.dv-chip').forEach(e=>e.classList.toggle('on',e.textContent===c)); renderDocs(); }
+function docBtn(org,kind,files){
+  const n=(files||[]).length, cls=(kind==='약관')?'y':'s';
+  if(!n) return `<span class="dv-btn off">없음</span>`;
+  return `<button class="dv-btn ${cls}" onclick="tapDoc('${esc(org)}','${kind}')">${DOC_ICON[kind]}다운로드${n>1?`<span class="n">${n}</span>`:''}</button>`;
+}
+function renderDocs(){
+  if(!docsData) return;
+  const q=($('dvQ').value||'').trim().toLowerCase();
+  const rows=docsData.filter(x=>(docsCat==='전체'||x.cat===docsCat) && (!q||x.org.toLowerCase().includes(q)));
+  $('dvList').innerHTML=rows.map(x=>`<div class="dv-row"><span class="dv-org">${esc(x.org)}</span>
+    ${docBtn(x.org,'약관',x['약관'])}${docBtn(x.org,'상품설명서',x['상품설명서'])}</div>`).join('');
+  $('dvCard').style.display=rows.length?'':'none';
+  $('dvEmpty').textContent=q?'검색하신 기관의 자료가 없습니다.':'등록된 자료가 없습니다.';
+  $('dvEmpty').style.display=rows.length?'none':'';
+}
+function dlDoc(org,kind,stored){
+  window.location='/api/docs/download?org='+encodeURIComponent(org)+'&kind='+encodeURIComponent(kind)+'&stored='+encodeURIComponent(stored);
+}
+function tapDoc(org,kind){
+  const x=(docsData||[]).find(z=>z.org===org); if(!x) return;
+  const files=x[kind]||[];
+  if(!files.length) return;
+  if(files.length===1){ dlDoc(org,kind,files[0].stored); toast(kind+' 다운로드'); return; }
+  $('dvShTitle').textContent=org+' · '+kind;
+  $('dvShSub').textContent='받을 파일을 선택하세요 ('+files.length+'개)';
+  $('dvShBody').innerHTML=files.map(f=>`<button class="dv-file" onclick="dlDoc('${esc(org)}','${kind}','${esc(f.stored)}');closeDocSheet();">
+    <span class="ic">PDF</span><span class="fn">${esc(f.filename)}</span><span class="go">다운로드 ›</span></button>`).join('');
+  $('dvSheetOv').classList.add('open');
+}
+function closeDocSheet(){ $('dvSheetOv').classList.remove('open'); }
+
 function onRateMonth(){ rateMonth=$('rtMonthSel').value; renderBest(); }
 function setRateTab(t){
   rateTab=t;
