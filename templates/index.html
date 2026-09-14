@@ -365,6 +365,9 @@ tr.row-done td{transition:background .3s}
   /* 탭 겹침(레이어) 5:5 — 선택 탭이 위로 올라와 옆 탭을 덮음 */
   /* 탭: 라운드 레일 + 아이콘 배지 + 겹침(5:5) */
   .super-tabs{border-bottom:none;gap:0;background:#E7E9ED;border-radius:28px;padding:5px}
+  /* 하단 탭바(홈·금리현황·신용등급…)가 같은 이동을 제공하므로 상단 알약 탭은 숨긴다.
+     데스크톱은 이 탭이 유일한 화면 전환 수단이므로 그대로 둔다. */
+  .super-tabs{display:none}
   .super-tab{display:flex;align-items:center;justify-content:center;flex:1;border-radius:24px;padding:9px 8px;font-weight:800;background:transparent;color:#8A92A0;border-bottom:none;position:relative;z-index:1;white-space:nowrap}
   .super-tab + .super-tab{margin-left:-16px}
   .super-tab.active{background:#F58220;color:#fff;z-index:2;box-shadow:0 3px 10px rgba(245,130,32,.30)}
