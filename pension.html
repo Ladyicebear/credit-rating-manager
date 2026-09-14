@@ -2021,22 +2021,45 @@ function _topDoc(){
   try{ if(window.top && window.top.document) return window.top.document; }catch(e){}
   return document;
 }
-function downloadUrl(url){
-  const w=window.open(url,'_blank');
-  // 팝업 차단 등으로 새 탭을 못 열면 최상위 창을 이동시킨다(첨부라 화면은 유지됨).
-  if(!w){ try{ (window.top||window).location.href=url; }catch(e){ window.location.href=url; } }
+/* 완료 감지 — 서버가 파일 응답에 심는 쿠키(fileDownloadToken)를 폴링한다.
+   응답 본문을 fetch로 받아 완료를 재는 방식은 모바일 사파리에서 await 이후 사용자
+   제스처가 끊겨 저장 자체가 막힐 수 있어 쓰지 않는다. 저장은 최상위 _blank로 안정적으로
+   태우고, '완료' 신호만 쿠키로 확인한다(jquery.fileDownload 기법). */
+function _dlToken(){ return 'dl'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function _watchDownload(token, doneMsg){
+  const started=Date.now();
+  const tick=setInterval(()=>{
+    if(document.cookie.indexOf('fileDownloadToken='+token)!==-1){
+      clearInterval(tick);
+      document.cookie='fileDownloadToken=; path=/; max-age=0';  // 다음 다운로드를 위해 지움
+      toast(doneMsg||'다운로드가 완료되었습니다');
+    }else if(Date.now()-started>120000){
+      clearInterval(tick);  // 2분 내 신호가 없으면 조용히 종료(잘못된 완료 알림 방지)
+    }
+  }, 350);
 }
-function submitDownloadForm(action, fields){
+function downloadUrl(url, doneMsg){
+  const token=_dlToken();
+  const u=url+(url.indexOf('?')===-1?'?':'&')+'dl_token='+encodeURIComponent(token);
+  const w=window.open(u,'_blank');
+  // 팝업 차단 등으로 새 탭을 못 열면 최상위 창을 이동시킨다(첨부라 화면은 유지됨).
+  if(!w){ try{ (window.top||window).location.href=u; }catch(e){ window.location.href=u; } }
+  _watchDownload(token, doneMsg);
+}
+function submitDownloadForm(action, fields, doneMsg){
+  const token=_dlToken();
   const doc=_topDoc();
   const f=doc.createElement('form');
   f.method='POST'; f.action=action; f.target='_blank'; f.style.display='none';
-  Object.keys(fields).forEach(k=>{
+  const all=Object.assign({}, fields, {dl_token:token});
+  Object.keys(all).forEach(k=>{
     const i=doc.createElement('input');
-    i.type='hidden'; i.name=k; i.value=fields[k];
+    i.type='hidden'; i.name=k; i.value=all[k];
     f.appendChild(i);
   });
   (doc.body||document.body).appendChild(f);
   f.submit();
+  _watchDownload(token, doneMsg);
   setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 60000);
 }
 
@@ -2048,9 +2071,9 @@ $('btnReport').onclick=async()=>{
   try{
     // 폼 전송으로 서버 응답을 그대로 받게 한다(브라우저 기본 다운로드).
     // blob + <a download> 방식은 모바일 크롬이 iframe 안에서 '다운로드 완료'로 표시하고도
-    // 파일을 남기지 않는 경우가 있어 쓰지 않는다.
-    submitDownloadForm('/api/pension_report', {payload: JSON.stringify({month:curMonth, rows:curRows})});
-    toast('금리현황 레포트를 다운로드합니다');
+    // 파일을 남기지 않는 경우가 있어 쓰지 않는다. 완료 메시지는 _watchDownload가 띄운다.
+    submitDownloadForm('/api/pension_report', {payload: JSON.stringify({month:curMonth, rows:curRows})},
+                       '금리현황 레포트 다운로드가 완료되었습니다');
   }catch(err){ console.error(err); toast('레포트 요청 실패: '+err.message, true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
@@ -2060,8 +2083,7 @@ $('btnHistory').onclick=async()=>{
   const btn=$('btnHistory'); const orig=btn.innerHTML;
   btn.disabled=true; toast('과거 금리 추이 파일 준비 중…');
   try{
-    downloadUrl('/download/rate_history');
-    toast('과거 금리 추이 파일을 다운로드합니다');
+    downloadUrl('/download/rate_history', '과거 금리 추이 다운로드가 완료되었습니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
@@ -2071,8 +2093,7 @@ $('btnCompare').onclick=async()=>{
   const btn=$('btnCompare'); const orig=btn.innerHTML;
   btn.disabled=true; toast('금리 비교 그래프 생성 중…');
   try{
-    downloadUrl('/download/rate_compare');
-    toast('금리 비교 그래프 엑셀을 다운로드합니다');
+    downloadUrl('/download/rate_compare', '금리 비교 그래프 다운로드가 완료되었습니다');
   }catch(err){ console.error(err); toast('생성 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ btn.disabled=false; btn.innerHTML=orig; }
 };
@@ -2115,8 +2136,7 @@ async function submitHistAppend(){
 /* ---------- 물가상승률: 과거 파일 다운로드 + 그래프 팝업 ---------- */
 function downloadCpiHistory(){
   try{
-    downloadUrl('/download/cpi_history');
-    toast('과거 물가상승률 파일을 다운로드합니다');
+    downloadUrl('/download/cpi_history', '과거 물가상승률 다운로드가 완료되었습니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message, true); }
 }
 /* 공지사항 팝업(모바일 제안카드 「공지」 버튼) */
@@ -2239,8 +2259,8 @@ async function postExport(payload, filename, btn){
   const orig=btn?btn.innerHTML:''; if(btn){btn.disabled=true;}
   toast('금리표 생성 중…');
   try{
-    submitDownloadForm('/api/pension_export', {payload: JSON.stringify(Object.assign({}, payload, {filename}))});
-    toast('금리표를 다운로드합니다');
+    submitDownloadForm('/api/pension_export', {payload: JSON.stringify(Object.assign({}, payload, {filename}))},
+                       '금리표 다운로드가 완료되었습니다');
   }catch(err){ console.error(err); toast('다운로드 실패: '+err.message+' (통합 서버에서만 동작)', true); }
   finally{ if(btn){btn.disabled=false; btn.innerHTML=orig;} }
 }
