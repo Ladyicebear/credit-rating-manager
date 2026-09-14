@@ -11,6 +11,7 @@ import subprocess
 from collections import Counter
 from datetime import datetime
 from markupsafe import Markup
+from urllib.parse import quote as _urlquote
 from flask import (Flask, render_template, jsonify, request, send_file,
                    redirect, url_for, session, make_response)
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -933,6 +934,24 @@ _RATE_HISTORY_JSON = os.path.join(BASE_DIR, 'data', 'rate_history.json')
 _XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 
+def _set_download_cookie(resp):
+    """다운로드 완료 감지용 쿠키(fileDownloadToken)를 응답에 심는다.
+
+    클라이언트가 dl_token을 함께 보내면, 브라우저가 이 응답(파일)을 받는 순간 같은 도메인
+    쿠키가 생기고 프런트가 document.cookie 폴링으로 '완료'를 감지한다(jquery.fileDownload 기법).
+    fetch로 본문을 받아 완료를 재는 방식은 모바일 사파리에서 await 이후 사용자 제스처가
+    끊겨 저장이 막히는 경우가 있어, 저장은 그대로 두고 완료 신호만 쿠키로 전달한다.
+    HttpOnly가 아니어야 자바스크립트가 읽을 수 있다."""
+    token = request.values.get('dl_token')
+    if token:
+        # 값이 아니라 '토큰 일치'만 보므로 안전한 문자만 남긴다.
+        token = re.sub(r'[^A-Za-z0-9._-]', '', token)[:64]
+        if token:
+            resp.set_cookie('fileDownloadToken', token, max_age=60,
+                            path='/', samesite='Lax')
+    return resp
+
+
 def _xlsx_attachment(src, fname, ascii_name):
     """xlsx 첨부 응답. 한글 파일명은 filename*(UTF-8)로 보내고, ASCII 대체 이름을 직접 준다.
 
@@ -943,7 +962,7 @@ def _xlsx_attachment(src, fname, ascii_name):
     resp.headers['Content-Disposition'] = (
         "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_name, _urlquote(fname))
     )
-    return resp
+    return _set_download_cookie(resp)
 
 
 @app.route('/download/rate_history')
@@ -1986,7 +2005,7 @@ def pension_report():
     resp.headers['Content-Disposition'] = (
         "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_name, _urlquote(fname))
     )
-    return resp
+    return _set_download_cookie(resp)
 
 
 # ── 과거 금리 추이: 매월 업권별 DB1년 평균 자동 append ──
