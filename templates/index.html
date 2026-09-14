@@ -54,6 +54,46 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 /* ── 통합 패널 / 임베드 iframe ── */
 .super-panel{}
 .pension-frame{width:100%;height:calc(100vh - 124px);border:none;display:block;background:#fff}
+/* ── 약관·상품설명서(하단탭 전용 화면) ── */
+#super-docsm{background:#F4F5F7;min-height:calc(100vh - 124px);padding-bottom:80px}
+.dvm-hdr{background:#fff;padding:14px 15px 12px;border-bottom:1px solid #EEF0F3}
+.dvm-title{font-size:1rem;font-weight:800;color:#123E7C;letter-spacing:-.3px;display:flex;align-items:center;gap:7px}
+.dvm-cnt{font-size:.68rem;font-weight:800;color:#CB6015;background:#FEF0E2;border-radius:10px;padding:2px 8px}
+.dvm-desc{font-size:.72rem;color:#9aa2ae;margin-top:3px}
+.dvm-search{display:flex;align-items:center;gap:7px;border:1.5px solid #E0E3E8;border-radius:11px;padding:9px 12px;margin-top:11px;background:#fff}
+.dvm-search input{border:none;outline:none;width:100%;font-size:.85rem;font-family:inherit;background:none;color:#222}
+.dvm-chips{display:flex;gap:6px;overflow-x:auto;padding:11px 14px 4px;-webkit-overflow-scrolling:touch}
+.dvm-chip{border:1.5px solid #E0E3E8;background:#fff;color:#6B7280;border-radius:15px;padding:5px 12px;font-size:.74rem;
+          font-weight:700;white-space:nowrap;flex:0 0 auto;font-family:inherit;cursor:pointer}
+.dvm-chip.on{background:#123E7C;color:#fff;border-color:#123E7C}
+.dvm-card{margin:12px 14px 0;background:#fff;border:1px solid #E7EBF1;border-radius:14px;overflow:hidden}
+.dvm-head{display:flex;align-items:center;padding:8px 13px;background:#F7F9FC;border-bottom:1px solid #EEF0F3}
+.dvm-head .c1{flex:1;font-size:.66rem;font-weight:800;color:#8A93A3}
+.dvm-head .c2,.dvm-head .c3{width:84px;text-align:center;font-size:.66rem;font-weight:800;color:#8A93A3}
+.dvm-row{display:flex;align-items:center;gap:6px;padding:10px 13px;border-bottom:1px solid #F2F4F8}
+.dvm-row:last-child{border-bottom:none}
+.dvm-org{flex:1;min-width:0;font-size:.85rem;font-weight:800;color:#16335B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dvm-btn{width:84px;border:none;border-radius:9px;font-size:.7rem;font-weight:800;padding:8px 0;font-family:inherit;position:relative;
+         display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;cursor:pointer}
+.dvm-btn svg{width:14px;height:14px;display:block;flex:0 0 auto}
+.dvm-btn.y{background:#EAF0F9;color:#123E7C}
+.dvm-btn.s{background:#FEF0E2;color:#CB6015}
+.dvm-btn.off{background:#F4F6F8;color:#C3C9D2;cursor:default}
+.dvm-btn .n{position:absolute;top:-5px;right:-5px;background:#1C9E6A;color:#fff;font-size:.58rem;font-weight:800;border-radius:8px;padding:1px 5px}
+.dvm-empty{color:#9aa0a8;font-size:.82rem;text-align:center;padding:44px 20px}
+.dvm-sheet-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:400;align-items:flex-end}
+.dvm-sheet-ov.open{display:flex}
+.dvm-sheet{background:#fff;width:100%;max-width:560px;margin:0 auto;border-radius:18px 18px 0 0;
+           padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto}
+.dvm-sheet h4{margin:0 0 3px;font-size:.95rem;color:#16335B}
+.dvm-shsub{font-size:.74rem;color:#9aa2ae;margin-bottom:12px}
+.dvm-file{display:flex;align-items:center;gap:9px;border:1px solid #E7EBF0;border-radius:10px;padding:11px 12px;margin-bottom:8px;
+          cursor:pointer;background:#fff;width:100%;font-family:inherit;text-align:left}
+.dvm-file .ic{font-size:.56rem;font-weight:900;color:#fff;background:#E0684C;border-radius:4px;padding:2px 5px;flex:0 0 auto}
+.dvm-file .fn{font-size:.78rem;color:#33455f;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dvm-file .go{color:#F58220;font-weight:800;font-size:.74rem;flex:0 0 auto}
+.dvm-sheet-x{width:100%;margin-top:6px;padding:12px;border:none;border-radius:10px;background:#EEF0F3;color:#5A6474;
+             font-weight:800;font-size:.88rem;font-family:inherit;cursor:pointer}
 .hdr-logo-svg{height:48px;width:auto;display:block}
 .hdr-sub{font-size:.7rem;color:#ffe2cc;margin-top:3px}
 .hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -452,6 +492,31 @@ tr.row-done td{transition:background .3s}
   <iframe id="docs-frame" class="pension-frame" src="/docs" title="약관·상품설명서 관리"></iframe>
 </div>
 {% endif %}
+
+<!-- ═══ [하단탭] 약관·상품설명서(모바일) ═══ RM 포함 전원 조회 가능 -->
+<div id="super-docsm" class="super-panel" style="display:none">
+  <div class="dvm-hdr">
+    <div class="dvm-title">약관·상품설명서 <span class="dvm-cnt" id="dvmCnt">–</span></div>
+    <div class="dvm-desc">기관을 찾아 약관·상품설명서를 받으세요</div>
+    <div class="dvm-search"><span>🔍</span><input id="dvmQ" placeholder="기관명 검색" oninput="renderDocsm()"></div>
+  </div>
+  <div class="dvm-chips" id="dvmChips"></div>
+  <div class="dvm-card" id="dvmCard">
+    <div class="dvm-head"><span class="c1">기관</span><span class="c2">약관</span><span class="c3">상품설명서</span></div>
+    <div id="dvmList"></div>
+  </div>
+  <div class="dvm-empty" id="dvmEmpty" style="display:none">불러오는 중…</div>
+</div>
+
+<!-- 파일이 2개 이상일 때 올라오는 선택 시트 -->
+<div class="dvm-sheet-ov" id="dvmSheetOv" onclick="if(event.target===this)closeDocmSheet()">
+  <div class="dvm-sheet">
+    <h4 id="dvmShTitle">파일 선택</h4>
+    <div class="dvm-shsub" id="dvmShSub"></div>
+    <div id="dvmShBody"></div>
+    <button class="dvm-sheet-x" onclick="closeDocmSheet()">닫기</button>
+  </div>
+</div>
 
 <!-- ═══ [통합탭2] 신용등급관리 ═══ -->
 <!-- 신용등급 서브바(설명 + 조회 컨트롤) -->
@@ -986,6 +1051,7 @@ function switchSuper(which){
   // 요소가 없을 수도 있으므로(예: RM은 상품제안관리 패널 미렌더) null-safe로 처리.
   // 이렇게 하지 않으면 중간에서 오류가 나 .main(신용등급 본문)을 숨기는 줄이 실행되지 않아
   // 원리금 탭에 신용등급 화면이 겹쳐 보이는 버그가 생긴다.
+  var _dm=document.getElementById('super-docsm'); if(_dm) _dm.style.display='none';   // 상단탭 전환 시 모바일 상품설명서 숨김
   const setDisp=(el,show,mode)=>{ if(el) el.style.display = show ? (mode||'block') : 'none'; };
   const setAct =(el,on)=>{ if(el) el.classList.toggle('active', on); };
   setDisp(document.getElementById('super-pension'),  pen);
@@ -1371,10 +1437,89 @@ function showToast(msg,type='info',dur=3200){
   if(dur>0)_tt=setTimeout(hideToast,dur);
 }
 function hideToast(){document.getElementById('toast').className=''}
-/* ── 하단 탭바: 홈·금리현황→원리금, 신용등급→신용등급, 약관·마이페이지→준비중 ── */
+/* ── 약관·상품설명서(하단탭): 기관 한 줄에 약관·상품설명서 다운로드 ── */
+var DOCM_ICON={
+  '약관':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9z"/><path d="M13 3v6h6"/><path d="M8.6 13.4h6.8M8.6 16.9h4.4"/></svg>',
+  '상품설명서':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.6" width="14" height="16.4" rx="1.7"/><path d="M9.3 4.6V3.5h5.4v1.1"/><path d="M8.8 10.8h6.4M8.8 14.4h4.4"/></svg>'
+};
+var docmData=null, docmCat='전체';
+function escDocm(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function loadDocsm(){
+  if(docmData) return;                       // 한 번만 불러온다
+  fetch('/api/docs').then(function(r){ return r.json(); }).then(function(d){
+    // 약관이나 상품설명서가 하나라도 등록된 기관만 노출한다
+    docmData=(d.items||[]).filter(function(x){ return (x['약관']||[]).length || (x['상품설명서']||[]).length; })
+                          .sort(function(a,b){ return a.org.localeCompare(b.org,'ko'); });
+    var cats=['전체']; docmData.forEach(function(x){ if(cats.indexOf(x.cat)<0) cats.push(x.cat); });
+    document.getElementById('dvmChips').innerHTML=cats.map(function(c){
+      return '<button class="dvm-chip'+(c===docmCat?' on':'')+'" onclick="setDocmCat(\''+escDocm(c)+'\')">'+escDocm(c)+'</button>';
+    }).join('');
+    document.getElementById('dvmCnt').textContent=docmData.length+'곳';
+    renderDocsm();
+  }).catch(function(){
+    document.getElementById('dvmCard').style.display='none';
+    var e=document.getElementById('dvmEmpty'); e.textContent='목록을 불러오지 못했습니다.'; e.style.display='';
+  });
+}
+function setDocmCat(c){
+  docmCat=c;
+  document.querySelectorAll('.dvm-chip').forEach(function(e){ e.classList.toggle('on', e.textContent===c); });
+  renderDocsm();
+}
+function docmBtn(org,kind,files){
+  var n=(files||[]).length, cls=(kind==='약관')?'y':'s';
+  if(!n) return '<span class="dvm-btn off">없음</span>';
+  return '<button class="dvm-btn '+cls+'" onclick="tapDocm(\''+escDocm(org)+'\',\''+kind+'\')">'+DOCM_ICON[kind]+'다운로드'
+       + (n>1?'<span class="n">'+n+'</span>':'') + '</button>';
+}
+function renderDocsm(){
+  if(!docmData) return;
+  var q=(document.getElementById('dvmQ').value||'').trim().toLowerCase();
+  var rows=docmData.filter(function(x){
+    return (docmCat==='전체'||x.cat===docmCat) && (!q||x.org.toLowerCase().indexOf(q)>=0);
+  });
+  document.getElementById('dvmList').innerHTML=rows.map(function(x){
+    return '<div class="dvm-row"><span class="dvm-org">'+escDocm(x.org)+'</span>'
+         + docmBtn(x.org,'약관',x['약관']) + docmBtn(x.org,'상품설명서',x['상품설명서']) + '</div>';
+  }).join('');
+  document.getElementById('dvmCard').style.display=rows.length?'':'none';
+  var e=document.getElementById('dvmEmpty');
+  e.textContent=q?'검색하신 기관의 자료가 없습니다.':'등록된 자료가 없습니다.';
+  e.style.display=rows.length?'none':'';
+}
+function dlDocm(org,kind,stored){
+  window.location='/api/docs/download?org='+encodeURIComponent(org)+'&kind='+encodeURIComponent(kind)+'&stored='+encodeURIComponent(stored);
+}
+function tapDocm(org,kind){
+  var x=(docmData||[]).filter(function(z){ return z.org===org; })[0]; if(!x) return;
+  var files=x[kind]||[]; if(!files.length) return;
+  if(files.length===1){ dlDocm(org,kind,files[0].stored); if(typeof showToast==='function') showToast(kind+' 다운로드','ok'); return; }
+  document.getElementById('dvmShTitle').textContent=org+' · '+kind;
+  document.getElementById('dvmShSub').textContent='받을 파일을 선택하세요 ('+files.length+'개)';
+  document.getElementById('dvmShBody').innerHTML=files.map(function(f){
+    return '<button class="dvm-file" onclick="dlDocm(\''+escDocm(org)+'\',\''+kind+'\',\''+escDocm(f.stored)+'\');closeDocmSheet();">'
+         + '<span class="ic">PDF</span><span class="fn">'+escDocm(f.filename)+'</span><span class="go">다운로드 ›</span></button>';
+  }).join('');
+  document.getElementById('dvmSheetOv').classList.add('open');
+}
+function closeDocmSheet(){ document.getElementById('dvmSheetOv').classList.remove('open'); }
+
+/* ── 하단 탭바: 홈·금리현황→원리금, 신용등급→신용등급, 상품설명서→문서 목록, 마이페이지→준비중 ── */
 function tabbarGo(which, el){
   document.querySelectorAll('#appTabbar .tab-item').forEach(function(b){ b.classList.remove('active'); });
   if(el) el.classList.add('active');
+  var dm=document.getElementById('super-docsm');
+  if(which==='docs'){   // 상품설명서: 다른 화면 숨기고 문서 목록 표시
+    ['super-pension','super-proposal','super-visitors','super-docs'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
+    var mn=document.querySelector('.main'); if(mn)mn.style.display='none';
+    var cs=document.getElementById('credit-subbar'); if(cs)cs.style.display='none';
+    document.querySelectorAll('.super-tab').forEach(function(t){t.classList.remove('active');});
+    if(dm) dm.style.display='block';
+    loadDocsm();
+    try{ window.scrollTo(0,0); }catch(e){}
+    return;
+  }
+  if(dm) dm.style.display='none';
   if(which==='home' || which==='rate'){
     if(typeof switchSuper==='function') switchSuper('pension');
     if(which==='home'){ try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); } }
@@ -1398,7 +1543,7 @@ function tabbarGo(which, el){
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.3v5.4c0 4.6 3.2 7.9 7.5 9.3 4.3-1.4 7.5-4.7 7.5-9.3V5.3L12 2.5Z"/><path d="m8.7 11.9 2.2 2.2 4.4-4.5"/></svg><span>신용등급</span>
   </button>
   <button class="tab-item" data-tab="docs" onclick="tabbarGo('docs',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg><span>상품설명서</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9z"/><path d="M13 3v6h6"/><path d="M8.6 13.4h6.8M8.6 16.9h4.4"/></svg><span>상품설명서</span>
   </button>
   <button class="tab-item" data-tab="my" onclick="tabbarGo('my',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6.2 8-6.2s8 2.2 8 6.2"/></svg><span>마이페이지</span>
