@@ -309,15 +309,17 @@ def _smtp_settings() -> dict:
         port = int(cfg.get('port'))
     except (TypeError, ValueError):
         port = SMTP_PORT
-    user = g('user', SMTP_USER)
+    user = str(g('user', SMTP_USER)).strip()
+    # Gmail 앱 비밀번호는 'abcd efgh ijkl mnop'처럼 보여줘서 공백째 넣기 쉬움 → 모든 공백 제거 후 사용.
+    pw = re.sub(r'\s+', '', str(g('password', SMTP_PASSWORD)))
     return {
-        'host': g('host', SMTP_HOST),
+        'host': str(g('host', SMTP_HOST)).strip(),
         'port': port,
         'user': user,
-        'password': g('password', SMTP_PASSWORD),
-        'from_addr': g('from_addr', SMTP_FROM or user),
+        'password': pw,
+        'from_addr': str(g('from_addr', SMTP_FROM or user)).strip(),
         'from_name': g('from_name', SMTP_FROM_NAME),
-        'base_url': g('base_url', APP_BASE_URL),
+        'base_url': str(g('base_url', APP_BASE_URL)).strip(),
     }
 
 
@@ -332,8 +334,11 @@ def _base_url() -> str:
 def _smtp_send_raw(to_addr: str, subject: str, html: str):
     """실제 발송. 실패 시 예외를 그대로 올린다(테스트 화면에서 원인 메시지 노출용)."""
     s = _smtp_settings()
-    if not (s['user'] and s['password'] and s['from_addr']):
-        raise RuntimeError('SMTP 설정이 비어 있습니다. 발신 계정과 앱 비밀번호를 저장해 주세요.')
+    missing = [label for label, v in (('발신 계정', s['user']),
+                                      ('앱 비밀번호', s['password']),
+                                      ('발신 주소', s['from_addr'])) if not v]
+    if missing:
+        raise RuntimeError('설정이 비어 있습니다: ' + ', '.join(missing) + ' 을(를) 입력·저장해 주세요.')
     msg = EmailMessage()
     msg['Subject'] = subject
     msg['From'] = formataddr((s['from_name'], s['from_addr']))
@@ -764,10 +769,11 @@ def api_email_settings():
                 cfg['port'] = int(str(d.get('port')).strip())
             except (TypeError, ValueError):
                 return jsonify({'success': False, 'message': '포트는 숫자여야 합니다.'}), 400
-        # 앱 비밀번호: 입력했을 때만 갱신(빈칸이면 기존 값 유지 → 재입력 부담 제거)
+        # 앱 비밀번호: 입력했을 때만 갱신(빈칸이면 기존 값 유지). 공백 제거(앱 비밀번호를
+        # 'abcd efgh ijkl mnop'처럼 공백째 붙여넣어도 되도록).
         pw = d.get('password')
-        if pw:
-            cfg['password'] = pw.strip()
+        if pw and re.sub(r'\s+', '', pw):
+            cfg['password'] = re.sub(r'\s+', '', pw)
         _save_smtp_cfg(cfg)
     return jsonify({'success': True})
 
@@ -787,7 +793,13 @@ def api_email_test():
         _smtp_send_raw(to, '[신용등급 시스템] 발송 테스트', html)
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)[:300] or '발송 실패'})
+        msg = str(e)[:300] or '발송 실패'
+        if '535' in msg or 'BadCredentials' in msg or 'not accepted' in msg:
+            msg = ('구글이 로그인을 거부했습니다(535). ① 계정 비밀번호가 아니라 16자리 '
+                   '"앱 비밀번호"인지 ② 2단계 인증이 켜져 있는지 ③ 새 계정이면 '
+                   'accounts.google.com/DisplayUnlockCaptcha 에서 접속 허용 후 재시도했는지 확인하세요. (원문: '
+                   + msg + ')')
+        return jsonify({'success': False, 'message': msg})
 
 
 @app.route('/api/change_password', methods=['POST'])
