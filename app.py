@@ -332,9 +332,39 @@ def _base_url() -> str:
     return request.url_root.rstrip('/')
 
 
-def _smtp_send_raw(to_addr: str, subject: str, html: str):
-    """실제 발송. 실패 시 예외를 그대로 올린다(테스트 화면에서 원인 메시지 노출용)."""
+def _smtp_settings_with(overrides: dict) -> dict:
+    """저장된 설정 위에 입력값(비어 있지 않은 것만)을 덮어쓴 발송 설정.
+
+    테스트 발송에서 '화면에 방금 입력한 값'으로 바로 검증하기 위한 용도.
+    비밀번호는 공백 제거, 포트는 정수화한다(저장 로직과 동일 규칙).
+    """
     s = _smtp_settings()
+    o = overrides or {}
+    for key in ('host', 'user', 'from_addr', 'from_name', 'base_url'):
+        v = o.get(key)
+        if v is not None and str(v).strip() != '':
+            s[key] = str(v).strip()
+    pw = o.get('password')
+    if pw and re.sub(r'\s+', '', pw):
+        s['password'] = re.sub(r'\s+', '', pw)
+    port = o.get('port')
+    if str(port or '').strip():
+        try:
+            s['port'] = int(str(port).strip())
+        except (TypeError, ValueError):
+            pass
+    if not s.get('from_addr'):
+        s['from_addr'] = s.get('user', '')
+    return s
+
+
+def _smtp_send_raw(to_addr: str, subject: str, html: str, s: dict = None):
+    """실제 발송. 실패 시 예외를 그대로 올린다(테스트 화면에서 원인 메시지 노출용).
+
+    s를 주면 그 설정으로, 없으면 저장된 설정으로 보낸다.
+    """
+    if s is None:
+        s = _smtp_settings()
     missing = [label for label, v in (('발신 계정', s['user']),
                                       ('앱 비밀번호', s['password']),
                                       ('발신 주소', s['from_addr'])) if not v]
@@ -824,9 +854,11 @@ def api_email_test():
     to = _normalize_email(d.get('to', ''))
     if not _EMAIL_RE.match(to):
         return jsonify({'success': False, 'message': '받는 이메일 형식이 올바르지 않습니다.'}), 400
+    # 화면에 방금 입력한 값(있으면)으로 즉시 테스트한다. 저장 여부와 무관하게
+    # '지금 보이는 설정'을 검증하므로, 저장 전 확인이나 기존 값 수정에 모두 안전하다.
+    s = _smtp_settings_with(d)
     # 발송 전 사전 점검: Gmail 앱 비밀번호는 공백 제외 16자리다. 길이가 다르면
     # 십중팔구 계정 비밀번호를 넣은 것 → 구글에 요청 보내기 전에 535 원인을 미리 안내.
-    s = _smtp_settings()
     if 'gmail.com' in (s.get('host') or '').lower() and s.get('password') \
             and len(s['password']) != 16:
         return jsonify({'success': False, 'message': (
@@ -837,7 +869,7 @@ def api_email_test():
             '이 메일이 도착했다면 발송 설정이 정상입니다. '
             '이제 로그인 매직링크와 가입 승인 메일이 이 계정으로 발송됩니다.</div>')
     try:
-        _smtp_send_raw(to, '[신용등급 시스템] 발송 테스트', html)
+        _smtp_send_raw(to, '[신용등급 시스템] 발송 테스트', html, s=s)
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': _smtp_error_hint(e)})

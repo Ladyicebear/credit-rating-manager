@@ -173,11 +173,17 @@ async function saveEmail(){
 async function testEmail(){
   const to=_mv('m_test');
   if(!to){ mailMsg('테스트 받을 이메일을 입력하세요.','err'); return; }
+  // 화면에 입력한 값 그대로 테스트한다(저장 안 해도 됨). 비밀번호 칸이 비어 있으면
+  // 저장된 값으로 테스트한다. → '저장 안 눌러서 옛 값으로 테스트되는' 함정 제거.
+  const body={to, host:_mv('m_host'), port:_mv('m_port'), user:_mv('m_user'),
+              from_addr:_mv('m_from'), from_name:_mv('m_fromname')};
+  const pw=document.getElementById('m_pw').value;
+  if(pw) body.password=pw;
   mailMsg('발송 중… (몇 초 걸릴 수 있어요)','ok');
   try{
-    const r=await fetch('/api/email_test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to})});
+    const r=await fetch('/api/email_test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(d.success) mailMsg('✅ 발송 성공! '+to+' 메일함(스팸함 포함)을 확인하세요.','ok');
+    if(d.success) mailMsg('✅ 발송 성공! '+to+' 메일함(스팸함 포함)을 확인하세요. 이 설정을 계속 쓰려면 "설정 저장"을 눌러 주세요.','ok');
     else mailMsg('❌ 발송 실패: '+(d.message||'설정을 확인하세요.'),'err');
   }catch(e){ mailMsg('서버와 통신하지 못했습니다.','err'); }
 }
