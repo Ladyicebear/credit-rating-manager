@@ -131,6 +131,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'admin_refresh_bond_rates',  # 시장금리 수동 갱신(연금컨설팅팀 전용)
     'docs_page', 'api_docs_upload', 'api_docs_delete', 'api_docs_bulk',  # 약관·상품설명서 관리(연금컨설팅팀 전용)
     'admin_members', 'api_members_action',   # 회원 가입 승인 관리(연금컨설팅팀 전용)
+    'api_email_settings', 'api_email_test',  # 이메일(SMTP) 발송 설정(연금컨설팅팀 전용)
 }
 
 
@@ -269,40 +270,96 @@ def _consume_magic_token(raw: str):
     return rec.get('email')
 
 
+# SMTP 설정은 두 곳에서 온다(파일 우선): ① data/smtp.json(연금컨설팅팀이 화면에서 저장 — VM 접근 불필요),
+# ② 환경변수(SMTP_USER 등). 파일 값이 있으면 환경변수보다 우선한다. 앱 비밀번호처럼 민감한 값을
+# VM/gcloud 없이 웹에서 넣을 수 있게 하는 장치. ⚠️ data/smtp.json은 .gitignore로 커밋되지 않는다.
+SMTP_CFG_FILE = os.path.join(DATA_DIR, 'smtp.json')
+_SMTP_LOCK = threading.Lock()
+
+
+def _load_smtp_cfg() -> dict:
+    if not os.path.exists(SMTP_CFG_FILE):
+        return {}
+    try:
+        with open(SMTP_CFG_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('smtp.json 읽기 실패')
+        return {}
+
+
+def _save_smtp_cfg(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = SMTP_CFG_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, SMTP_CFG_FILE)
+
+
+def _smtp_settings() -> dict:
+    """파일(data/smtp.json) 값이 있으면 우선, 없으면 환경변수 기본값으로 채운 발송 설정."""
+    cfg = _load_smtp_cfg()
+
+    def g(key, env_default):
+        v = cfg.get(key)
+        return v if (v is not None and str(v).strip() != '') else env_default
+
+    try:
+        port = int(cfg.get('port'))
+    except (TypeError, ValueError):
+        port = SMTP_PORT
+    user = g('user', SMTP_USER)
+    return {
+        'host': g('host', SMTP_HOST),
+        'port': port,
+        'user': user,
+        'password': g('password', SMTP_PASSWORD),
+        'from_addr': g('from_addr', SMTP_FROM or user),
+        'from_name': g('from_name', SMTP_FROM_NAME),
+        'base_url': g('base_url', APP_BASE_URL),
+    }
+
+
 def _base_url() -> str:
-    """매직링크에 쓸 절대 주소. APP_BASE_URL 우선, 없으면 요청에서 추정."""
-    if APP_BASE_URL:
-        return APP_BASE_URL
+    """매직링크에 쓸 절대 주소. 저장된 설정/환경변수 우선, 없으면 요청에서 추정."""
+    s = _smtp_settings()
+    if s.get('base_url'):
+        return str(s['base_url']).rstrip('/')
     return request.url_root.rstrip('/')
 
 
-def _send_email(to_addr: str, subject: str, html: str) -> bool:
-    """HTML 이메일 발송. SMTP 미설정 시 발송하지 않고 로그만 남기고 False 반환."""
-    if not (SMTP_USER and SMTP_PASSWORD and SMTP_FROM):
-        logger.warning('SMTP 미설정 — 이메일 발송 생략(대상=%s, 제목=%s). '
-                       '개발 중이면 서버 로그의 링크를 사용하세요.', to_addr, subject)
-        return False
+def _smtp_send_raw(to_addr: str, subject: str, html: str):
+    """실제 발송. 실패 시 예외를 그대로 올린다(테스트 화면에서 원인 메시지 노출용)."""
+    s = _smtp_settings()
+    if not (s['user'] and s['password'] and s['from_addr']):
+        raise RuntimeError('SMTP 설정이 비어 있습니다. 발신 계정과 앱 비밀번호를 저장해 주세요.')
     msg = EmailMessage()
     msg['Subject'] = subject
-    msg['From'] = formataddr((SMTP_FROM_NAME, SMTP_FROM))
+    msg['From'] = formataddr((s['from_name'], s['from_addr']))
     msg['To'] = to_addr
     msg.set_content('이 메일은 HTML 형식입니다. HTML을 지원하는 메일 클라이언트에서 확인해 주세요.')
     msg.add_alternative(html, subtype='html')
+    if s['port'] == 465:
+        with smtplib.SMTP_SSL(s['host'], s['port'], timeout=20) as srv:
+            srv.login(s['user'], s['password'])
+            srv.send_message(msg)
+    else:
+        with smtplib.SMTP(s['host'], s['port'], timeout=20) as srv:
+            srv.ehlo()
+            srv.starttls()
+            srv.ehlo()
+            srv.login(s['user'], s['password'])
+            srv.send_message(msg)
+
+
+def _send_email(to_addr: str, subject: str, html: str) -> bool:
+    """HTML 이메일 발송. 미설정/실패 시 로그만 남기고 False 반환(발송 흐름을 막지 않음)."""
     try:
-        if SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as s:
-                s.login(SMTP_USER, SMTP_PASSWORD)
-                s.send_message(msg)
-        else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
-                s.ehlo()
-                s.starttls()
-                s.ehlo()
-                s.login(SMTP_USER, SMTP_PASSWORD)
-                s.send_message(msg)
+        _smtp_send_raw(to_addr, subject, html)
         return True
     except Exception:
-        logger.exception('이메일 발송 실패(대상=%s)', to_addr)
+        logger.exception('이메일 발송 실패(대상=%s, 제목=%s)', to_addr, subject)
         return False
 
 
@@ -640,7 +697,13 @@ def admin_members():
                   key=lambda m: (order.get(m.get('status'), 9), m.get('created_at', '')),
                   reverse=False)
     pending_n = sum(1 for m in members.values() if m.get('status') == 'pending')
-    return render_template('admin_members.html', members=rows, pending_n=pending_n)
+    s = _smtp_settings()
+    smtp_view = {
+        'host': s['host'], 'port': s['port'], 'user': s['user'],
+        'from_addr': s['from_addr'], 'from_name': s['from_name'],
+        'base_url': s['base_url'], 'has_password': bool(s['password']),
+    }
+    return render_template('admin_members.html', members=rows, pending_n=pending_n, smtp=smtp_view)
 
 
 @app.route('/api/members/action', methods=['POST'])
@@ -683,6 +746,48 @@ def api_members_action():
         except Exception:
             logger.exception('승인 알림 메일 실패(대상=%s)', email)
     return jsonify({'success': True})
+
+
+# ── 이메일(SMTP) 발송 설정 — 연금컨설팅팀이 화면에서 저장(VM/gcloud 불필요) ──────────
+@app.route('/api/email_settings', methods=['POST'])
+def api_email_settings():
+    if session.get('role') != 'consulting':
+        return jsonify({'success': False, 'message': '연금컨설팅팀만 사용할 수 있습니다.'}), 403
+    d = request.get_json(silent=True) or {}
+    with _SMTP_LOCK:
+        cfg = _load_smtp_cfg()
+        for k in ('host', 'user', 'from_addr', 'from_name', 'base_url'):
+            if k in d:
+                cfg[k] = (d.get(k) or '').strip()
+        if str(d.get('port', '')).strip():
+            try:
+                cfg['port'] = int(str(d.get('port')).strip())
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'message': '포트는 숫자여야 합니다.'}), 400
+        # 앱 비밀번호: 입력했을 때만 갱신(빈칸이면 기존 값 유지 → 재입력 부담 제거)
+        pw = d.get('password')
+        if pw:
+            cfg['password'] = pw.strip()
+        _save_smtp_cfg(cfg)
+    return jsonify({'success': True})
+
+
+@app.route('/api/email_test', methods=['POST'])
+def api_email_test():
+    if session.get('role') != 'consulting':
+        return jsonify({'success': False, 'message': '연금컨설팅팀만 사용할 수 있습니다.'}), 403
+    d = request.get_json(silent=True) or {}
+    to = _normalize_email(d.get('to', ''))
+    if not _EMAIL_RE.match(to):
+        return jsonify({'success': False, 'message': '받는 이메일 형식이 올바르지 않습니다.'}), 400
+    html = ('<div style="font-family:sans-serif">✅ 테스트 메일입니다.<br><br>'
+            '이 메일이 도착했다면 발송 설정이 정상입니다. '
+            '이제 로그인 매직링크와 가입 승인 메일이 이 계정으로 발송됩니다.</div>')
+    try:
+        _smtp_send_raw(to, '[신용등급 시스템] 발송 테스트', html)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)[:300] or '발송 실패'})
 
 
 @app.route('/api/change_password', methods=['POST'])

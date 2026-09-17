@@ -52,6 +52,10 @@ data/members.json.*
 data/login_tokens.json
 data/login_tokens.json.*
 
+# 이메일(SMTP) 발송 설정 — 앱 비밀번호 포함 (커밋 금지)
+data/smtp.json
+data/smtp.json.*
+
 # 상품제안관리 런타임 데이터(기기/서버별로 관리, 배포 시 서버 것 유지)
 data/proposals.json
 data/proposal_meta.json
