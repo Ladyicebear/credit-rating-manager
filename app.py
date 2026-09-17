@@ -5,11 +5,16 @@ import json
 import time
 import uuid
 import shutil
+import hashlib
+import secrets
+import smtplib
 import logging
 import threading
 import subprocess
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
+from email.message import EmailMessage
+from email.utils import formataddr
 from markupsafe import Markup
 from flask import (Flask, render_template, jsonify, request, send_file,
                    redirect, url_for, session, make_response)
@@ -43,6 +48,42 @@ RM_PASSWORD = os.environ.get('RM_PASSWORD', '')
 # RM 비밀번호 만료 주기(일). 이 기간이 지나면 RM 로그인이 막히고, 연금컨설팅팀이 재설정해야 다시 로그인 가능.
 RM_PW_MAX_AGE_DAYS = int(os.environ.get('RM_PW_MAX_AGE_DAYS', '14'))
 
+# ── 회원가입 + 연금컨설팅팀 승인 + 회사 이메일 매직링크 로그인 ─────────────────
+# 신규 회원(현업 RM 등)은 회사 이메일로 가입 신청 → 연금컨설팅팀 승인 → 이후
+# 로그인할 때마다 회사 이메일로 온 '매직링크'를 클릭해야 세션이 생성된다(비밀번호 없음).
+# 승인된 회원의 역할은 'rm'(조회·다운로드 전용). 기존 APP_USER/RM_USER(아이디+비밀번호)는 그대로 유지.
+
+# 가입을 허용할 회사 이메일 도메인(쉼표 구분, 소문자 비교). 환경변수로 덮어쓸 수 있음.
+ALLOWED_EMAIL_DOMAINS = [d.strip().lower().lstrip('@')
+                         for d in os.environ.get('ALLOWED_EMAIL_DOMAINS', 'miraeasset.com').split(',')
+                         if d.strip()]
+
+# 가입 시 선택하는 소속(팀) 목록. 바꾸려면 이 목록만 수정하면 됨.
+AFFILIATIONS = [
+    '연금RM 1-1-1팀', '연금RM 1-1-2팀', '연금RM 1-2-1팀', '연금RM 1-2-2팀',
+    '연금RM 2-1-1팀', '연금RM 2-1-2팀', '연금RM 2-2-1팀', '연금RM 2-2-2팀',
+    '연금RM 3-1-1팀', '연금RM 3-1-2팀', '연금RM 3-2-1팀', '연금RM 3-2-2팀',
+    '공기업솔루션팀', '연금법인RM팀', '글로벌기업솔루션팀', '글로벌기업 RM팀',
+]
+
+# 매직링크 유효시간(분). 이 시간이 지나면 링크는 무효.
+MAGIC_LINK_TTL_MIN = int(os.environ.get('MAGIC_LINK_TTL_MIN', '15'))
+# 매직링크 절대 URL 생성 기준 주소(프록시/Cloud Run 배포 시 권장, 예: https://앱주소).
+# 미설정 시 요청 주소에서 추정한다.
+APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')
+
+# ── SMTP(이메일 발송) — 기본값 Gmail(587/STARTTLS). ──
+# 배포 시 SMTP_USER(발신 Gmail 주소) + SMTP_PASSWORD(구글 '앱 비밀번호')를 환경변수로 넣으면 실제 발송.
+# 미설정 시 발송을 생략하고 매직링크를 서버 로그에만 출력한다(로컬 개발용).
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_FROM = os.environ.get('SMTP_FROM', SMTP_USER)          # 발신 주소(미설정 시 SMTP_USER)
+SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', '연금컨설팅 신용등급 시스템')
+# 신규 가입 신청이 들어오면 알림을 받을 관리자 이메일(선택). 미설정 시 알림 생략.
+ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_NOTIFY_EMAIL', '')
+
 
 def _role_for(username: str):
     if username and username == APP_USER:
@@ -68,7 +109,8 @@ MIN_PASSWORD_LEN = 8
 # 로그인 없이 접근 허용할 엔드포인트
 # api_change_password: 로그인 화면에서 비밀번호를 바꿀 수 있게 공개. 대신 아이디+현재 비밀번호를
 # 모두 맞게 입력해야만 통과하므로 로그인 자체와 같은 수준의 검증을 거친다.
-_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password'}
+_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password',
+                     'signup', 'login_email', 'auth_verify'}
 
 # RM(조회 전용)이 접근할 수 없는 쓰기/실행/관리 엔드포인트.
 # (다운로드·조회 GET은 여기 없음 → RM 허용). 서버측 최종 방어선이며 화면 숨김과 별개로 강제된다.
@@ -88,6 +130,8 @@ _ADMIN_ONLY_ENDPOINTS = {
     'admin_deploy', 'admin_deploy_status',   # 서버 배포/상태(연금컨설팅팀 전용)
     'admin_refresh_bond_rates',  # 시장금리 수동 갱신(연금컨설팅팀 전용)
     'docs_page', 'api_docs_upload', 'api_docs_delete', 'api_docs_bulk',  # 약관·상품설명서 관리(연금컨설팅팀 전용)
+    'admin_members', 'api_members_action',   # 회원 가입 승인 관리(연금컨설팅팀 전용)
+    'api_email_settings', 'api_email_test',  # 이메일(SMTP) 발송 설정(연금컨설팅팀 전용)
 }
 
 
@@ -107,6 +151,249 @@ def _save_auth(data: dict):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(AUTH_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ── 회원(가입 신청/승인) 저장소 + 매직링크 토큰 + 이메일 발송 ──────────────────
+#   members.json : {이메일(소문자): {email,name,emp_id,affiliation,status,role,created_at,...}}
+#     status = pending(승인 대기) | approved(승인됨) | rejected(거절됨)
+#   login_tokens.json : {토큰해시: {email, expires_at, created_at}}  ← 매직링크(1회용)
+#   ⚠️ 둘 다 런타임 데이터 → data/(GCS 버킷)에 저장되어 재배포에도 유지된다.
+MEMBERS_FILE = os.path.join(DATA_DIR, 'members.json')
+TOKENS_FILE = os.path.join(DATA_DIR, 'login_tokens.json')
+_MEMBERS_LOCK = threading.Lock()
+_TOKENS_LOCK = threading.Lock()
+_DT_FMT = '%Y-%m-%d %H:%M:%S'
+# 이메일 형식(간단 검증). 도메인 허용 여부는 _email_domain_ok로 별도 확인.
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def _now_str() -> str:
+    return datetime.now().strftime(_DT_FMT)
+
+
+def _parse_dt(s: str):
+    try:
+        return datetime.strptime(s, _DT_FMT)
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_email(email: str) -> str:
+    return (email or '').strip().lower()
+
+
+def _email_domain_ok(email: str) -> bool:
+    """허용된 회사 이메일 도메인인지. ALLOWED_EMAIL_DOMAINS가 비어 있으면 모두 허용."""
+    if not ALLOWED_EMAIL_DOMAINS:
+        return True
+    dom = email.rsplit('@', 1)[-1].lower() if '@' in email else ''
+    return dom in ALLOWED_EMAIL_DOMAINS
+
+
+def _load_members() -> dict:
+    if not os.path.exists(MEMBERS_FILE):
+        return {}
+    try:
+        with open(MEMBERS_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('members.json 읽기 실패')
+        return {}
+
+
+def _save_members(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = MEMBERS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, MEMBERS_FILE)
+
+
+def _load_tokens() -> dict:
+    if not os.path.exists(TOKENS_FILE):
+        return {}
+    try:
+        with open(TOKENS_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('login_tokens.json 읽기 실패')
+        return {}
+
+
+def _save_tokens(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = TOKENS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, TOKENS_FILE)
+
+
+def _hash_token(raw: str) -> str:
+    # 원문 토큰은 저장하지 않고 해시만 저장 → 파일이 유출돼도 그 자체로는 로그인 불가.
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+
+def _create_magic_token(email: str) -> str:
+    """이메일에 대한 1회용 매직링크 토큰을 만들어 저장하고 원문 토큰을 반환. 만료분은 함께 정리."""
+    raw = secrets.token_urlsafe(32)
+    now = datetime.now()
+    exp = now + timedelta(minutes=MAGIC_LINK_TTL_MIN)
+    with _TOKENS_LOCK:
+        toks = _load_tokens()
+        # 만료된 토큰 청소(파일이 무한정 커지지 않도록)
+        toks = {k: v for k, v in toks.items()
+                if (_parse_dt(v.get('expires_at', '')) or now) > now}
+        toks[_hash_token(raw)] = {'email': email,
+                                  'expires_at': exp.strftime(_DT_FMT),
+                                  'created_at': now.strftime(_DT_FMT)}
+        _save_tokens(toks)
+    return raw
+
+
+def _consume_magic_token(raw: str):
+    """매직링크 토큰을 검증하고 즉시 제거(1회용). 유효하면 이메일, 아니면 None."""
+    if not raw:
+        return None
+    h = _hash_token(raw)
+    with _TOKENS_LOCK:
+        toks = _load_tokens()
+        rec = toks.pop(h, None)   # 유효/만료 관계없이 제거(재사용 방지)
+        if rec is not None:
+            _save_tokens(toks)
+    if not rec:
+        return None
+    exp = _parse_dt(rec.get('expires_at', ''))
+    if not exp or exp < datetime.now():
+        return None
+    return rec.get('email')
+
+
+# SMTP 설정은 두 곳에서 온다(파일 우선): ① data/smtp.json(연금컨설팅팀이 화면에서 저장 — VM 접근 불필요),
+# ② 환경변수(SMTP_USER 등). 파일 값이 있으면 환경변수보다 우선한다. 앱 비밀번호처럼 민감한 값을
+# VM/gcloud 없이 웹에서 넣을 수 있게 하는 장치. ⚠️ data/smtp.json은 .gitignore로 커밋되지 않는다.
+SMTP_CFG_FILE = os.path.join(DATA_DIR, 'smtp.json')
+_SMTP_LOCK = threading.Lock()
+
+
+def _load_smtp_cfg() -> dict:
+    if not os.path.exists(SMTP_CFG_FILE):
+        return {}
+    try:
+        with open(SMTP_CFG_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('smtp.json 읽기 실패')
+        return {}
+
+
+def _save_smtp_cfg(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = SMTP_CFG_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, SMTP_CFG_FILE)
+
+
+def _smtp_settings() -> dict:
+    """파일(data/smtp.json) 값이 있으면 우선, 없으면 환경변수 기본값으로 채운 발송 설정."""
+    cfg = _load_smtp_cfg()
+
+    def g(key, env_default):
+        v = cfg.get(key)
+        return v if (v is not None and str(v).strip() != '') else env_default
+
+    try:
+        port = int(cfg.get('port'))
+    except (TypeError, ValueError):
+        port = SMTP_PORT
+    user = g('user', SMTP_USER)
+    return {
+        'host': g('host', SMTP_HOST),
+        'port': port,
+        'user': user,
+        'password': g('password', SMTP_PASSWORD),
+        'from_addr': g('from_addr', SMTP_FROM or user),
+        'from_name': g('from_name', SMTP_FROM_NAME),
+        'base_url': g('base_url', APP_BASE_URL),
+    }
+
+
+def _base_url() -> str:
+    """매직링크에 쓸 절대 주소. 저장된 설정/환경변수 우선, 없으면 요청에서 추정."""
+    s = _smtp_settings()
+    if s.get('base_url'):
+        return str(s['base_url']).rstrip('/')
+    return request.url_root.rstrip('/')
+
+
+def _smtp_send_raw(to_addr: str, subject: str, html: str):
+    """실제 발송. 실패 시 예외를 그대로 올린다(테스트 화면에서 원인 메시지 노출용)."""
+    s = _smtp_settings()
+    if not (s['user'] and s['password'] and s['from_addr']):
+        raise RuntimeError('SMTP 설정이 비어 있습니다. 발신 계정과 앱 비밀번호를 저장해 주세요.')
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = formataddr((s['from_name'], s['from_addr']))
+    msg['To'] = to_addr
+    msg.set_content('이 메일은 HTML 형식입니다. HTML을 지원하는 메일 클라이언트에서 확인해 주세요.')
+    msg.add_alternative(html, subtype='html')
+    if s['port'] == 465:
+        with smtplib.SMTP_SSL(s['host'], s['port'], timeout=20) as srv:
+            srv.login(s['user'], s['password'])
+            srv.send_message(msg)
+    else:
+        with smtplib.SMTP(s['host'], s['port'], timeout=20) as srv:
+            srv.ehlo()
+            srv.starttls()
+            srv.ehlo()
+            srv.login(s['user'], s['password'])
+            srv.send_message(msg)
+
+
+def _send_email(to_addr: str, subject: str, html: str) -> bool:
+    """HTML 이메일 발송. 미설정/실패 시 로그만 남기고 False 반환(발송 흐름을 막지 않음)."""
+    try:
+        _smtp_send_raw(to_addr, subject, html)
+        return True
+    except Exception:
+        logger.exception('이메일 발송 실패(대상=%s, 제목=%s)', to_addr, subject)
+        return False
+
+
+def _send_magic_link(email: str, name: str, link: str) -> bool:
+    html = f"""\
+<div style="font-family:'Malgun Gothic',sans-serif;max-width:520px;margin:0 auto;color:#222">
+  <h2 style="color:#16335B">퇴직연금 신용등급 관리 시스템 로그인</h2>
+  <p>{Markup.escape(name or '')}님, 아래 버튼을 눌러 로그인하세요.</p>
+  <p style="margin:26px 0">
+    <a href="{Markup.escape(link)}"
+       style="background:#F58220;color:#fff;text-decoration:none;padding:14px 28px;
+              border-radius:10px;font-weight:800;display:inline-block">로그인하기</a>
+  </p>
+  <p style="font-size:.85rem;color:#666">이 링크는 {MAGIC_LINK_TTL_MIN}분간만 유효하며 1회만 사용할 수 있습니다.<br>
+     본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
+  <p style="font-size:.75rem;color:#999;word-break:break-all">{Markup.escape(link)}</p>
+</div>"""
+    return _send_email(email, '[신용등급 시스템] 로그인 링크', html)
+
+
+def _send_approved_mail(email: str, name: str) -> bool:
+    login_url = _base_url() + '/login'
+    html = f"""\
+<div style="font-family:'Malgun Gothic',sans-serif;max-width:520px;margin:0 auto;color:#222">
+  <h2 style="color:#16335B">가입이 승인되었습니다</h2>
+  <p>{Markup.escape(name or '')}님, 연금컨설팅팀 승인이 완료되었습니다.</p>
+  <p>이제 로그인 화면에서 회사 이메일을 입력하면 로그인 링크를 받아 접속할 수 있습니다.</p>
+  <p style="margin:22px 0">
+    <a href="{Markup.escape(login_url)}"
+       style="background:#F58220;color:#fff;text-decoration:none;padding:12px 24px;
+              border-radius:10px;font-weight:800;display:inline-block">로그인 화면으로</a>
+  </p>
+</div>"""
+    return _send_email(email, '[신용등급 시스템] 가입이 승인되었습니다', html)
 
 
 # ── 방문자 접속 집계 (일자별) ──────────────────────────────────────────
@@ -299,6 +586,208 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+
+# ── 신규 회원 가입 신청 ────────────────────────────────────────────────
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+    if request.method == 'GET':
+        return render_template('signup.html', affiliations=AFFILIATIONS,
+                               domains=ALLOWED_EMAIL_DOMAINS, form={})
+
+    name = request.form.get('name', '').strip()
+    emp_id = request.form.get('emp_id', '').strip()
+    email = _normalize_email(request.form.get('email', ''))
+    affiliation = request.form.get('affiliation', '').strip()
+    form = {'name': name, 'emp_id': emp_id, 'email': email, 'affiliation': affiliation}
+
+    def _fail(msg):
+        return render_template('signup.html', affiliations=AFFILIATIONS,
+                               domains=ALLOWED_EMAIL_DOMAINS, form=form, error=msg)
+
+    if not (name and emp_id and email and affiliation):
+        return _fail('모든 항목을 입력해 주세요.')
+    if not _EMAIL_RE.match(email):
+        return _fail('이메일 형식이 올바르지 않습니다.')
+    if not _email_domain_ok(email):
+        return _fail('회사 이메일(%s)로만 가입할 수 있습니다.'
+                     % ', '.join('@' + d for d in ALLOWED_EMAIL_DOMAINS))
+    if affiliation not in AFFILIATIONS:
+        return _fail('소속을 목록에서 선택해 주세요.')
+
+    with _MEMBERS_LOCK:
+        members = _load_members()
+        existing = members.get(email)
+        if existing and existing.get('status') == 'approved':
+            return _fail('이미 가입·승인된 이메일입니다. 로그인 화면에서 로그인하세요.')
+        if existing and existing.get('status') == 'pending':
+            return _fail('이미 가입 신청되어 승인 대기 중인 이메일입니다.')
+        # 신규 또는 거절 후 재신청 → pending으로 (재)등록
+        members[email] = {
+            'email': email, 'name': name, 'emp_id': emp_id,
+            'affiliation': affiliation, 'status': 'pending', 'role': 'rm',
+            'created_at': _now_str(),
+        }
+        _save_members(members)
+
+    logger.info('가입 신청 접수: %s (%s / %s)', email, name, affiliation)
+    if ADMIN_NOTIFY_EMAIL:
+        try:
+            _send_email(
+                ADMIN_NOTIFY_EMAIL, '[신용등급 시스템] 신규 가입 신청',
+                '<div style="font-family:sans-serif">신규 가입 신청이 접수되었습니다.<br><br>'
+                f'이름: {Markup.escape(name)}<br>사번: {Markup.escape(emp_id)}<br>'
+                f'이메일: {Markup.escape(email)}<br>소속: {Markup.escape(affiliation)}<br><br>'
+                f'<a href="{Markup.escape(_base_url())}/admin/members">승인 관리 화면 열기</a></div>')
+        except Exception:
+            logger.exception('가입 신청 관리자 알림 실패')
+
+    return render_template('signup.html', affiliations=AFFILIATIONS,
+                           domains=ALLOWED_EMAIL_DOMAINS, form={}, done=True)
+
+
+# ── 회사 이메일 매직링크 로그인 요청(비밀번호 없음) ─────────────────────────
+@app.route('/login/email', methods=['POST'])
+def login_email():
+    email = _normalize_email(request.form.get('email', ''))
+    # 계정 존재 여부를 그대로 노출하지 않도록 승인/미존재는 동일한 안내 문구 사용.
+    generic = ('입력하신 이메일이 승인된 계정이면 로그인 링크를 보냈습니다. '
+               '메일함(스팸함 포함)을 확인해 주세요.')
+    if _EMAIL_RE.match(email) and _email_domain_ok(email):
+        m = _load_members().get(email)
+        if m and m.get('status') == 'pending':
+            return render_template('login.html',
+                                   info='아직 승인 대기 중입니다. 연금컨설팅팀 승인 후 로그인할 수 있습니다.')
+        if m and m.get('status') == 'approved':
+            raw = _create_magic_token(email)
+            link = _base_url() + url_for('auth_verify', token=raw)
+            sent = _send_magic_link(email, m.get('name', ''), link)
+            if not sent:
+                logger.info('매직링크(발송 생략/실패, 개발용): %s', link)
+    return render_template('login.html', info=generic)
+
+
+# ── 매직링크 검증 → 세션 생성 ───────────────────────────────────────────
+@app.route('/auth/verify')
+def auth_verify():
+    email = _consume_magic_token(request.args.get('token', ''))
+    if not email:
+        return render_template('login.html',
+                               error='로그인 링크가 만료되었거나 유효하지 않습니다. 다시 시도해 주세요.')
+    m = _load_members().get(email)
+    if not m or m.get('status') != 'approved':
+        return render_template('login.html', error='승인되지 않은 계정입니다. 연금컨설팅팀에 문의하세요.')
+    session['logged_in'] = True
+    session['user'] = email
+    session['role'] = m.get('role', 'rm')     # 회원은 조회·다운로드 전용(rm)
+    session['name'] = m.get('name', '')
+    session['view'] = 'web'
+    return redirect(url_for('index'))
+
+
+# ── 연금컨설팅팀: 회원 가입 승인 관리 ────────────────────────────────────
+@app.route('/admin/members')
+def admin_members():
+    members = _load_members()
+    # 대기 먼저, 그다음 최신 신청순
+    order = {'pending': 0, 'approved': 1, 'rejected': 2}
+    rows = sorted(members.values(),
+                  key=lambda m: (order.get(m.get('status'), 9), m.get('created_at', '')),
+                  reverse=False)
+    pending_n = sum(1 for m in members.values() if m.get('status') == 'pending')
+    s = _smtp_settings()
+    smtp_view = {
+        'host': s['host'], 'port': s['port'], 'user': s['user'],
+        'from_addr': s['from_addr'], 'from_name': s['from_name'],
+        'base_url': s['base_url'], 'has_password': bool(s['password']),
+    }
+    return render_template('admin_members.html', members=rows, pending_n=pending_n, smtp=smtp_view)
+
+
+@app.route('/api/members/action', methods=['POST'])
+def api_members_action():
+    if session.get('role') != 'consulting':
+        return jsonify({'success': False, 'message': '연금컨설팅팀만 사용할 수 있습니다.'}), 403
+    d = request.get_json(silent=True) or {}
+    email = _normalize_email(d.get('email', ''))
+    action = (d.get('action') or '').strip()
+    if action not in ('approve', 'reject', 'delete'):
+        return jsonify({'success': False, 'message': '알 수 없는 작업입니다.'}), 400
+
+    approved_now = False
+    name = ''
+    with _MEMBERS_LOCK:
+        members = _load_members()
+        m = members.get(email)
+        if not m:
+            return jsonify({'success': False, 'message': '해당 회원을 찾을 수 없습니다.'}), 404
+        name = m.get('name', '')
+        if action == 'delete':
+            members.pop(email, None)
+        elif action == 'approve':
+            if m.get('status') != 'approved':
+                approved_now = True
+            m['status'] = 'approved'
+            m['approved_at'] = _now_str()
+            m['approved_by'] = session.get('user', '')
+            m.pop('rejected_at', None)
+            m.pop('rejected_by', None)
+        elif action == 'reject':
+            m['status'] = 'rejected'
+            m['rejected_at'] = _now_str()
+            m['rejected_by'] = session.get('user', '')
+        _save_members(members)
+
+    if approved_now:
+        try:
+            _send_approved_mail(email, name)
+        except Exception:
+            logger.exception('승인 알림 메일 실패(대상=%s)', email)
+    return jsonify({'success': True})
+
+
+# ── 이메일(SMTP) 발송 설정 — 연금컨설팅팀이 화면에서 저장(VM/gcloud 불필요) ──────────
+@app.route('/api/email_settings', methods=['POST'])
+def api_email_settings():
+    if session.get('role') != 'consulting':
+        return jsonify({'success': False, 'message': '연금컨설팅팀만 사용할 수 있습니다.'}), 403
+    d = request.get_json(silent=True) or {}
+    with _SMTP_LOCK:
+        cfg = _load_smtp_cfg()
+        for k in ('host', 'user', 'from_addr', 'from_name', 'base_url'):
+            if k in d:
+                cfg[k] = (d.get(k) or '').strip()
+        if str(d.get('port', '')).strip():
+            try:
+                cfg['port'] = int(str(d.get('port')).strip())
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'message': '포트는 숫자여야 합니다.'}), 400
+        # 앱 비밀번호: 입력했을 때만 갱신(빈칸이면 기존 값 유지 → 재입력 부담 제거)
+        pw = d.get('password')
+        if pw:
+            cfg['password'] = pw.strip()
+        _save_smtp_cfg(cfg)
+    return jsonify({'success': True})
+
+
+@app.route('/api/email_test', methods=['POST'])
+def api_email_test():
+    if session.get('role') != 'consulting':
+        return jsonify({'success': False, 'message': '연금컨설팅팀만 사용할 수 있습니다.'}), 403
+    d = request.get_json(silent=True) or {}
+    to = _normalize_email(d.get('to', ''))
+    if not _EMAIL_RE.match(to):
+        return jsonify({'success': False, 'message': '받는 이메일 형식이 올바르지 않습니다.'}), 400
+    html = ('<div style="font-family:sans-serif">✅ 테스트 메일입니다.<br><br>'
+            '이 메일이 도착했다면 발송 설정이 정상입니다. '
+            '이제 로그인 매직링크와 가입 승인 메일이 이 계정으로 발송됩니다.</div>')
+    try:
+        _smtp_send_raw(to, '[신용등급 시스템] 발송 테스트', html)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)[:300] or '발송 실패'})
 
 
 @app.route('/api/change_password', methods=['POST'])
@@ -2120,6 +2609,9 @@ def index():
         role=session.get('role', ''),   # consulting=전체, rm=조회·다운로드만(화면 제어용)
         rm_user=RM_USER,                 # RM 비밀번호 변경 UI 표시/대상용(미설정 시 버튼 숨김)
         rm_days_left=_rm_days_left(),    # RM 비밀번호 만료까지 남은 일수(표시용)
+        # 회원 승인 탭 배지: 승인 대기 인원(연금컨설팅팀만 화면에 노출됨)
+        members_pending=(sum(1 for m in _load_members().values() if m.get('status') == 'pending')
+                         if session.get('role') == 'consulting' else 0),
     )
     # 메인 페이지 로드 = 1 접속 → 일자별 방문자 집계(웹/모바일 모두)
     return _record_visit(make_response(html))

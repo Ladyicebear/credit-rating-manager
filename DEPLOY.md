@@ -50,6 +50,32 @@ gcloud run deploy credit-rating-manager \
 > **SECRET_KEY**: 로그인 세션 쿠키 서명용. 아무 긴 랜덤 문자열이면 됩니다(예: `openssl rand -hex 32` 결과).
 > 여러 인스턴스가 같은 값을 써야 로그인이 유지되므로 **반드시 고정값으로 지정**하세요.
 > `APP_USER`/`APP_PASSWORD`를 안 주면 기본 `admin`/`goun`으로 뜨니, 배포 시 꼭 본인 값으로 바꾸세요.
+> `APP_USER` 계정이 **연금컨설팅팀(전체관리)** 계정이며, 회원 가입 승인을 담당합니다.
+
+### 회원가입·승인·이메일 매직링크 로그인 환경변수 (선택)
+
+현업 사용자는 **회사 이메일로 가입 신청 → 연금컨설팅팀 승인 → 로그인할 때마다 회사 이메일로 온
+매직링크 클릭**으로 접속합니다(비밀번호 없음, 승인된 회원은 조회·다운로드 전용). 이 흐름을 쓰려면
+아래 값을 `--set-env-vars`(또는 `--update-env-vars`)에 함께 넣으세요. **미설정 시** 매직링크 이메일이
+실제로 발송되지 않고 서버 로그에만 링크가 남습니다(로컬 개발용).
+
+| 환경변수 | 설명 | 예시 |
+|---|---|---|
+| `SMTP_USER` | 발신 Gmail 주소 | `noreply@miraeasset.com` 또는 Gmail 계정 |
+| `SMTP_PASSWORD` | 구글 **앱 비밀번호**(계정 비밀번호 아님) | 2단계 인증 후 발급한 16자리 |
+| `SMTP_FROM` | 발신 표시 주소(미설정 시 `SMTP_USER`) | `noreply@miraeasset.com` |
+| `SMTP_HOST` / `SMTP_PORT` | 기본 `smtp.gmail.com` / `587`. 다른 서비스(SendGrid 등)로 바꿀 때만 지정 | |
+| `APP_BASE_URL` | 매직링크에 넣을 앱 주소(프록시 뒤 배포 시 권장) | `https://credit-rating-manager-xxxx.a.run.app` |
+| `ALLOWED_EMAIL_DOMAINS` | 가입 허용 도메인(쉼표 구분). 기본 `miraeasset.com` | `miraeasset.com` |
+| `MAGIC_LINK_TTL_MIN` | 매직링크 유효시간(분). 기본 `15` | `15` |
+| `ADMIN_NOTIFY_EMAIL` | 새 가입 신청 알림을 받을 주소(선택) | 담당자 이메일 |
+
+> **Gmail 앱 비밀번호**: Google 계정 → 보안 → 2단계 인증 켜기 → "앱 비밀번호" 생성 → 그 값을 `SMTP_PASSWORD`로.
+> Gmail은 소량(하루 수백 통)에 적합합니다. 도달률/대량 발송이 필요해지면 `SMTP_HOST`/`SMTP_PORT`만 바꿔
+> SendGrid·SES 등으로 교체할 수 있습니다.
+>
+> **승인 관리 화면**: 연금컨설팅팀(`APP_USER`) 계정으로 로그인한 뒤 **`/admin/members`** 로 접속하면
+> 가입 대기자를 승인/거절할 수 있습니다.
 - 처음이면 "Artifact Registry 저장소를 만들까요?" 등을 물어봅니다 → `Y`.
 - 빌드에 몇 분 걸립니다(크롬 포함 이미지).
 - 끝나면 `Service URL: https://credit-rating-manager-xxxxxxxx.a.run.app` 이 출력됩니다.

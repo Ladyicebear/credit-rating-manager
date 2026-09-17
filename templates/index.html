@@ -41,6 +41,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
            font-size:.95rem;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:-.3px;
            color:#8a92a0;transition:all .12s;margin-bottom:-1px;border-radius:0}
 .super-tab.active{color:#F68121;border-bottom-color:#F68121}    /* 선택: 오렌지 글자+밑줄 */
+.stab-badge{display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;border-radius:10px;
+            background:#e8933a;color:#fff;font-size:.72rem;font-weight:800;line-height:18px;vertical-align:middle}
 .super-tab:not(.active):hover{color:#16335B}                    /* 미선택: 회색→호버 네이비 */
 .super-tab .stab-ic{display:none}
 
@@ -358,8 +360,8 @@ tr.row-done td{transition:background .3s}
   /* 상단 통합탭: 화면폭 꽉 채운 앱형 탭 */
   .super-tabs{margin-top:9px;gap:0}
   .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
-  /* 상품제안관리·방문자 통계는 관리자용 데스크톱 화면 → 모바일에서는 탭 숨김 */
-  #stab-proposal,#stab-visitors,#stab-docs{display:none}
+  /* 상품제안관리·방문자 통계·회원 승인은 관리자용 데스크톱 화면 → 모바일에서는 탭 숨김 */
+  #stab-proposal,#stab-visitors,#stab-docs,#stab-members{display:none}
   /* ── 모바일 상단 변경(요청): SMART FUTURE 로고 + 원리금/신용등급 알약 탭 ── */
   .brand-logo,.brand-sub{display:none}
   .brand-smart{display:block;line-height:0}
@@ -475,6 +477,7 @@ tr.row-done td{transition:background .3s}
     <button id="stab-proposal" class="super-tab"       onclick="switchSuper('proposal')">상품제안관리</button>
     <button id="stab-docs"     class="super-tab"       onclick="switchSuper('docs')">약관·상품설명서</button>
     <button id="stab-visitors" class="super-tab"       onclick="switchSuper('visitors')">방문자 통계</button>
+    <button id="stab-members"  class="super-tab"       onclick="switchSuper('members')">회원 승인{% if members_pending %} <span class="stab-badge">{{ members_pending }}</span>{% endif %}</button>
     {% endif %}
   </div>
 </header>
@@ -492,6 +495,10 @@ tr.row-done td{transition:background .3s}
 <!-- ═══ [통합탭4] 방문자 통계 ═══ (연금컨설팅팀 전용 · RM 미렌더 · 모바일 숨김) -->
 <div id="super-visitors" class="super-panel" style="display:none">
   <iframe id="visitors-frame" class="pension-frame" src="/admin/visitors" title="방문자 통계"></iframe>
+</div>
+<!-- ═══ [통합탭5] 회원 승인 ═══ (연금컨설팅팀 전용 · RM 미렌더 · 모바일 숨김) -->
+<div id="super-members" class="super-panel" style="display:none">
+  <iframe id="members-frame" class="pension-frame" src="/admin/members" title="회원 승인 관리"></iframe>
 </div>
 
 <div id="super-docs" class="super-panel" style="display:none">
@@ -1047,12 +1054,13 @@ document.addEventListener('DOMContentLoaded', function(){
 /* 상품제안관리 탭 숨김 기준(CSS @media max-width:768px)과 동일하게 맞춤 */
 function isProposalHidden(){ try{ return window.matchMedia('(max-width:768px)').matches; }catch(e){ return window.innerWidth<=768; } }
 function switchSuper(which){
-  // 상품제안관리·방문자 통계는 모바일/좁은 화면에서 숨김 → 이 탭이 지정되면 원리금으로 대체
-  if((which==='proposal'||which==='visitors'||which==='docs') && isProposalHidden()) which='pension';
+  // 상품제안관리·방문자 통계·회원 승인은 모바일/좁은 화면에서 숨김 → 이 탭이 지정되면 원리금으로 대체
+  if((which==='proposal'||which==='visitors'||which==='docs'||which==='members') && isProposalHidden()) which='pension';
   const pen = which==='pension';
   const prop = which==='proposal';
   const visit = which==='visitors';
   const docs = which==='docs';
+  const members = which==='members';
   const credit = which==='credit';
   // 요소가 없을 수도 있으므로(예: RM은 상품제안관리 패널 미렌더) null-safe로 처리.
   // 이렇게 하지 않으면 중간에서 오류가 나 .main(신용등급 본문)을 숨기는 줄이 실행되지 않아
@@ -1063,6 +1071,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-pension'),  pen);
   setDisp(document.getElementById('super-proposal'), prop);
   setDisp(document.getElementById('super-visitors'), visit);
+  setDisp(document.getElementById('super-members'), members);
   setDisp(document.getElementById('super-docs'), docs);
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
@@ -1071,8 +1080,9 @@ function switchSuper(which){
   setAct(document.getElementById('stab-credit'),   credit);
   setAct(document.getElementById('stab-proposal'), prop);
   setAct(document.getElementById('stab-visitors'), visit);
+  setAct(document.getElementById('stab-members'), members);
   setAct(document.getElementById('stab-docs'), docs);
-  if(pen || prop || visit || docs) fitPensionFrame();
+  if(pen || prop || visit || docs || members) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
 (function initSuper(){

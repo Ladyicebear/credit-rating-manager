@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>회원 승인 관리 · 연금컨설팅팀</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
+     color:#222;background:#F3EEE6;min-height:100vh}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 18px 60px}
+.hd{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px}
+h1{font-size:1.4rem;font-weight:800;color:#16335B}
+.hd a{font-size:.85rem;font-weight:700;color:#8a8f98;text-decoration:none}
+.hd a:hover{color:#F58220;text-decoration:underline}
+.sub{font-size:.88rem;color:#6b727d;margin-bottom:20px}
+.sub b{color:#F58220}
+.card{background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(90,66,30,.12);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:13px 14px;text-align:left;border-bottom:1px solid #f0eee9;vertical-align:middle}
+th{background:#faf8f4;font-weight:800;color:#555;font-size:.8rem;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.email{color:#16335B;font-weight:700}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:800}
+.badge.pending{background:#fff3e0;color:#c97a12}
+.badge.approved{background:#eaf6ee;color:#1c6b3a}
+.badge.rejected{background:#f6eaea;color:#a53838}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.btn{border:none;border-radius:8px;padding:7px 13px;font-family:inherit;font-size:.78rem;font-weight:800;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.b-approve{background:#1c9b52;color:#fff}
+.b-approve:hover{background:#178044}
+.b-reject{background:#e8933a;color:#fff}
+.b-reject:hover{background:#cf7d2a}
+.b-delete{background:#eee;color:#777}
+.b-delete:hover{background:#e2d9d0;color:#a53838}
+.empty{padding:50px 20px;text-align:center;color:#9298a1;font-size:.92rem}
+/* 이메일(SMTP) 설정 카드 */
+.mail-card{background:#fff;border-radius:14px;box-shadow:0 6px 22px rgba(90,66,30,.10);margin-bottom:18px;overflow:hidden}
+.mail-card>summary{list-style:none;cursor:pointer;padding:15px 18px;font-weight:800;color:#16335B;font-size:.95rem;
+                   display:flex;align-items:center;gap:10px;user-select:none}
+.mail-card>summary::-webkit-details-marker{display:none}
+.mail-on{font-size:.72rem;font-weight:800;color:#1c6b3a;background:#eaf6ee;border-radius:20px;padding:3px 10px}
+.mail-off{font-size:.72rem;font-weight:800;color:#a53838;background:#f6eaea;border-radius:20px;padding:3px 10px}
+.mail-body{padding:4px 18px 20px}
+.mail-help{font-size:.82rem;color:#6b727d;line-height:1.6;margin-bottom:14px}
+.mail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.mail-grid label{display:flex;flex-direction:column;font-size:.78rem;font-weight:700;color:#555;gap:5px}
+.mail-grid input{padding:10px 12px;border:1px solid #dde3ec;border-radius:9px;font-size:.9rem;font-family:inherit}
+.mail-grid input:focus{outline:none;border-color:#F58220;box-shadow:0 0 0 3px rgba(245,130,32,.14)}
+.mail-wide{grid-column:1 / -1}
+.mail-acts{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.mail-test{display:flex;gap:6px;align-items:center}
+.mail-test input{padding:9px 11px;border:1px solid #dde3ec;border-radius:9px;font-size:.85rem;font-family:inherit;min-width:200px}
+.btn.b-approve{padding:10px 18px;font-size:.85rem}
+.mail-msg{margin-top:12px;font-size:.82rem;font-weight:700;display:none}
+.mail-msg.show{display:block}
+.mail-msg.ok{color:#1c6b3a}
+.mail-msg.err{color:#a53838}
+@media(max-width:640px){.mail-grid{grid-template-columns:1fr}.mail-test input{min-width:0}}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#16335B;color:#fff;
+       padding:12px 22px;border-radius:10px;font-size:.85rem;font-weight:700;opacity:0;pointer-events:none;
+       transition:opacity .25s}
+.toast.show{opacity:1}
+@media(max-width:640px){
+  th:nth-child(2),td:nth-child(2){display:none} /* 사번 숨김(모바일) */
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>회원 승인 관리</h1>
+    <a href="/">← 메인으로</a>
+  </div>
+  <div class="sub">승인 대기 <b>{{ pending_n }}</b>건 · 전체 {{ members|length }}명</div>
+
+  <!-- 이메일(SMTP) 발송 설정 — 연금컨설팅팀이 여기서 앱 비밀번호를 넣고 저장하면 VM/명령어 없이 발송됨 -->
+  <details class="mail-card" {% if not smtp.has_password %}open{% endif %}>
+    <summary>
+      ⚙️ 이메일(SMTP) 발송 설정
+      {% if smtp.has_password %}<span class="mail-on">발송 준비됨</span>{% else %}<span class="mail-off">미설정 — 앱 비밀번호 필요</span>{% endif %}
+    </summary>
+    <div class="mail-body">
+      <p class="mail-help">로그인 매직링크·가입 승인 메일을 보낼 계정입니다. 새 Gmail의 <b>앱 비밀번호(16자리)</b>를 넣고 저장하세요.
+         저장값은 서버에만 보관되며(깃·화면에 노출 안 됨) 재배포해도 유지됩니다.</p>
+      <div class="mail-grid">
+        <label>발신 계정(이메일)<input id="m_user" type="email" value="{{ smtp.user }}" placeholder="smartpensionlogin@gmail.com"></label>
+        <label>앱 비밀번호<input id="m_pw" type="password" placeholder="{% if smtp.has_password %}저장됨 — 변경 시에만 입력{% else %}16자리 앱 비밀번호{% endif %}" autocomplete="new-password"></label>
+        <label>발신 주소<input id="m_from" type="email" value="{{ smtp.from_addr }}" placeholder="발신 계정과 동일"></label>
+        <label>발신자 이름<input id="m_fromname" type="text" value="{{ smtp.from_name }}" placeholder="연금컨설팅 신용등급 시스템"></label>
+        <label>SMTP 서버<input id="m_host" type="text" value="{{ smtp.host }}" placeholder="smtp.gmail.com"></label>
+        <label>포트<input id="m_port" type="number" value="{{ smtp.port }}" placeholder="587"></label>
+        <label class="mail-wide">앱 주소(매직링크용)<input id="m_base" type="text" value="{{ smtp.base_url }}" placeholder="https://retirementpension.co.kr"></label>
+      </div>
+      <div class="mail-acts">
+        <button class="btn b-approve" onclick="saveEmail()">설정 저장</button>
+        <span class="mail-test">
+          <input id="m_test" type="email" placeholder="테스트 받을 이메일">
+          <button class="btn b-reject" onclick="testEmail()">테스트 발송</button>
+        </span>
+      </div>
+      <div class="mail-msg" id="mailMsg"></div>
+    </div>
+  </details>
+
+  <div class="card">
+    {% if members %}
+    <table>
+      <thead>
+        <tr><th>이름</th><th>사번</th><th>회사 이메일</th><th>소속</th><th>상태</th><th>신청일</th><th>관리</th></tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr data-email="{{ m.email }}">
+          <td>{{ m.name }}</td>
+          <td>{{ m.emp_id }}</td>
+          <td class="email">{{ m.email }}</td>
+          <td>{{ m.affiliation }}</td>
+          <td>
+            {% if m.status == 'approved' %}<span class="badge approved">승인됨</span>
+            {% elif m.status == 'rejected' %}<span class="badge rejected">거절됨</span>
+            {% else %}<span class="badge pending">대기</span>{% endif %}
+          </td>
+          <td style="white-space:nowrap;color:#8a8f98">{{ m.created_at }}</td>
+          <td>
+            <div class="acts">
+              {% if m.status != 'approved' %}
+              <button class="btn b-approve" onclick="act(this,'approve')">승인</button>
+              {% endif %}
+              {% if m.status != 'rejected' %}
+              <button class="btn b-reject" onclick="act(this,'reject')">거절</button>
+              {% endif %}
+              <button class="btn b-delete" onclick="act(this,'delete')">삭제</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">아직 가입 신청이 없습니다.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+function mailMsg(text,type){
+  const el=document.getElementById('mailMsg');
+  el.textContent=text||''; el.className='mail-msg'+(text?` show ${type||'err'}`:'');
+}
+const _mv=id=>document.getElementById(id).value.trim();
+async function saveEmail(){
+  const body={host:_mv('m_host'),port:_mv('m_port'),user:_mv('m_user'),
+              from_addr:_mv('m_from'),from_name:_mv('m_fromname'),base_url:_mv('m_base')};
+  const pw=document.getElementById('m_pw').value;   // 빈칸이면 기존 유지
+  if(pw) body.password=pw;
+  mailMsg('저장 중…','ok');
+  try{
+    const r=await fetch('/api/email_settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.success){ mailMsg('저장되었습니다. "테스트 발송"으로 확인해 보세요.','ok'); document.getElementById('m_pw').value=''; }
+    else mailMsg(d.message||'저장 실패','err');
+  }catch(e){ mailMsg('서버와 통신하지 못했습니다.','err'); }
+}
+async function testEmail(){
+  const to=_mv('m_test');
+  if(!to){ mailMsg('테스트 받을 이메일을 입력하세요.','err'); return; }
+  mailMsg('발송 중… (몇 초 걸릴 수 있어요)','ok');
+  try{
+    const r=await fetch('/api/email_test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to})});
+    const d=await r.json();
+    if(d.success) mailMsg('✅ 발송 성공! '+to+' 메일함(스팸함 포함)을 확인하세요.','ok');
+    else mailMsg('❌ 발송 실패: '+(d.message||'설정을 확인하세요.'),'err');
+  }catch(e){ mailMsg('서버와 통신하지 못했습니다.','err'); }
+}
+async function act(btn, action){
+  const tr=btn.closest('tr'); const email=tr.dataset.email;
+  const labels={approve:'승인',reject:'거절',delete:'삭제'};
+  if(action==='delete' && !confirm(email+' 회원을 삭제할까요?')) return;
+  const btns=tr.querySelectorAll('button'); btns.forEach(b=>b.disabled=true);
+  try{
+    const res=await fetch('/api/members/action',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,action:action})
+    });
+    const d=await res.json();
+    if(d.success){
+      toast(labels[action]+' 처리되었습니다.');
+      setTimeout(()=>location.reload(),700);
+    }else{
+      toast(d.message||'처리에 실패했습니다.');
+      btns.forEach(b=>b.disabled=false);
+    }
+  }catch(e){
+    toast('서버와 통신하지 못했습니다.');
+    btns.forEach(b=>b.disabled=false);
+  }
+}
+</script>
+</body>
+</html>
