@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>회원 승인 관리 · 연금컨설팅팀</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;
+     color:#222;background:#F3EEE6;min-height:100vh}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 18px 60px}
+.hd{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px}
+h1{font-size:1.4rem;font-weight:800;color:#16335B}
+.hd a{font-size:.85rem;font-weight:700;color:#8a8f98;text-decoration:none}
+.hd a:hover{color:#F58220;text-decoration:underline}
+.sub{font-size:.88rem;color:#6b727d;margin-bottom:20px}
+.sub b{color:#F58220}
+.card{background:#fff;border-radius:16px;box-shadow:0 8px 30px rgba(90,66,30,.12);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th,td{padding:13px 14px;text-align:left;border-bottom:1px solid #f0eee9;vertical-align:middle}
+th{background:#faf8f4;font-weight:800;color:#555;font-size:.8rem;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.email{color:#16335B;font-weight:700}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:800}
+.badge.pending{background:#fff3e0;color:#c97a12}
+.badge.approved{background:#eaf6ee;color:#1c6b3a}
+.badge.rejected{background:#f6eaea;color:#a53838}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.btn{border:none;border-radius:8px;padding:7px 13px;font-family:inherit;font-size:.78rem;font-weight:800;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.b-approve{background:#1c9b52;color:#fff}
+.b-approve:hover{background:#178044}
+.b-reject{background:#e8933a;color:#fff}
+.b-reject:hover{background:#cf7d2a}
+.b-delete{background:#eee;color:#777}
+.b-delete:hover{background:#e2d9d0;color:#a53838}
+.empty{padding:50px 20px;text-align:center;color:#9298a1;font-size:.92rem}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#16335B;color:#fff;
+       padding:12px 22px;border-radius:10px;font-size:.85rem;font-weight:700;opacity:0;pointer-events:none;
+       transition:opacity .25s}
+.toast.show{opacity:1}
+@media(max-width:640px){
+  th:nth-child(2),td:nth-child(2){display:none} /* 사번 숨김(모바일) */
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>회원 승인 관리</h1>
+    <a href="/">← 메인으로</a>
+  </div>
+  <div class="sub">승인 대기 <b>{{ pending_n }}</b>건 · 전체 {{ members|length }}명</div>
+
+  <div class="card">
+    {% if members %}
+    <table>
+      <thead>
+        <tr><th>이름</th><th>사번</th><th>회사 이메일</th><th>소속</th><th>상태</th><th>신청일</th><th>관리</th></tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr data-email="{{ m.email }}">
+          <td>{{ m.name }}</td>
+          <td>{{ m.emp_id }}</td>
+          <td class="email">{{ m.email }}</td>
+          <td>{{ m.affiliation }}</td>
+          <td>
+            {% if m.status == 'approved' %}<span class="badge approved">승인됨</span>
+            {% elif m.status == 'rejected' %}<span class="badge rejected">거절됨</span>
+            {% else %}<span class="badge pending">대기</span>{% endif %}
+          </td>
+          <td style="white-space:nowrap;color:#8a8f98">{{ m.created_at }}</td>
+          <td>
+            <div class="acts">
+              {% if m.status != 'approved' %}
+              <button class="btn b-approve" onclick="act(this,'approve')">승인</button>
+              {% endif %}
+              {% if m.status != 'rejected' %}
+              <button class="btn b-reject" onclick="act(this,'reject')">거절</button>
+              {% endif %}
+              <button class="btn b-delete" onclick="act(this,'delete')">삭제</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">아직 가입 신청이 없습니다.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+async function act(btn, action){
+  const tr=btn.closest('tr'); const email=tr.dataset.email;
+  const labels={approve:'승인',reject:'거절',delete:'삭제'};
+  if(action==='delete' && !confirm(email+' 회원을 삭제할까요?')) return;
+  const btns=tr.querySelectorAll('button'); btns.forEach(b=>b.disabled=true);
+  try{
+    const res=await fetch('/api/members/action',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email,action:action})
+    });
+    const d=await res.json();
+    if(d.success){
+      toast(labels[action]+' 처리되었습니다.');
+      setTimeout(()=>location.reload(),700);
+    }else{
+      toast(d.message||'처리에 실패했습니다.');
+      btns.forEach(b=>b.disabled=false);
+    }
+  }catch(e){
+    toast('서버와 통신하지 못했습니다.');
+    btns.forEach(b=>b.disabled=false);
+  }
+}
+</script>
+</body>
+</html>

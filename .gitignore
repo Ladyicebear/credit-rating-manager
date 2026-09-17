@@ -46,6 +46,12 @@ meritz_*.txt
 data/auth.json
 data/auth.json.*
 
+# 회원 가입/승인 정보(이름·사번·이메일 등 개인정보) + 매직링크 토큰 (커밋 금지)
+data/members.json
+data/members.json.*
+data/login_tokens.json
+data/login_tokens.json.*
+
 # 상품제안관리 런타임 데이터(기기/서버별로 관리, 배포 시 서버 것 유지)
 data/proposals.json
 data/proposal_meta.json
