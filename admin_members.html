@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가입 승인 관리</title>
+<style>
+  :root{--navy:#16335B;--navy-d:#0F2647;--orange:#F68121;--orange-d:#E85A00;
+        --line:#E5E7EB;--ink:#1F2937;--muted:#6B7280;--bg:#F3F5F9;--white:#fff;
+        --green:#1C6B3A;--green-bg:#E7F5EC;--red:#C0392B;--red-bg:#FDECEA;--amber:#B26A00;--amber-bg:#FFF3E0}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif;font-size:14px}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 40px}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  .title{font-size:18px;font-weight:800;color:var(--navy);letter-spacing:-.4px}
+  .sub{font-size:12px;color:var(--muted);margin:2px 0 16px}
+  .btn-back{border:1px solid var(--navy);background:#fff;color:var(--navy);border-radius:8px;
+            padding:7px 13px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-decoration:none}
+  .btn-back:hover{background:var(--navy);color:#fff}
+  .warn{background:var(--amber-bg);border:1px solid #F0C67A;color:var(--amber);border-radius:10px;
+        padding:10px 14px;font-size:12.5px;font-weight:700;margin-bottom:14px;line-height:1.6}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .kpi .lb{font-size:12px;color:var(--muted);font-weight:700}
+  .kpi .vl{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-top:3px;font-variant-numeric:tabular-nums}
+  .kpi.pend .vl{color:var(--amber)} .kpi.appr .vl{color:var(--green)} .kpi.rej .vl{color:var(--red)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;margin-bottom:14px}
+  .seg button{border:none;background:#fff;color:#4B5563;font:inherit;font-size:12.5px;font-weight:700;
+              padding:8px 15px;cursor:pointer}
+  .seg button.on{background:#FCEAD8;color:var(--orange-d)}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:0;margin-bottom:14px;
+        box-shadow:0 1px 4px rgba(0,0,0,.05);overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:#F7F9FC;color:#4B5563;font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+  tbody td{padding:10px 12px;border-bottom:1px solid #F0F2F6;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  .nm{font-weight:800;color:var(--navy)}
+  .em{color:#4B5563;font-size:12.5px}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:800}
+  .b-pend{background:var(--amber-bg);color:var(--amber)}
+  .b-appr{background:var(--green-bg);color:var(--green)}
+  .b-rej{background:var(--red-bg);color:var(--red)}
+  .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .btn{border:none;border-radius:7px;padding:6px 12px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+  .btn-appr{background:var(--green);color:#fff} .btn-appr:hover{background:#14512b}
+  .btn-rej{background:#fff;border:1px solid var(--red);color:var(--red)} .btn-rej:hover{background:var(--red);color:#fff}
+  .btn-del{background:#fff;border:1px solid #B7BDC7;color:#6B7280} .btn-del:hover{background:#6B7280;color:#fff}
+  .muted{color:var(--muted);font-size:12px}
+  .empty{text-align:center;color:var(--muted);padding:44px 20px;font-size:14px}
+  .note{font-size:11.5px;color:#9CA3AF;line-height:1.7;margin-top:8px}
+  @media(max-width:720px){
+    .kpis{grid-template-columns:repeat(3,1fr)}
+    thead{display:none}
+    tbody td{display:block;text-align:left;border-bottom:none;padding:4px 14px}
+    tbody tr{display:block;border-bottom:1px solid var(--line);padding:8px 0}
+    .acts{justify-content:flex-start;margin-top:6px}
+  }
+  /* 토스트 */
+  #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#16335B;color:#fff;
+         padding:11px 18px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.25);
+         opacity:0;pointer-events:none;transition:opacity .25s;z-index:80}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="title">🔐 가입 승인 관리</div>
+    <a class="btn-back" href="/">← 메인으로</a>
+  </div>
+  <div class="sub">RM 영업사원 가입 신청을 승인/반려합니다. 승인된 사원만 로그인(이메일 본인인증)이 가능합니다.</div>
+
+  <div class="warn" id="smtp-warn" style="display:none"></div>
+
+  <div class="kpis">
+    <div class="kpi pend"><div class="lb">승인 대기</div><div class="vl" id="c-pend">–</div></div>
+    <div class="kpi appr"><div class="lb">승인 완료</div><div class="vl" id="c-appr">–</div></div>
+    <div class="kpi rej"><div class="lb">반려</div><div class="vl" id="c-rej">–</div></div>
+  </div>
+
+  <div class="seg" id="seg">
+    <button data-f="pending" class="on">대기</button>
+    <button data-f="approved">승인</button>
+    <button data-f="rejected">반려</button>
+    <button data-f="all">전체</button>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>이름 / 이메일</th><th>소속팀</th><th>상태</th><th>신청·처리</th><th style="text-align:right">관리</th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="5" class="empty">불러오는 중…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="note">
+    · 승인/반려 시 신청자의 회사 이메일로 결과 안내 메일이 발송됩니다(메일 서버 설정 시).<br>
+    · 반려하면 해당 계정의 신뢰기기(30일 기억)가 해제됩니다. 삭제하면 재가입 신청이 가능합니다.
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+let FILTER='pending', ALL=[];
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function badge(st){
+  if(st==='pending')  return '<span class="badge b-pend">대기</span>';
+  if(st==='approved') return '<span class="badge b-appr">승인</span>';
+  if(st==='rejected') return '<span class="badge b-rej">반려</span>';
+  return '<span class="badge">'+esc(st)+'</span>';
+}
+
+async function load(){
+  try{
+    const res=await fetch('/api/rm/members');
+    if(res.status===403){ $('#tbody').innerHTML='<tr><td colspan="5" class="empty">접근 권한이 없습니다(연금컨설팅팀 전용).</td></tr>'; return; }
+    const d=await res.json();
+    ALL=d.members||[];
+    $('#c-pend').textContent=d.counts.pending;
+    $('#c-appr').textContent=d.counts.approved;
+    $('#c-rej').textContent=d.counts.rejected;
+    const w=$('#smtp-warn');
+    if(!d.smtp_ready){ w.style.display='block';
+      w.innerHTML='⚠️ 메일 서버(SMTP)가 아직 설정되지 않아 인증·안내 메일이 실제로 발송되지 않습니다. 배포 환경변수(SMTP_HOST 등)를 설정해 주세요.'; }
+    else { w.style.display='none'; }
+    render();
+  }catch(e){ $('#tbody').innerHTML='<tr><td colspan="5" class="empty">불러오지 못했습니다.</td></tr>'; }
+}
+
+function render(){
+  const rows=ALL.filter(m=>FILTER==='all'?true:m.status===FILTER);
+  if(!rows.length){ $('#tbody').innerHTML='<tr><td colspan="5" class="empty">해당하는 회원이 없습니다.</td></tr>'; return; }
+  $('#tbody').innerHTML=rows.map(m=>{
+    const info = m.status==='pending'
+      ? '신청 '+esc(m.created_at||'')
+      : (esc(m.reviewed_at||'')+(m.reviewed_by?(' · '+esc(m.reviewed_by)):''))
+        + (m.status==='rejected'&&m.reject_reason?('<br><span class="muted">사유: '+esc(m.reject_reason)+'</span>'):'')
+        + (m.status==='approved'&&m.last_login?('<br><span class="muted">최근 로그인: '+esc(m.last_login)+'</span>'):'');
+    let acts='';
+    if(m.status==='pending'){
+      acts='<button class="btn btn-appr" onclick="review(\''+esc(m.email)+'\',\'approve\')">승인</button>'
+          +'<button class="btn btn-rej" onclick="review(\''+esc(m.email)+'\',\'reject\')">반려</button>';
+    }else if(m.status==='approved'){
+      acts='<button class="btn btn-rej" onclick="review(\''+esc(m.email)+'\',\'reject\')">승인취소</button>'
+          +'<button class="btn btn-del" onclick="review(\''+esc(m.email)+'\',\'delete\')">삭제</button>';
+    }else{
+      acts='<button class="btn btn-appr" onclick="review(\''+esc(m.email)+'\',\'approve\')">승인</button>'
+          +'<button class="btn btn-del" onclick="review(\''+esc(m.email)+'\',\'delete\')">삭제</button>';
+    }
+    return '<tr>'
+      +'<td><div class="nm">'+esc(m.name||'')+'</div><div class="em">'+esc(m.email||'')+'</div></td>'
+      +'<td>'+esc(m.team||'')+'</td>'
+      +'<td>'+badge(m.status)+'</td>'
+      +'<td>'+info+'</td>'
+      +'<td><div class="acts">'+acts+'</div></td>'
+      +'</tr>';
+  }).join('');
+}
+
+async function review(email, action){
+  let reason='';
+  if(action==='reject'){ reason=prompt('반려 사유(선택, 신청자에게 메일로 안내됩니다):','')||''; }
+  else if(action==='delete'){ if(!confirm(email+' 회원을 삭제할까요? (재가입 신청 가능)')) return; }
+  else if(action==='approve'){ if(!confirm(email+' 가입을 승인할까요?')) return; }
+  try{
+    const res=await fetch('/api/rm/members/review',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,action,reason})
+    });
+    const d=await res.json();
+    toast(d.message||(d.success?'처리되었습니다.':'실패했습니다.'));
+    if(d.success) load();
+  }catch(e){ toast('서버와 통신하지 못했습니다.'); }
+}
+
+$('#seg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  FILTER=b.dataset.f;
+  document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x===b));
+  render();
+});
+
+load();
+</script>
+</body>
+</html>

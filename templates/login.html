@@ -71,6 +71,28 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .pw-save{background:#F58220;color:#fff}
 .pw-save:hover{background:#CB6015}
 .pw-save:disabled{background:#f0b988;cursor:default}
+/* 회원가입 / 인증 공용 */
+.lg-links{display:flex;gap:14px;justify-content:center;margin-top:15px}
+.lg-links button{background:none;border:none;font-family:inherit;font-size:.82rem;font-weight:700;
+                 color:#8a8f98;text-decoration:underline;cursor:pointer;padding:0}
+.lg-links button:hover{color:#F58220}
+.pw-card select{width:100%;padding:10px 12px;border:1px solid #dde3ec;border-radius:8px;font-size:.9rem;
+                font-family:inherit;background:#fff;color:#222;appearance:none;-webkit-appearance:none;
+                background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239aa0a8' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");
+                background-repeat:no-repeat;background-position:right 12px center}
+.pw-card select:focus{outline:none;border-color:#F58220;box-shadow:0 0 0 3px rgba(245,130,32,.15)}
+.pw-card .pw-desc{font-size:.76rem;color:#8a92a0;line-height:1.5;margin:-4px 0 14px;text-align:center}
+/* 인증코드 입력칸 */
+.vf-code{width:100%;text-align:center;letter-spacing:.55em;font-size:1.5rem;font-weight:800;
+         padding:12px 10px 12px 20px;border:1px solid #dde3ec;border-radius:10px;font-family:inherit;color:#16335B}
+.vf-code:focus{outline:none;border-color:#F58220;box-shadow:0 0 0 3px rgba(245,130,32,.15)}
+.vf-remember{display:flex;align-items:center;gap:8px;font-size:.82rem;color:#555;font-weight:600;
+             margin:14px 2px 4px;cursor:pointer;user-select:none}
+.vf-remember input{width:17px;height:17px;accent-color:#F58220;margin:0}
+.vf-resend{display:block;width:100%;margin-top:12px;background:none;border:none;font-family:inherit;
+           font-size:.78rem;font-weight:700;color:#8a8f98;text-decoration:underline;cursor:pointer}
+.vf-resend:hover{color:#F58220}
+.vf-mail{font-weight:800;color:#16335B}
 
 /* ════════ 웹(데스크톱 ≥768px) 전용 — 모바일은 위 기본 스타일 그대로 ════════ */
 @media(min-width:768px){
@@ -134,7 +156,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       <label class="lg-remember"><input type="checkbox" id="remember"/> 아이디 저장</label>
 
       <button type="submit" name="view" value="web" class="lg-btn">로그인</button>
-      <button type="button" class="lg-pwlink" onclick="openPw()">비밀번호 변경</button>
+      <div class="lg-links">
+        <button type="button" onclick="openSignup()">회원가입 신청</button>
+        <button type="button" onclick="openPw()">비밀번호 변경</button>
+      </div>
 
       <div class="lg-foot">System Designed &amp; Built by Goun</div>
     </form>
@@ -179,6 +204,77 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       </div>
     </div>
   </div>
+
+  <!-- 회원가입 신청(RM 신규) -->
+  <div class="pw-ov" id="su-ov" onclick="if(event.target===this)closeSignup()">
+    <div class="pw-card">
+      <h2>📝 회원가입 신청</h2>
+      <div class="pw-desc">가입 신청 후 <b>연금컨설팅팀 승인</b>이 완료되면 로그인할 수 있습니다.</div>
+      <div class="fg">
+        <label for="su-name">이름</label>
+        <input type="text" id="su-name" autocomplete="name" placeholder="이름"/>
+      </div>
+      <div class="fg">
+        <label for="su-team">소속팀</label>
+        <select id="su-team">
+          <option value="">소속팀을 선택하세요</option>
+          {% for t in teams %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="fg">
+        <label for="su-email">회사 이메일</label>
+        <input type="email" id="su-email" autocomplete="email" placeholder="name@company.co.kr"/>
+      </div>
+      <div class="fg">
+        <label for="su-pw">비밀번호</label>
+        <input type="password" id="su-pw" autocomplete="new-password"/>
+        <div class="pw-hint">8자 이상으로 설정하세요.</div>
+      </div>
+      <div class="fg">
+        <label for="su-pw2">비밀번호 확인</label>
+        <input type="password" id="su-pw2" autocomplete="new-password"/>
+      </div>
+      <div class="pw-msg" id="su-msg"></div>
+      <div class="pw-foot">
+        <button type="button" class="pw-cancel" onclick="closeSignup()">취소</button>
+        <button type="button" class="pw-save" id="su-save" onclick="submitSignup()">가입 신청</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 로그인 본인확인(이메일 인증코드) — verify_email 있으면 자동 표시 -->
+  <div class="pw-ov{% if verify_email %} open{% endif %}" id="vf-ov" onclick="if(event.target===this)closeVerify()">
+    <div class="pw-card">
+      <h2>📧 본인확인</h2>
+      <div class="pw-desc">
+        <span class="vf-mail" id="vf-email">{{ verify_email or '' }}</span> 로<br>
+        6자리 인증코드를 보냈습니다. 코드를 입력해 주세요.
+        {% if verify_email and not smtp_ready %}<br><span style="color:#c0392b">(메일 서버 미설정 — 서버 로그의 코드를 사용하세요)</span>{% endif %}
+      </div>
+      <input type="hidden" id="vf-view" value="{{ verify_view or 'web' }}"/>
+      <div class="fg">
+        <input type="text" id="vf-code" class="vf-code" inputmode="numeric" maxlength="6"
+               autocomplete="one-time-code" placeholder="——————"/>
+      </div>
+      <label class="vf-remember"><input type="checkbox" id="vf-remember" checked/> 이 기기 30일 동안 기억(다음 로그인 시 인증 생략)</label>
+      <div class="pw-msg" id="vf-msg"></div>
+      <div class="pw-foot">
+        <button type="button" class="pw-save" id="vf-save" onclick="submitVerify()" style="flex:1">로그인</button>
+      </div>
+      <button type="button" class="vf-resend" onclick="resendCode()">인증코드 재발송</button>
+    </div>
+  </div>
+
+  {% if pending_notice %}
+  <!-- 승인 대기 안내 -->
+  <div class="exp-ov" id="pend-ov" onclick="if(event.target===this)this.remove()">
+    <div class="exp-card">
+      <div class="exp-ico">⏳</div>
+      <div class="exp-msg">아직 <b>승인 대기 중</b>인 계정입니다.<br>연금컨설팅팀 승인 후 로그인할 수 있습니다.</div>
+      <button type="button" class="exp-ok" onclick="document.getElementById('pend-ov').remove()">확인</button>
+    </div>
+  </div>
+  {% endif %}
 
 <script>
 const $=id=>document.getElementById(id);
@@ -230,7 +326,82 @@ async function submitPw(){
   }
 }
 $('pw-ov').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitPw(); } });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePw(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closePw(); closeSignup(); } });
+
+/* ── 회원가입 신청 ── */
+function openSignup(){
+  ['su-name','su-email','su-pw','su-pw2'].forEach(id=>$(id).value='');
+  $('su-team').value='';
+  suMsg('');
+  $('su-ov').classList.add('open');
+  $('su-name').focus();
+}
+function closeSignup(){ $('su-ov').classList.remove('open'); }
+function suMsg(text,type){
+  const el=$('su-msg'); el.textContent=text||'';
+  el.className='pw-msg'+(text?` show ${type||'err'}`:'');
+}
+async function submitSignup(){
+  const name=$('su-name').value.trim(), team=$('su-team').value,
+        email=$('su-email').value.trim(), pw=$('su-pw').value, pw2=$('su-pw2').value;
+  if(!name||!team||!email||!pw||!pw2){ suMsg('모든 항목을 입력하세요.'); return; }
+  if(pw!==pw2){ suMsg('비밀번호가 서로 일치하지 않습니다.'); return; }
+  const btn=$('su-save'); btn.disabled=true; suMsg('');
+  try{
+    const res=await fetch('/api/rm/signup',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,team,email,password:pw,confirm:pw2})
+    });
+    const d=await res.json();
+    if(d.success){
+      suMsg(d.message||'가입 신청이 접수되었습니다.','ok');
+      setTimeout(closeSignup,2600);
+    }else{ suMsg(d.message||'가입 신청에 실패했습니다.'); }
+  }catch(e){ suMsg('서버와 통신하지 못했습니다.'); }
+  finally{ btn.disabled=false; }
+}
+
+/* ── 로그인 본인확인(인증코드) ── */
+function closeVerify(){ $('vf-ov').classList.remove('open'); }
+function vfMsg(text,type){
+  const el=$('vf-msg'); el.textContent=text||'';
+  el.className='pw-msg'+(text?` show ${type||'err'}`:'');
+}
+async function submitVerify(){
+  const email=$('vf-email').textContent.trim(), code=$('vf-code').value.trim(),
+        remember=$('vf-remember').checked, view=$('vf-view').value;
+  if(code.length<6){ vfMsg('6자리 인증코드를 입력하세요.'); return; }
+  const btn=$('vf-save'); btn.disabled=true; vfMsg('');
+  try{
+    const res=await fetch('/api/rm/verify_login',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,code,remember,view})
+    });
+    const d=await res.json();
+    if(d.success){ vfMsg('인증되었습니다. 이동 중…','ok'); location.href=d.redirect||'/'; }
+    else{ vfMsg(d.message||'인증에 실패했습니다.'); btn.disabled=false; }
+  }catch(e){ vfMsg('서버와 통신하지 못했습니다.'); btn.disabled=false; }
+}
+async function resendCode(){
+  const email=$('vf-email').textContent.trim();
+  vfMsg('');
+  try{
+    const res=await fetch('/api/rm/resend',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email})
+    });
+    const d=await res.json();
+    vfMsg(d.message||(d.success?'재발송했습니다.':'재발송에 실패했습니다.'), d.success?'ok':'err');
+  }catch(e){ vfMsg('서버와 통신하지 못했습니다.'); }
+}
+/* 인증코드: 숫자만 허용 + 자동 포커스 */
+(function(){
+  const c=$('vf-code');
+  if(c){ c.addEventListener('input',()=>{ c.value=c.value.replace(/\D/g,'').slice(0,6); });
+         if($('vf-ov').classList.contains('open')) c.focus(); }
+})();
+$('vf-ov').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitVerify(); } });
+$('su-ov').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submitSignup(); } });
 </script>
 </body>
 </html>

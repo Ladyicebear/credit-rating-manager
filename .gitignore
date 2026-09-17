@@ -46,6 +46,10 @@ meritz_*.txt
 data/auth.json
 data/auth.json.*
 
+# RM 개별 회원(가입·승인·신뢰기기) 런타임 데이터 — 비밀번호 해시 포함, 커밋 금지
+data/members.json
+data/members.json.*
+
 # 상품제안관리 런타임 데이터(기기/서버별로 관리, 배포 시 서버 것 유지)
 data/proposals.json
 data/proposal_meta.json

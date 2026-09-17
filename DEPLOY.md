@@ -88,6 +88,56 @@ gcloud run services update credit-rating-manager --region asia-northeast3 \
   바꾸면 비용을 크게 줄일 수 있습니다. 다만 그러려면 스케줄러를 Cloud Scheduler로 분리하는 추가 작업이 필요합니다.
   → 원하시면 그 구성으로 만들어 드리겠습니다(코드에 전용 엔드포인트 추가 + Cloud Scheduler 설정).
 
+## 🔐 2차 보안 — RM 개별 계정(회원가입 → 승인 → 이메일 본인인증)
+
+RM 영업사원이 **회사 이메일로 직접 회원가입** → **연금컨설팅팀이 승인** → 승인된 사원이
+로그인하면 **회사 이메일로 6자리 인증코드**가 발송되고, 코드를 확인해야 로그인됩니다.
+한 번 인증한 브라우저는 **30일간 코드 없이** 로그인합니다(신뢰기기).
+
+> 기존 연금컨설팅팀 계정(`APP_USER`/`APP_PASSWORD`)과 환경변수 RM 공용계정은 그대로 동작합니다.
+> 개별 RM 계정은 그 위에 추가되는 방식이라 기존 로그인은 영향받지 않습니다.
+
+### 필요한 환경변수
+```bash
+gcloud run services update credit-rating-manager --region asia-northeast3 \
+  --update-env-vars "\
+RM_EMAIL_DOMAINS=company.co.kr,\
+RM_TEAMS=강남WM센터,서초WM센터,여의도WM센터,판교WM센터,분당WM센터,\
+SMTP_HOST=smtp.gmail.com,\
+SMTP_PORT=587,\
+SMTP_USER=noreply@company.co.kr,\
+SMTP_PASS=<Gmail-앱-비밀번호-16자리>,\
+SMTP_FROM=noreply@company.co.kr,\
+SMTP_FROM_NAME=스마트펜션,\
+RM_ADMIN_NOTIFY_EMAIL=pension-team@company.co.kr"
+```
+| 변수 | 설명 |
+|------|------|
+| `RM_EMAIL_DOMAINS` | 가입 허용 회사 이메일 도메인(쉼표구분). 예: `company.co.kr`. **미설정 시 도메인 제한 없음**(외부 메일도 가입 가능하니 반드시 설정 권장). |
+| `RM_TEAMS` | 회원가입 시 선택하는 소속팀 목록(쉼표구분). 미설정 시 기본 목록 사용. |
+| `RM_DEVICE_TRUST_DAYS` | 신뢰기기 유지일. 기본 `30`. |
+| `RM_ADMIN_NOTIFY_EMAIL` | 새 가입 신청 시 알림 메일을 받을 연금컨설팅팀 주소(선택). |
+| `SMTP_HOST/PORT/USER/PASS/FROM/FROM_NAME` | 인증·안내 메일 발송 계정. 업체 비종속(표준 SMTP). |
+
+> **SMTP를 설정하지 않으면** 인증코드가 실제로 발송되지 않고 서버 로그에만 남습니다(개발용).
+> 운영에서는 반드시 SMTP를 설정하세요. Cloud Run은 25번 포트를 막지만 **587(STARTTLS)·465(SSL)는 열려 있어** Gmail/Workspace·SendGrid·네이버웍스 등 어떤 SMTP든 사용할 수 있습니다.
+
+### Gmail / Google Workspace로 발송하기 (가장 간단)
+1. 발송용 구글 계정에서 **2단계 인증**을 켠다.
+2. Google 계정 → 보안 → **앱 비밀번호** 발급(16자리). → `SMTP_PASS`에 넣는다.
+3. `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER`=그 계정 메일, `SMTP_FROM`=동일(또는 Workspace 별칭).
+   - Workspace라면 관리콘솔에서 SMTP/IMAP 허용 정책을 확인하세요.
+
+### 운영 흐름
+- RM: 로그인 화면 → **회원가입 신청**(이름·소속팀·회사이메일·비밀번호) → 승인 대기.
+- 연금컨설팅팀: 메인 상단 **가입승인** 탭(데스크톱, 연금컨설팅팀 전용)에서 승인/반려/삭제.
+- 승인된 RM: 로그인 → 회사 이메일로 온 6자리 코드 입력 → 완료(‘이 기기 30일 기억’ 선택 가능).
+
+> 회원 데이터는 `data/members.json`에 저장되어 **GCS 버킷에 영구 보존**됩니다(재배포해도 유지).
+> 비밀번호는 해시로만 저장하며 평문·인증코드는 저장하지 않습니다(코드는 해시+10분 만료).
+
+---
+
 ## ⚠️ 문제 해결
 - **메모리 부족(OOM)으로 조회 실패**: 조회 시 크롬이 여러 개 동시에 떠서 무겁습니다.
   `--memory 8Gi` 로 올리거나, 동시 실행 개수를 줄이는 코드 수정을 요청하세요.

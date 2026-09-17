@@ -68,7 +68,8 @@ MIN_PASSWORD_LEN = 8
 # 로그인 없이 접근 허용할 엔드포인트
 # api_change_password: 로그인 화면에서 비밀번호를 바꿀 수 있게 공개. 대신 아이디+현재 비밀번호를
 # 모두 맞게 입력해야만 통과하므로 로그인 자체와 같은 수준의 검증을 거친다.
-_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password'}
+_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password',
+                     'api_rm_signup', 'api_rm_verify_login', 'api_rm_resend'}
 
 # RM(조회 전용)이 접근할 수 없는 쓰기/실행/관리 엔드포인트.
 # (다운로드·조회 GET은 여기 없음 → RM 허용). 서버측 최종 방어선이며 화면 숨김과 별개로 강제된다.
@@ -88,6 +89,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'admin_deploy', 'admin_deploy_status',   # 서버 배포/상태(연금컨설팅팀 전용)
     'admin_refresh_bond_rates',  # 시장금리 수동 갱신(연금컨설팅팀 전용)
     'docs_page', 'api_docs_upload', 'api_docs_delete', 'api_docs_bulk',  # 약관·상품설명서 관리(연금컨설팅팀 전용)
+    'admin_members', 'api_rm_members', 'api_rm_members_review',   # RM 가입 승인 관리(연금컨설팅팀 전용)
 }
 
 
@@ -277,7 +279,7 @@ def login():
         if role and verify_password(u, p):
             if role == 'rm' and _rm_pw_expired():
                 # 2주 경과 → RM 로그인 차단(팝업 안내), 연금컨설팅팀 재설정 필요
-                return render_template('login.html', error='', rm_expired=True)
+                return render_template('login.html', error='', rm_expired=True, teams=RM_TEAMS)
             if role == 'rm' and not _rm_pw_set_at():
                 _mark_rm_pw_set_at()   # 초기 비밀번호 최초 로그인 → 만료 시계 시작
             session['logged_in'] = True
@@ -289,10 +291,41 @@ def login():
             if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
                 nxt = '/'
             return redirect(nxt)
+
+        # ── 개별 RM 회원 계정(회사 이메일 로그인) ── 2차 보안 ──
+        member = _get_member(u)
+        if member and check_password_hash(member.get('password_hash', ''), p):
+            st = member.get('status')
+            if st == 'pending':
+                return render_template('login.html', error='', teams=RM_TEAMS, pending_notice=True)
+            if st == 'rejected':
+                return render_template('login.html', teams=RM_TEAMS,
+                    error='가입이 반려된 계정입니다. 연금컨설팅팀으로 문의해 주세요.')
+            if st != 'approved':
+                return render_template('login.html', teams=RM_TEAMS,
+                    error='로그인할 수 없는 계정입니다. 연금컨설팅팀으로 문의해 주세요.')
+            view = 'simple' if request.form.get('view') == 'simple' else 'web'
+            # 신뢰기기(30일)면 인증코드 없이 바로 로그인
+            if _device_trusted(u):
+                return _do_member_login(u, member, view)
+            # 아니면 회사 이메일로 인증코드 발송 → 코드 입력 화면
+            code = _issue_otp(u)
+            sent = _send_email(
+                member['email'], '[스마트펜션] 로그인 본인확인 인증코드',
+                f"[스마트펜션] 로그인 본인확인 인증코드는 [ {code} ] 입니다.\n"
+                f"유효시간은 10분입니다. 본인이 요청하지 않았다면 비밀번호를 변경해 주세요.")
+            if _smtp_ready() and not sent:
+                return render_template('login.html', teams=RM_TEAMS,
+                    error='인증 메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+            if not _smtp_ready():
+                logger.warning('SMTP 미설정 — 개발용 로그인 인증코드(%s)=%s', u, code)
+            return render_template('login.html', teams=RM_TEAMS,
+                                   verify_email=u, verify_view=view, smtp_ready=_smtp_ready())
+
         error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
         return redirect(url_for('index'))
-    return render_template('login.html', error=error)
+    return render_template('login.html', error=error, teams=RM_TEAMS)
 
 
 @app.route('/logout')
@@ -364,6 +397,405 @@ def api_change_password():
     _save_auth(auth)
     logger.info('비밀번호 변경 완료 (대상=%s, 변경자=%s)', target, acting_user)
     return jsonify({'success': True, 'message': '비밀번호가 변경되었습니다.'})
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 2차 보안 — RM 개별 계정(회원가입 → 승인 → 이메일 본인인증 로그인)
+# ══════════════════════════════════════════════════════════════════════
+#  1) RM이 회사 이메일 + 소속팀 + 이름/비밀번호로 가입 신청 → status=pending
+#  2) 연금컨설팅팀이 승인/반려 → status=approved / rejected
+#  3) 승인된 계정이 로그인하면 회사 이메일로 6자리 인증코드 발송 →
+#     코드 확인 시 로그인 완료. '이 기기 30일 기억' 선택 시 해당 브라우저는
+#     30일간 코드 없이 로그인(신뢰기기).
+#
+#  ⚙️ 배포 환경변수(미설정 시 기능이 안전하게 축소·경고):
+#     RM_EMAIL_DOMAINS = 허용 회사 이메일 도메인(쉼표구분). 예: company.co.kr
+#                        미설정 시 도메인 제한 없음(가입 시 경고 로그).
+#     RM_TEAMS         = 소속팀 목록(쉼표구분). 미설정 시 기본 목록.
+#     RM_DEVICE_TRUST_DAYS = 신뢰기기 유지일(기본 30).
+#     RM_ADMIN_NOTIFY_EMAIL = 새 가입 신청 시 알림 받을 연금컨설팅팀 메일(선택).
+#     SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM[/SMTP_FROM_NAME]
+#         = 인증메일 발송 계정. Google Workspace/Gmail: smtp.gmail.com / 587 /
+#           계정메일 / 앱 비밀번호(2단계인증 후 발급). SMTP 미설정 시 발송은
+#           생략되고 개발용으로 인증코드를 로그에만 남긴다.
+MEMBERS_FILE = os.path.join(DATA_DIR, 'members.json')
+_MEMBERS_LOCK = threading.Lock()
+
+# 허용 회사 이메일 도메인(소문자, '@' 제거). 미설정 시 빈 목록 → 제한 없음.
+RM_EMAIL_DOMAINS = [d.strip().lower().lstrip('@') for d in
+                    os.environ.get('RM_EMAIL_DOMAINS', '').split(',') if d.strip()]
+
+# 소속팀 목록. 미설정 시 기본값(배포 시 RM_TEAMS 환경변수로 교체).
+_DEFAULT_TEAMS = ['강남WM센터', '서초WM센터', '여의도WM센터', '판교WM센터', '분당WM센터']
+RM_TEAMS = [t.strip() for t in os.environ.get('RM_TEAMS', '').split(',') if t.strip()] or _DEFAULT_TEAMS
+
+RM_DEVICE_TRUST_DAYS = int(os.environ.get('RM_DEVICE_TRUST_DAYS', '30'))
+_OTP_TTL_SEC = 10 * 60      # 인증코드 유효시간(10분)
+_OTP_MAX_TRY = 5            # 인증코드 입력 최대 시도
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+# ── SMTP 이메일 발송(업체 비종속: 표준 SMTP STARTTLS/SSL) ──────────────
+SMTP_HOST = os.environ.get('SMTP_HOST', '')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASS = os.environ.get('SMTP_PASS', '')
+SMTP_FROM = os.environ.get('SMTP_FROM', '') or SMTP_USER
+SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', '스마트펜션')
+
+
+def _smtp_ready() -> bool:
+    return bool(SMTP_HOST and SMTP_USER and SMTP_PASS)
+
+
+def _send_email(to_addr: str, subject: str, text_body: str, html_body: str = None) -> bool:
+    """표준 SMTP로 메일 발송. 성공 시 True. SMTP 미설정이면 False(개발환경)."""
+    import smtplib
+    import ssl
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.utils import formataddr, formatdate, make_msgid
+    if not _smtp_ready():
+        logger.warning('SMTP 미설정 — 메일 발송 생략(to=%s, subject=%s)', to_addr, subject)
+        return False
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = formataddr((str(SMTP_FROM_NAME), SMTP_FROM))
+    msg['To'] = to_addr
+    msg['Date'] = formatdate(localtime=True)
+    msg['Message-ID'] = make_msgid()
+    msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
+    if html_body:
+        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+    ctx = ssl.create_default_context()
+    try:
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=20, context=ctx) as s:
+                s.login(SMTP_USER, SMTP_PASS)
+                s.sendmail(SMTP_FROM, [to_addr], msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
+                s.ehlo()
+                s.starttls(context=ctx)
+                s.ehlo()
+                s.login(SMTP_USER, SMTP_PASS)
+                s.sendmail(SMTP_FROM, [to_addr], msg.as_string())
+        logger.info('메일 발송 완료(to=%s, subject=%s)', to_addr, subject)
+        return True
+    except Exception:
+        logger.exception('메일 발송 실패(to=%s)', to_addr)
+        return False
+
+
+# ── 회원(RM) 저장소 ───────────────────────────────────────────────────
+def _load_members() -> dict:
+    if not os.path.exists(MEMBERS_FILE):
+        return {'members': {}}
+    try:
+        with open(MEMBERS_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        if not isinstance(d, dict) or 'members' not in d:
+            return {'members': {}}
+        return d
+    except Exception:
+        logger.exception('members.json 읽기 실패')
+        return {'members': {}}
+
+
+def _save_members(d: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = MEMBERS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, MEMBERS_FILE)
+
+
+def _get_member(email: str):
+    if not email:
+        return None
+    return _load_members().get('members', {}).get(email.strip().lower())
+
+
+def _email_domain_ok(email: str) -> bool:
+    if not RM_EMAIL_DOMAINS:
+        return True   # 도메인 미설정(개발) — 허용하되 가입 시 경고
+    return email.rsplit('@', 1)[-1].lower() in RM_EMAIL_DOMAINS
+
+
+def _now_str() -> str:
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _hash_token(t: str) -> str:
+    import hashlib
+    return hashlib.sha256(t.encode('utf-8')).hexdigest()
+
+
+# ── 로그인 인증코드(OTP) ──────────────────────────────────────────────
+def _issue_otp(email: str):
+    """6자리 인증코드 발급 → 회원에 해시로 저장(10분 유효). 평문 코드 반환."""
+    import secrets
+    code = f'{secrets.randbelow(1000000):06d}'
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        m = data.get('members', {}).get(email)
+        if not m:
+            return None
+        m['otp'] = {'hash': generate_password_hash(code),
+                    'exp': time.time() + _OTP_TTL_SEC, 'tries': 0}
+        _save_members(data)
+    return code
+
+
+def _verify_otp(email: str, code: str):
+    """인증코드 확인. (성공여부, 메시지). 성공 시 코드 즉시 폐기."""
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        m = data.get('members', {}).get(email)
+        otp = m.get('otp') if m else None
+        if not otp:
+            return False, '인증코드를 다시 요청해 주세요.'
+        if time.time() > otp.get('exp', 0):
+            m['otp'] = None
+            _save_members(data)
+            return False, '인증코드가 만료되었습니다. 다시 요청해 주세요.'
+        if otp.get('tries', 0) >= _OTP_MAX_TRY:
+            m['otp'] = None
+            _save_members(data)
+            return False, '인증 시도 횟수를 초과했습니다. 다시 요청해 주세요.'
+        if not check_password_hash(otp['hash'], (code or '').strip()):
+            otp['tries'] = otp.get('tries', 0) + 1
+            _save_members(data)
+            return False, '인증코드가 올바르지 않습니다.'
+        m['otp'] = None   # 사용 후 폐기(1회성)
+        _save_members(data)
+        return True, ''
+
+
+# ── 신뢰기기(30일) ────────────────────────────────────────────────────
+def _new_device_token(email: str):
+    """신뢰기기 토큰 발급 → 해시를 회원에 저장(만료 포함). 평문 토큰(쿠키용) 반환."""
+    import secrets
+    token = secrets.token_hex(16)
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        m = data.get('members', {}).get(email)
+        if not m:
+            return None
+        now = time.time()
+        devices = [dv for dv in m.get('devices', []) if dv.get('exp', 0) > now]
+        devices.append({'hash': _hash_token(token),
+                        'exp': now + RM_DEVICE_TRUST_DAYS * 86400,
+                        'ua': (request.headers.get('User-Agent', '') or '')[:120],
+                        'created_at': _now_str()})
+        m['devices'] = devices[-20:]   # 기기 목록 상한
+        _save_members(data)
+    return token
+
+
+def _device_trusted(email: str) -> bool:
+    token = request.cookies.get('rm_dev', '')
+    if not token:
+        return False
+    m = _get_member(email)
+    if not m:
+        return False
+    h = _hash_token(token)
+    now = time.time()
+    return any(dv.get('hash') == h and dv.get('exp', 0) > now for dv in m.get('devices', []))
+
+
+def _do_member_login(email: str, member: dict, view: str = 'web'):
+    """회원 세션 확립 + last_login 기록 후 리다이렉트."""
+    session['logged_in'] = True
+    session['user'] = email
+    session['role'] = 'rm'          # 조회·다운로드 전용(연금컨설팅팀 관리기능 차단)
+    session['member'] = True
+    session['name'] = member.get('name', '')
+    session['team'] = member.get('team', '')
+    session['view'] = 'simple' if view == 'simple' else 'web'
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        m = data.get('members', {}).get(email)
+        if m:
+            m['last_login'] = _now_str()
+            _save_members(data)
+    nxt = request.args.get('next') or '/'
+    if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
+        nxt = '/'
+    return redirect(nxt)
+
+
+# ── 가입 신청(공개) ───────────────────────────────────────────────────
+@app.route('/api/rm/signup', methods=['POST'])
+def api_rm_signup():
+    d = request.get_json(silent=True) or {}
+    name = (d.get('name') or '').strip()
+    email = (d.get('email') or '').strip().lower()
+    team = (d.get('team') or '').strip()
+    pw = d.get('password') or ''
+    confirm = d.get('confirm') or ''
+    if not name or not email or not team or not pw:
+        return jsonify({'success': False, 'message': '모든 항목을 입력하세요.'}), 400
+    if not _EMAIL_RE.match(email):
+        return jsonify({'success': False, 'message': '올바른 이메일 형식이 아닙니다.'}), 400
+    if not _email_domain_ok(email):
+        allow = ', '.join('@' + x for x in RM_EMAIL_DOMAINS)
+        return jsonify({'success': False, 'message': f'회사 이메일({allow})로만 가입할 수 있습니다.'}), 400
+    if team not in RM_TEAMS:
+        return jsonify({'success': False, 'message': '소속팀을 다시 선택하세요.'}), 400
+    if len(pw) < MIN_PASSWORD_LEN:
+        return jsonify({'success': False, 'message': f'비밀번호는 {MIN_PASSWORD_LEN}자 이상이어야 합니다.'}), 400
+    if pw != confirm:
+        return jsonify({'success': False, 'message': '비밀번호가 서로 일치하지 않습니다.'}), 400
+    if _role_for(email):   # 연금컨설팅팀/환경변수 계정과 충돌 방지
+        return jsonify({'success': False, 'message': '이미 사용 중인 계정입니다.'}), 409
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        members = data.setdefault('members', {})
+        ex = members.get(email)
+        if ex and ex.get('status') == 'pending':
+            return jsonify({'success': False, 'message': '이미 가입 신청된 이메일입니다. 승인을 기다려 주세요.'}), 409
+        if ex and ex.get('status') == 'approved':
+            return jsonify({'success': False, 'message': '이미 가입된 이메일입니다. 로그인해 주세요.'}), 409
+        # 반려된 이메일은 재신청 허용(기존 기기/코드는 폐기하고 새로 신청)
+        members[email] = {
+            'email': email, 'name': name, 'team': team,
+            'password_hash': generate_password_hash(pw),
+            'status': 'pending',
+            'created_at': _now_str(),
+            'reviewed_at': None, 'reviewed_by': None, 'reject_reason': None,
+            'last_login': None, 'devices': [], 'otp': None,
+        }
+        _save_members(data)
+    logger.info('RM 가입 신청: %s (%s / %s)', email, name, team)
+    if not RM_EMAIL_DOMAINS:
+        logger.warning('RM_EMAIL_DOMAINS 미설정 — 도메인 제한 없이 가입을 받았습니다.')
+    admin_to = os.environ.get('RM_ADMIN_NOTIFY_EMAIL', '')
+    if admin_to:
+        _send_email(admin_to, '[스마트펜션] 새 가입 신청 접수',
+                    f'{name}({email}, {team}) 님이 가입을 신청했습니다.\n'
+                    f'승인 관리 화면에서 승인/반려를 처리해 주세요.')
+    return jsonify({'success': True,
+                    'message': '가입 신청이 접수되었습니다. 연금컨설팅팀 승인 후 로그인할 수 있습니다.'})
+
+
+# ── 로그인 인증코드 확인(공개) ────────────────────────────────────────
+@app.route('/api/rm/verify_login', methods=['POST'])
+def api_rm_verify_login():
+    d = request.get_json(silent=True) or {}
+    email = (d.get('email') or '').strip().lower()
+    code = (d.get('code') or '').strip()
+    remember = bool(d.get('remember'))
+    view = 'simple' if d.get('view') == 'simple' else 'web'
+    member = _get_member(email)
+    if not member or member.get('status') != 'approved':
+        return jsonify({'success': False, 'message': '로그인 정보를 다시 확인해 주세요.'}), 400
+    ok, msg = _verify_otp(email, code)
+    if not ok:
+        return jsonify({'success': False, 'message': msg}), 400
+    session['logged_in'] = True
+    session['user'] = email
+    session['role'] = 'rm'
+    session['member'] = True
+    session['name'] = member.get('name', '')
+    session['team'] = member.get('team', '')
+    session['view'] = view
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        m = data.get('members', {}).get(email)
+        if m:
+            m['last_login'] = _now_str()
+            _save_members(data)
+    resp = jsonify({'success': True, 'redirect': '/'})
+    if remember:
+        token = _new_device_token(email)
+        if token:
+            resp.set_cookie('rm_dev', token, max_age=RM_DEVICE_TRUST_DAYS * 86400,
+                            httponly=True, samesite='Lax')
+    logger.info('RM 로그인 인증 완료: %s (신뢰기기=%s)', email, remember)
+    return resp
+
+
+# ── 로그인 인증코드 재발송(공개) ──────────────────────────────────────
+@app.route('/api/rm/resend', methods=['POST'])
+def api_rm_resend():
+    d = request.get_json(silent=True) or {}
+    email = (d.get('email') or '').strip().lower()
+    member = _get_member(email)
+    if not member or member.get('status') != 'approved':
+        return jsonify({'success': False, 'message': '로그인 정보를 다시 확인해 주세요.'}), 400
+    code = _issue_otp(email)
+    sent = _send_email(member['email'], '[스마트펜션] 로그인 본인확인 인증코드',
+                       f"[스마트펜션] 로그인 본인확인 인증코드는 [ {code} ] 입니다.\n유효시간은 10분입니다.")
+    if not _smtp_ready():
+        logger.warning('SMTP 미설정 — 개발용 로그인 인증코드(%s)=%s', email, code)
+        return jsonify({'success': True, 'message': '인증코드를 재발송했습니다.'})
+    if not sent:
+        return jsonify({'success': False, 'message': '메일 발송에 실패했습니다.'}), 500
+    return jsonify({'success': True, 'message': '인증코드를 재발송했습니다.'})
+
+
+# ── 가입 승인 관리(연금컨설팅팀 전용 — _ADMIN_ONLY_ENDPOINTS) ─────────
+@app.route('/admin/members')
+def admin_members():
+    return send_file(os.path.join(BASE_DIR, 'admin_members.html'))
+
+
+@app.route('/api/rm/members')
+def api_rm_members():
+    data = _load_members().get('members', {})
+    fields = ('email', 'name', 'team', 'status', 'created_at',
+              'reviewed_at', 'reviewed_by', 'reject_reason', 'last_login')
+    out = [{k: m.get(k) for k in fields} for m in data.values()]
+    out.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+    out.sort(key=lambda x: 0 if x.get('status') == 'pending' else 1)   # 대기 먼저
+    counts = Counter(m.get('status') for m in data.values())
+    return jsonify({'teams': RM_TEAMS, 'members': out,
+                    'smtp_ready': _smtp_ready(),
+                    'domains': RM_EMAIL_DOMAINS,
+                    'counts': {'pending': counts.get('pending', 0),
+                               'approved': counts.get('approved', 0),
+                               'rejected': counts.get('rejected', 0)}})
+
+
+@app.route('/api/rm/members/review', methods=['POST'])
+def api_rm_members_review():
+    d = request.get_json(silent=True) or {}
+    email = (d.get('email') or '').strip().lower()
+    action = (d.get('action') or '').strip()
+    reason = (d.get('reason') or '').strip()
+    if action not in ('approve', 'reject', 'delete'):
+        return jsonify({'success': False, 'message': '잘못된 요청입니다.'}), 400
+    with _MEMBERS_LOCK:
+        data = _load_members()
+        m = data.get('members', {}).get(email)
+        if not m:
+            return jsonify({'success': False, 'message': '해당 회원을 찾을 수 없습니다.'}), 404
+        if action == 'delete':
+            data['members'].pop(email, None)
+            _save_members(data)
+            logger.info('RM 회원 삭제: %s (처리자=%s)', email, session.get('user'))
+            return jsonify({'success': True, 'message': '회원을 삭제했습니다.'})
+        m['status'] = 'approved' if action == 'approve' else 'rejected'
+        m['reviewed_at'] = _now_str()
+        m['reviewed_by'] = session.get('user', '')
+        m['reject_reason'] = reason if action == 'reject' else None
+        if action == 'reject':
+            m['devices'] = []   # 반려 시 신뢰기기 폐기
+        m['otp'] = None
+        name = m.get('name', '')
+        _save_members(data)
+    if action == 'approve':
+        _send_email(email, '[스마트펜션] 가입이 승인되었습니다',
+                    f"{name}님, 스마트펜션 가입이 승인되었습니다.\n"
+                    f"이제 회사 이메일({email})과 설정하신 비밀번호로 로그인할 수 있습니다.\n"
+                    f"로그인 시 본인확인 인증코드가 이 이메일로 발송됩니다.")
+    else:
+        _send_email(email, '[스마트펜션] 가입 신청 결과 안내',
+                    f"{name}님, 가입 신청이 반려되었습니다." + (f"\n사유: {reason}" if reason else ''))
+    logger.info('RM 회원 심사: %s → %s (처리자=%s)', email, action, session.get('user'))
+    return jsonify({'success': True, 'message': '처리되었습니다.'})
+
 
 # ── 백그라운드 조회 상태 ───────────────────────────────────────────────
 _refresh_lock = threading.Lock()
