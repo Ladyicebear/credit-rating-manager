@@ -2504,6 +2504,9 @@ def index():
         role=session.get('role', ''),   # consulting=전체, rm=조회·다운로드만(화면 제어용)
         rm_user=RM_USER,                 # RM 비밀번호 변경 UI 표시/대상용(미설정 시 버튼 숨김)
         rm_days_left=_rm_days_left(),    # RM 비밀번호 만료까지 남은 일수(표시용)
+        # 회원 승인 탭 배지: 승인 대기 인원(연금컨설팅팀만 화면에 노출됨)
+        members_pending=(sum(1 for m in _load_members().values() if m.get('status') == 'pending')
+                         if session.get('role') == 'consulting' else 0),
     )
     # 메인 페이지 로드 = 1 접속 → 일자별 방문자 집계(웹/모바일 모두)
     return _record_visit(make_response(html))
