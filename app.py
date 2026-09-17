@@ -7,6 +7,7 @@ import uuid
 import shutil
 import hashlib
 import secrets
+import socket
 import smtplib
 import logging
 import threading
@@ -358,13 +359,50 @@ def _smtp_send_raw(to_addr: str, subject: str, html: str):
             srv.send_message(msg)
 
 
+def _smtp_error_hint(exc: Exception) -> str:
+    """SMTP 예외를 사용자용 한국어 원인 안내로 변환. 테스트 화면·로그에서 공용으로 쓴다.
+
+    Gmail 535(로그인 거부)가 압도적으로 흔하므로 앱 비밀번호 안내를 우선한다.
+    """
+    raw = (str(exc) or '').strip()
+    low = raw.lower()
+
+    # ① 인증 거부(가장 흔함) — 535 BadCredentials, 534 앱 비밀번호 필요(5.7.9)
+    auth = isinstance(exc, smtplib.SMTPAuthenticationError)
+    if auth or '535' in raw or '534' in raw or 'badcredentials' in low or '5.7.9' in raw \
+            or 'username and password not accepted' in low or 'not accepted' in low:
+        return ('구글이 로그인을 거부했습니다(535/534). 계정 비밀번호가 아니라 '
+                '"앱 비밀번호"가 필요합니다. ① 구글 계정 → 보안에서 2단계 인증을 켠 뒤 '
+                '② "앱 비밀번호"를 새로 발급해 그 16자리(공백 무시)를 입력하세요. '
+                '③ 발신 계정에 @gmail.com까지 전체 주소가 들어갔는지, '
+                '회사(Workspace) 계정이면 관리자가 SMTP 사용을 허용했는지 확인하세요. (원문: '
+                + (raw[:200] or '없음') + ')')
+
+    # ② 발신 주소 거부 — Gmail은 인증 계정과 다른 From을 대개 거부(553/5.7.x)
+    if isinstance(exc, smtplib.SMTPSenderRefused) or '553' in raw or '5.7.0' in raw:
+        return ('발신 주소가 거부되었습니다. Gmail은 로그인한 계정과 다른 "발신 주소"를 '
+                '보통 허용하지 않습니다. 발신 주소를 로그인 계정과 같게 두거나, '
+                'Gmail에 등록된 별칭(alias)만 쓰세요. (원문: ' + (raw[:200] or '없음') + ')')
+
+    # ③ 연결 실패 — 포트/방화벽. 587(STARTTLS) ↔ 465(SSL) 확인.
+    if isinstance(exc, (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected,
+                        ConnectionError, TimeoutError, socket.timeout, socket.gaierror)) \
+            or 'timed out' in low or 'connection refused' in low \
+            or 'name or service not known' in low or 'getaddrinfo' in low:
+        return ('메일 서버에 연결하지 못했습니다. 호스트/포트와 방화벽을 확인하세요. '
+                '보통 587(STARTTLS) 또는 465(SSL)를 씁니다. (원문: ' + (raw[:200] or '없음') + ')')
+
+    return raw[:300] or '발송에 실패했습니다.'
+
+
 def _send_email(to_addr: str, subject: str, html: str) -> bool:
     """HTML 이메일 발송. 미설정/실패 시 로그만 남기고 False 반환(발송 흐름을 막지 않음)."""
     try:
         _smtp_send_raw(to_addr, subject, html)
         return True
-    except Exception:
-        logger.exception('이메일 발송 실패(대상=%s, 제목=%s)', to_addr, subject)
+    except Exception as e:
+        logger.error('이메일 발송 실패(대상=%s, 제목=%s): %s', to_addr, subject, _smtp_error_hint(e))
+        logger.debug('이메일 발송 실패 상세', exc_info=True)
         return False
 
 
@@ -786,6 +824,15 @@ def api_email_test():
     to = _normalize_email(d.get('to', ''))
     if not _EMAIL_RE.match(to):
         return jsonify({'success': False, 'message': '받는 이메일 형식이 올바르지 않습니다.'}), 400
+    # 발송 전 사전 점검: Gmail 앱 비밀번호는 공백 제외 16자리다. 길이가 다르면
+    # 십중팔구 계정 비밀번호를 넣은 것 → 구글에 요청 보내기 전에 535 원인을 미리 안내.
+    s = _smtp_settings()
+    if 'gmail.com' in (s.get('host') or '').lower() and s.get('password') \
+            and len(s['password']) != 16:
+        return jsonify({'success': False, 'message': (
+            f"앱 비밀번호가 공백 제외 16자리가 아닙니다(현재 {len(s['password'])}자리). "
+            '구글 계정 비밀번호가 아니라, 2단계 인증을 켠 뒤 발급하는 16자리 '
+            '"앱 비밀번호"를 입력해 주세요.')})
     html = ('<div style="font-family:sans-serif">✅ 테스트 메일입니다.<br><br>'
             '이 메일이 도착했다면 발송 설정이 정상입니다. '
             '이제 로그인 매직링크와 가입 승인 메일이 이 계정으로 발송됩니다.</div>')
@@ -793,13 +840,7 @@ def api_email_test():
         _smtp_send_raw(to, '[신용등급 시스템] 발송 테스트', html)
         return jsonify({'success': True})
     except Exception as e:
-        msg = str(e)[:300] or '발송 실패'
-        if '535' in msg or 'BadCredentials' in msg or 'not accepted' in msg:
-            msg = ('구글이 로그인을 거부했습니다(535). ① 계정 비밀번호가 아니라 16자리 '
-                   '"앱 비밀번호"인지 ② 2단계 인증이 켜져 있는지 ③ 새 계정이면 '
-                   'accounts.google.com/DisplayUnlockCaptcha 에서 접속 허용 후 재시도했는지 확인하세요. (원문: '
-                   + msg + ')')
-        return jsonify({'success': False, 'message': msg})
+        return jsonify({'success': False, 'message': _smtp_error_hint(e)})
 
 
 @app.route('/api/change_password', methods=['POST'])
