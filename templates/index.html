@@ -1567,7 +1567,7 @@ function tabbarGo(which, el){
   if(el) el.classList.add('active');
   var dm=document.getElementById('super-docsm');
   if(which==='docs'){   // 상품설명서: 다른 화면 숨기고 문서 목록 표시
-    ['super-pension','super-proposal','super-visitors','super-docs'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
+    ['super-pension','super-proposal','super-visitors','super-docs','super-home'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
     var mn=document.querySelector('.main'); if(mn)mn.style.display='none';
     var cs=document.getElementById('credit-subbar'); if(cs)cs.style.display='none';
     document.querySelectorAll('.super-tab').forEach(function(t){t.classList.remove('active');});
