@@ -327,6 +327,9 @@ tr.row-done td{transition:background .3s}
 /* ── 휴대폰(앱형) 반응형 : 데스크톱 웹 형태는 그대로, 모바일만 재구성 ── */
 .app-tabbar{display:none}   /* 하단 탭바: 데스크톱 숨김 */
 @media(max-width:768px){
+  /* 모바일: 스크롤바(회색 줄) 숨김 — 데스크톱은 그대로, 스크롤 기능 유지 */
+  *{scrollbar-width:none;-ms-overflow-style:none}
+  *::-webkit-scrollbar{width:0;height:0;display:none}
   /* ── 앱형 하단 고정 탭바 ── */
   .app-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;
               background:#fff;border-top:1px solid #EAECEF;box-shadow:0 -2px 12px rgba(16,24,40,.06);

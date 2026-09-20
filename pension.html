@@ -16,6 +16,9 @@
     --db:#0E7C86; --dc:#2563A8; --def:#B7791F;
   }
   *{box-sizing:border-box}
+  /* 스크롤바(회색 줄) 숨김 — 스크롤 기능은 그대로 */
+  *{scrollbar-width:none;-ms-overflow-style:none}
+  *::-webkit-scrollbar{width:0;height:0;display:none}
   html,body{margin:0;padding:0}
   body{font-family:"Malgun Gothic","맑은 고딕",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     color:var(--ink);background:var(--bg);font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}

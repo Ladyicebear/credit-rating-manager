@@ -9,6 +9,9 @@
         --bg:#FFFFFF;--card:#FFFFFF;--line:#E7EBF1;--line-2:#EEF1F6;
         --ink:#1F2937;--muted:#8A92A0;--muted-2:#A9B2C2}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  /* 스크롤바(회색 줄) 숨김 — 스크롤 기능은 그대로 */
+  *{scrollbar-width:none;-ms-overflow-style:none}
+  *::-webkit-scrollbar{width:0;height:0;display:none}
   body{margin:0;background:var(--bg);color:var(--ink);
        font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif}
   .app{max-width:480px;margin:0 auto;min-height:100vh;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
