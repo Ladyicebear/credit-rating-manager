@@ -675,9 +675,19 @@ def login_email():
 
 
 # ── 매직링크 검증 → 세션 생성 ───────────────────────────────────────────
-@app.route('/auth/verify')
+@app.route('/auth/verify', methods=['GET', 'POST'])
 def auth_verify():
-    email = _consume_magic_token(request.args.get('token', ''))
+    # 회사 메일 보안(예: Microsoft Safe Links)은 수신 메일의 링크를 사용자가 누르기 전에
+    # 자동으로 GET해서 검사한다. 1회용 토큰을 GET에서 바로 소비하면 이 사전검사에 소진되어
+    # 정작 사용자가 클릭할 땐 '만료'로 뜬다. → GET에서는 소비하지 않고 '로그인하기' 확인
+    # 페이지만 보여주고, 버튼을 눌러 POST가 올 때만 토큰을 소비한다(스캐너는 GET만 하므로 안전).
+    if request.method == 'GET':
+        token = request.args.get('token', '')
+        if not token:
+            return render_template('login.html',
+                                   error='로그인 링크가 올바르지 않습니다. 다시 시도해 주세요.')
+        return render_template('auth_confirm.html', token=token)
+    email = _consume_magic_token(request.form.get('token', ''))
     if not email:
         return render_template('login.html',
                                error='로그인 링크가 만료되었거나 유효하지 않습니다. 다시 시도해 주세요.')
