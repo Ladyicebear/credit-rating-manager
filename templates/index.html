@@ -522,13 +522,13 @@ tr.row-done td{transition:background .3s}
     <div class="mvx-notice" onclick="homeNotice()">
       <span class="mvx-mi"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg></span>
       <div><div class="mvx-tt">이달의 공지</div><div class="mvx-sb">중요한 소식을 확인해보세요.</div></div>
-      <img class="mvx-nimg" src="/static/images/notice_illust.png" alt="">
+      <img class="mvx-nimg" src="/static/images/notice_illust.png?v=2" alt="">
     </div>
     <div class="mvx-grid">
-      <button class="mvx-tile" onclick="homeGoProposal()"><span class="mvx-ic"><img src="/static/images/icon_proposal.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">이달의 제안상품</span><span class="mvx-go g-org">›</span></div></button>
-      <button class="mvx-tile" onclick="homeGoRate()"><span class="mvx-ic"><img src="/static/images/icon_rate.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">금리 현황</span><span class="mvx-go g-blue">›</span></div></button>
-      <button class="mvx-tile" onclick="homeGo('credit')"><span class="mvx-ic"><img src="/static/images/icon_credit.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">신용등급</span><span class="mvx-go g-blue">›</span></div></button>
-      <button class="mvx-tile" onclick="homeGo('docs')"><span class="mvx-ic"><img src="/static/images/icon_docs.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">약관·상품설명서</span><span class="mvx-go g-org">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGoProposal()"><span class="mvx-ic"><img src="/static/images/icon_proposal.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">이달의 제안상품</span><span class="mvx-go g-org">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGoRate()"><span class="mvx-ic"><img src="/static/images/icon_rate.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">금리 현황</span><span class="mvx-go g-blue">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGo('credit')"><span class="mvx-ic"><img src="/static/images/icon_credit.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">신용등급</span><span class="mvx-go g-blue">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGo('docs')"><span class="mvx-ic"><img src="/static/images/icon_docs.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">약관·상품설명서</span><span class="mvx-go g-org">›</span></div></button>
     </div>
   </div>
   <!-- 홈 공지 팝업 -->
@@ -1580,6 +1580,8 @@ function closeDocmSheet(){ document.getElementById('dvmSheetOv').classList.remov
 
 /* ── 하단 탭바: 홈·금리현황→원리금, 신용등급→신용등급, 상품설명서→문서 목록, 마이페이지→준비중 ── */
 function tabbarGo(which, el){
+  // 마이페이지: 준비중 — 화면 전환 없이 현재 화면·현재 탭을 그대로 두고 안내만 표시
+  if(which==='my'){ if(typeof showToast==='function') showToast('준비 중입니다','ok'); return; }
   document.querySelectorAll('#appTabbar .tab-item').forEach(function(b){ b.classList.remove('active'); });
   if(el) el.classList.add('active');
   var dm=document.getElementById('super-docsm');
