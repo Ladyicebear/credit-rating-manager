@@ -67,7 +67,7 @@ AFFILIATIONS = [
 ]
 
 # 매직링크 유효시간(분). 이 시간이 지나면 링크는 무효.
-MAGIC_LINK_TTL_MIN = int(os.environ.get('MAGIC_LINK_TTL_MIN', '15'))
+MAGIC_LINK_TTL_MIN = int(os.environ.get('MAGIC_LINK_TTL_MIN', '30'))
 # 매직링크 절대 URL 생성 기준 주소(프록시/Cloud Run 배포 시 권장, 예: https://앱주소).
 # 미설정 시 요청 주소에서 추정한다.
 APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')
@@ -156,7 +156,7 @@ def _save_auth(data: dict):
 # ── 회원(가입 신청/승인) 저장소 + 매직링크 토큰 + 이메일 발송 ──────────────────
 #   members.json : {이메일(소문자): {email,name,emp_id,affiliation,status,role,created_at,...}}
 #     status = pending(승인 대기) | approved(승인됨) | rejected(거절됨)
-#   login_tokens.json : {토큰해시: {email, expires_at, created_at}}  ← 매직링크(1회용)
+#   login_tokens.json : {토큰해시: {email, expires_at, created_at}}  ← 매직링크(유효시간 내 재사용 가능)
 #   ⚠️ 둘 다 런타임 데이터 → data/(GCS 버킷)에 저장되어 재배포에도 유지된다.
 MEMBERS_FILE = os.path.join(DATA_DIR, 'members.json')
 TOKENS_FILE = os.path.join(DATA_DIR, 'login_tokens.json')
@@ -236,7 +236,8 @@ def _hash_token(raw: str) -> str:
 
 
 def _create_magic_token(email: str) -> str:
-    """이메일에 대한 1회용 매직링크 토큰을 만들어 저장하고 원문 토큰을 반환. 만료분은 함께 정리."""
+    """이메일에 대한 매직링크 토큰을 만들어 저장하고 원문 토큰을 반환. 만료분은 함께 정리.
+    (유효시간 내에는 재사용 가능 — 회사 메일 보안이 링크를 미리 열어도 사용자가 정상 로그인.)"""
     raw = secrets.token_urlsafe(32)
     now = datetime.now()
     exp = now + timedelta(minutes=MAGIC_LINK_TTL_MIN)
@@ -252,21 +253,23 @@ def _create_magic_token(email: str) -> str:
     return raw
 
 
-def _consume_magic_token(raw: str):
-    """매직링크 토큰을 검증하고 즉시 제거(1회용). 유효하면 이메일, 아니면 None."""
+def _verify_magic_token(raw: str):
+    """매직링크 토큰 검증. 만료 전이면 이메일을 반환하고 토큰은 유지(유효시간 내 재사용 허용).
+    회사 메일 보안(Safe Links 등)이 링크를 먼저 열어(GET/POST) 소진시켜도 사용자가 15~30분
+    안에 정상 로그인되도록 하기 위함. 만료된 토큰은 제거한다."""
     if not raw:
         return None
     h = _hash_token(raw)
     with _TOKENS_LOCK:
         toks = _load_tokens()
-        rec = toks.pop(h, None)   # 유효/만료 관계없이 제거(재사용 방지)
-        if rec is not None:
+        rec = toks.get(h)
+        if rec is None:
+            return None
+        exp = _parse_dt(rec.get('expires_at', ''))
+        if not exp or exp < datetime.now():
+            toks.pop(h, None)     # 만료 → 정리
             _save_tokens(toks)
-    if not rec:
-        return None
-    exp = _parse_dt(rec.get('expires_at', ''))
-    if not exp or exp < datetime.now():
-        return None
+            return None
     return rec.get('email')
 
 
@@ -378,7 +381,7 @@ def _send_magic_link(email: str, name: str, link: str) -> bool:
        style="background:#F58220;color:#fff;text-decoration:none;padding:14px 28px;
               border-radius:10px;font-weight:800;display:inline-block">로그인하기</a>
   </p>
-  <p style="font-size:.85rem;color:#666">이 링크는 {MAGIC_LINK_TTL_MIN}분간만 유효하며 1회만 사용할 수 있습니다.<br>
+  <p style="font-size:.85rem;color:#666">이 링크는 {MAGIC_LINK_TTL_MIN}분간 유효합니다.<br>
      본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
   <p style="font-size:.75rem;color:#999;word-break:break-all">{Markup.escape(link)}</p>
 </div>"""
@@ -687,7 +690,7 @@ def auth_verify():
             return render_template('login.html',
                                    error='로그인 링크가 올바르지 않습니다. 다시 시도해 주세요.')
         return render_template('auth_confirm.html', token=token)
-    email = _consume_magic_token(request.form.get('token', ''))
+    email = _verify_magic_token(request.form.get('token', ''))
     if not email:
         return render_template('login.html',
                                error='로그인 링크가 만료되었거나 유효하지 않습니다. 다시 시도해 주세요.')
