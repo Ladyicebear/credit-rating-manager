@@ -330,6 +330,23 @@ tr.row-done td{transition:background .3s}
   /* 모바일: 스크롤바(회색 줄) 숨김 — 데스크톱은 그대로, 스크롤 기능 유지 */
   *{scrollbar-width:none;-ms-overflow-style:none}
   *::-webkit-scrollbar{width:0;height:0;display:none}
+  /* ── 모바일 홈(카드 메뉴) ── */
+  #super-home{display:block;height:auto;overflow:visible;background:#fff;padding-bottom:16px}
+  .mvx-notice{display:flex;align-items:center;gap:12px;margin:14px 16px 0;background:#EAF1FC;border-radius:18px;padding:16px 16px;cursor:pointer}
+  .mvx-mi{flex:none;width:48px;height:48px;border-radius:50%;background:#F58220;color:#fff;display:flex;align-items:center;justify-content:center}
+  .mvx-mi svg{width:25px;height:25px}
+  .mvx-tt{font-size:16px;font-weight:800;color:#16335B;letter-spacing:-.3px}
+  .mvx-sb{font-size:12px;color:#6B7686;margin-top:3px}
+  .mvx-nimg{margin-left:auto;flex:none;height:62px;width:auto;display:block}
+  .mvx-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 16px 0}
+  .mvx-tile{position:relative;background:#fff;border:1px solid #EEF1F6;border-radius:18px;box-shadow:0 2px 10px rgba(16,24,40,.05);padding:18px 15px 16px;min-height:130px;display:flex;flex-direction:column;text-align:left;cursor:pointer;font-family:inherit}
+  .mvx-ic{width:54px;height:54px;margin-bottom:8px}
+  .mvx-ic img{width:100%;height:100%;object-fit:contain;display:block}
+  .mvx-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .mvx-lb{font-size:14px;font-weight:800;color:#16335B;letter-spacing:-.3px;white-space:nowrap}
+  .mvx-go{flex:none;width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:800;line-height:1}
+  .mvx-go.g-org{background:#F58220}
+  .mvx-go.g-blue{background:#2F80D6}
   /* ── 앱형 하단 고정 탭바 ── */
   .app-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;
               background:#fff;border-top:1px solid #EAECEF;box-shadow:0 -2px 12px rgba(16,24,40,.06);
@@ -488,6 +505,23 @@ tr.row-done td{transition:background .3s}
 <!-- ═══ [통합탭1] 원리금보장상품 금리 ═══ -->
 <div id="super-pension" class="super-panel">
   <iframe id="pension-frame" class="pension-frame" src="/pension" title="원리금보장상품 금리관리"></iframe>
+</div>
+
+<!-- 모바일 홈(카드 메뉴) — 하단탭 '홈'에서 표시 -->
+<div id="super-home" class="super-panel" style="display:none">
+  <div class="mvx">
+    <div class="mvx-notice" onclick="homeNotice()">
+      <span class="mvx-mi"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg></span>
+      <div><div class="mvx-tt">이달의 공지</div><div class="mvx-sb">중요한 소식을 확인해보세요.</div></div>
+      <img class="mvx-nimg" src="/static/images/notice_illust.png" alt="">
+    </div>
+    <div class="mvx-grid">
+      <button class="mvx-tile" onclick="homeGoProposal()"><span class="mvx-ic"><img src="/static/images/icon_proposal.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">이달의 제안상품</span><span class="mvx-go g-org">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGo('rate')"><span class="mvx-ic"><img src="/static/images/icon_rate.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">금리 현황</span><span class="mvx-go g-blue">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGo('credit')"><span class="mvx-ic"><img src="/static/images/icon_credit.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">신용등급</span><span class="mvx-go g-blue">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGo('docs')"><span class="mvx-ic"><img src="/static/images/icon_docs.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">약관·상품설명서</span><span class="mvx-go g-org">›</span></div></button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ [통합탭3] 상품제안관리 ═══ (RM은 접근 불가 → 미렌더) -->
@@ -1076,6 +1110,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-visitors'), visit);
   setDisp(document.getElementById('super-members'), members);
   setDisp(document.getElementById('super-docs'), docs);
+  setDisp(document.getElementById('super-home'), which==='home');
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
   if(credit){ fitRatingTable(); setTimeout(fitRatingTable, 80); }   // .main 표시 후 5행 고정(레이아웃 안정 후 재보정)
@@ -1091,6 +1126,9 @@ function switchSuper(which){
 (function initSuper(){
   let t='pension';
   try{ t = localStorage.getItem('goun_super_tab') || 'pension'; }catch(e){}
+  var _mob = window.matchMedia && window.matchMedia('(max-width:768px)').matches;
+  if(_mob) t='home';                 // 모바일: 항상 홈(카드 메뉴)로 시작
+  else if(t==='home') t='pension';   // 데스크톱엔 홈이 없음 → 원리금으로
   switchSuper(t);
   fitPensionFrame();
 })();
@@ -1539,15 +1577,20 @@ function tabbarGo(which, el){
     return;
   }
   if(dm) dm.style.display='none';
-  if(which==='home' || which==='rate'){
+  if(which==='home'){
+    if(typeof switchSuper==='function') switchSuper('home');
+    try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
+  } else if(which==='rate'){
     if(typeof switchSuper==='function') switchSuper('pension');
-    if(which==='home'){ try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); } }
   } else if(which==='credit'){
     if(typeof switchSuper==='function') switchSuper('credit');
   } else {
     if(typeof showToast==='function') showToast('준비 중입니다','ok');
   }
 }
+function homeGo(tab){ var el=document.querySelector('#appTabbar [data-tab="'+tab+'"]'); tabbarGo(tab, el); }
+function homeGoProposal(){ homeGo('rate'); setTimeout(function(){ try{ var f=document.getElementById('pension-frame'); var d=f&&f.contentDocument; var p=d&&d.getElementById('proposalMobile'); if(p) p.scrollIntoView({block:'start'}); }catch(e){} }, 500); }
+function homeNotice(){ homeGo('rate'); setTimeout(function(){ try{ var f=document.getElementById('pension-frame'); var w=f&&f.contentWindow; if(w&&typeof w.openNotice==='function') w.openNotice(); }catch(e){} }, 500); }
 </script>
 
 <!-- ── 앱형 하단 고정 탭바(모바일 전용) ── -->
