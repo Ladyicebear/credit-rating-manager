@@ -371,7 +371,7 @@ def _send_email(to_addr: str, subject: str, html: str) -> bool:
 def _send_magic_link(email: str, name: str, link: str) -> bool:
     html = f"""\
 <div style="font-family:'Malgun Gothic',sans-serif;max-width:520px;margin:0 auto;color:#222">
-  <h2 style="color:#16335B">퇴직연금 신용등급 관리 시스템 로그인</h2>
+  <h2 style="color:#16335B">퇴직연금 원리금보장상품 mobile 서비스 로그인</h2>
   <p>{Markup.escape(name or '')}님, 아래 버튼을 눌러 로그인하세요.</p>
   <p style="margin:26px 0">
     <a href="{Markup.escape(link)}"
