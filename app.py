@@ -2616,6 +2616,9 @@ def simple2_preview():
 
 @app.route('/')
 def index():
+    # 휴대폰(모바일 UA) 접속 → 새 모바일 홈(ver2, simple2.html). PC는 기존 데스크톱/ver1 유지.
+    if _MOBILE_UA_RE.search(request.headers.get('User-Agent', '') or ''):
+        return _record_visit(make_response(send_file(os.path.join(BASE_DIR, 'simple2.html'))))
     # 간편조회(v2, 모바일 신규 디자인) — 로그인 시 선택. 기존 v1은 아래 그대로 유지.
     if session.get('view') == 'simple':
         return _record_visit(make_response(send_file(os.path.join(BASE_DIR, 'simple.html'))))
