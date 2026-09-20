@@ -187,72 +187,11 @@
   .badge.no{color:#D64545;background:#FCECEC;border:1px solid #F3C9C9}
   .rt-none{color:var(--muted);font-size:12px}
   .rt-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7}
-
-  /* ── 홈 메뉴(카드) 화면 ── */
-  .mv-notice{display:flex;align-items:center;gap:12px;margin:14px 16px 0;background:#EAF1FC;border-radius:18px;padding:16px 16px;cursor:pointer}
-  .mv-notice:active{background:#DEEAF8}
-  .mv-mi{flex:none;width:48px;height:48px;border-radius:50%;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center}
-  .mv-mi svg{width:25px;height:25px}
-  .mv-ntt{font-size:16px;font-weight:800;color:#16335B;letter-spacing:-.3px}
-  .mv-nsb{font-size:12px;color:#6B7686;margin-top:3px}
-  .mv-nimg{margin-left:auto;flex:none;height:62px;width:auto;display:block}
-  .mv-cv{margin-left:8px;color:#9AB4D6;font-size:18px;font-weight:800;line-height:1}
-  .mv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 16px 0}
-  .mv-tile{position:relative;background:#fff;border:1px solid var(--line-2);border-radius:18px;box-shadow:0 2px 10px rgba(16,24,40,.05);padding:18px 15px 16px;min-height:132px;display:flex;flex-direction:column;text-align:left;cursor:pointer;font-family:inherit}
-  .mv-tile:active{background:#F7F8FA}
-  .mv-tile.t-org,.mv-tile.t-blue{background:#fff}
-  .mv-ic{width:54px;height:54px;margin-bottom:8px}
-  .mv-ic svg{width:46px;height:46px;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .mv-ic img{width:100%;height:100%;object-fit:contain;display:block}
-  .mv-lb{font-size:15px;font-weight:800;color:#16335B;letter-spacing:-.3px}
-  .mv-sb{font-size:11.5px;color:#7C8494;line-height:1.5;margin-top:6px}
-  .mv-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .mv-go{flex:none;width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:800;line-height:1}
-  .mv-go.g-org{background:var(--orange)}
-  .mv-go.g-blue{background:#2F80D6}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- 홈 메뉴(카드) 화면 -->
-  <div id="menuView">
-    <header class="hdr">
-      <div class="hdr-top">
-        <div>
-          <div class="logo"><span class="l-navy">Retirement</span> <span class="l-org">Pension</span></div>
-          <div class="logo-sub">Management System</div>
-        </div>
-        <button class="logout" onclick="location.href='/logout'">🔒 로그아웃</button>
-      </div>
-    </header>
-
-    <div class="mv-notice" onclick="openNotice()">
-      <span class="mv-mi"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg></span>
-      <div><div class="mv-ntt">이달의 공지</div><div class="mv-nsb">중요한 소식을 확인해보세요.</div></div>
-      <img class="mv-nimg" src="/static/images/notice_illust.png" alt="">
-    </div>
-
-    <div class="mv-grid">
-      <button class="mv-tile t-org" onclick="showProposals()">
-        <span class="mv-ic"><img src="/static/images/icon_proposal.png" alt=""></span>
-        <div class="mv-foot"><span class="mv-lb">이달의 제안상품</span><span class="mv-go g-org">›</span></div>
-      </button>
-      <button class="mv-tile t-blue" onclick="showRate()">
-        <span class="mv-ic"><img src="/static/images/icon_rate.png" alt=""></span>
-        <div class="mv-foot"><span class="mv-lb">금리 현황</span><span class="mv-go g-blue">›</span></div>
-      </button>
-      <button class="mv-tile t-blue" onclick="toast('신용등급 화면 준비중')">
-        <span class="mv-ic"><img src="/static/images/icon_credit.png" alt=""></span>
-        <div class="mv-foot"><span class="mv-lb">신용등급</span><span class="mv-go g-blue">›</span></div>
-      </button>
-      <button class="mv-tile t-org" onclick="showDocs()">
-        <span class="mv-ic"><img src="/static/images/icon_docs.png" alt=""></span>
-        <div class="mv-foot"><span class="mv-lb">약관·상품설명서</span><span class="mv-go g-org">›</span></div>
-      </button>
-    </div>
-  </div><!-- /menuView -->
-
-  <div id="homeView" style="display:none">
+  <div id="homeView">
   <!-- 헤더 -->
   <header class="hdr">
     <div class="hdr-top">
@@ -318,7 +257,7 @@
   <!-- 금리현황 화면 -->
   <div id="rateView" class="rate-view" style="display:none">
     <div class="rt-hdr">
-      <button class="rt-back" onclick="showMenu()" aria-label="뒤로">
+      <button class="rt-back" onclick="showHome()" aria-label="뒤로">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
       </button>
       <div class="rt-title">금리현황</div>
@@ -378,7 +317,7 @@
 
 <!-- 하단 네비 -->
 <nav class="botnav">
-  <button class="nav-i on" id="navHome" onclick="showMenu()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></span><span class="nl">홈</span></button>
+  <button class="nav-i on" id="navHome" onclick="showHome()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg></span><span class="nl">홈</span></button>
   <button class="nav-i" onclick="toast('상품조회 준비중')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-3.6-3.6"/></svg></span><span class="nl">상품조회</span></button>
   <button class="nav-i" id="navRate" onclick="showRate()"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="m7 14 3.5-4 3 2.5L20 7"/></svg></span><span class="nl">금리현황</span></button>
   <button class="nav-i" onclick="toast('신용등급 준비중')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="M9 13.5 7.5 21l4.5-2.6L16.5 21 15 13.5"/></svg></span><span class="nl">신용등급</span></button>
@@ -544,11 +483,9 @@ function renderBest(){
   $('rtDef').innerHTML=bestRowHtml(bestTop(rows, r=>r.def!=null, 'def', 36), '3년', 'def');
 }
 function setNav(id){ document.querySelectorAll('.botnav .nav-i').forEach(n=>n.classList.remove('on')); const el=$(id); if(el) el.classList.add('on'); }
-function showMenu(){ $('homeView').style.display='none'; $('rateView').style.display='none'; $('docsView').style.display='none'; $('menuView').style.display=''; setNav('navHome'); window.scrollTo(0,0); }
-function showHome(){ $('menuView').style.display='none'; $('rateView').style.display='none'; $('docsView').style.display='none'; $('homeView').style.display=''; setNav('navHome'); window.scrollTo(0,0); }
-function showProposals(){ showHome(); const p=document.querySelector('.prop'); if(p) setTimeout(()=>p.scrollIntoView({block:'start',behavior:'smooth'}),40); }
+function showHome(){ $('rateView').style.display='none'; $('docsView').style.display='none'; $('homeView').style.display=''; setNav('navHome'); window.scrollTo(0,0); }
 function showRate(){
-  $('menuView').style.display='none'; $('homeView').style.display='none'; $('docsView').style.display='none'; $('rateView').style.display=''; setNav('navRate');
+  $('homeView').style.display='none'; $('docsView').style.display='none'; $('rateView').style.display=''; setNav('navRate');
   const sel=$('rtMonthSel');
   sel.innerHTML=months.map(m=>`<option value="${m}">${ymLabel(m)}</option>`).join('') || `<option>-</option>`;
   rateMonth = (rateMonth && months.includes(rateMonth)) ? rateMonth : (curMonth || months[months.length-1] || '');
@@ -567,7 +504,7 @@ const DOC_ICON={
 };
 let docsData=null, docsCat='전체';
 function showDocs(){
-  $('menuView').style.display='none'; $('homeView').style.display='none'; $('rateView').style.display='none'; $('docsView').style.display=''; setNav('navDocs');
+  $('homeView').style.display='none'; $('rateView').style.display='none'; $('docsView').style.display=''; setNav('navDocs');
   window.scrollTo(0,0);
   if(docsData) return;
   fetch('/api/docs').then(r=>r.json()).then(d=>{
