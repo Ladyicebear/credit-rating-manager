@@ -48,7 +48,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .lg-links a,.lg-links button{background:none;border:none;font-family:inherit;font-size:.84rem;
         font-weight:700;color:#8a8f98;text-decoration:none;cursor:pointer;padding:4px 2px}
 .lg-links a:hover,.lg-links button:hover{color:#F58220;text-decoration:underline}
-.lg-signup{color:#F58220 !important}
+.lg-signup{background:#043B72 !important;color:#fff !important;border-radius:10px;padding:9px 18px !important;font-weight:800}
+.lg-signup:hover{background:#032c56 !important;color:#fff !important;text-decoration:none !important}
 .lg-divider{border:none;border-top:1px solid #eee;margin:20px 0 16px}
 .lg-pwlink{display:block;width:100%;margin-top:15px;background:none;border:none;font-family:inherit;
            font-size:.82rem;font-weight:700;color:#8a8f98;text-decoration:underline;cursor:pointer}
@@ -140,7 +141,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       </form>
 
       <div class="lg-links">
-        <a class="lg-signup" href="{{ url_for('signup') }}">신규 가입 신청 →</a>
+        <a class="lg-signup" href="{{ url_for('signup') }}">신규가입</a>
         <button type="button" onclick="toggleAdmin()">관리자 로그인</button>
       </div>
 
