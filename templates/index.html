@@ -347,6 +347,15 @@ tr.row-done td{transition:background .3s}
   .mvx-go{flex:none;width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:800;line-height:1}
   .mvx-go.g-org{background:#F58220}
   .mvx-go.g-blue{background:#2F80D6}
+  /* 홈 공지 팝업 */
+  .hn-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px}
+  .hn-card{background:#fff;border-radius:16px;width:400px;max-width:100%;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.3)}
+  .hn-head{background:#EAF1FC;color:#16335B;padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
+  .hn-head b{font-size:16px;font-weight:800}
+  .hn-x{background:none;border:none;color:#5a6b85;width:30px;height:30px;font-size:16px;cursor:pointer;border-radius:8px}
+  .hn-body{padding:20px;font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:break-word;color:#333;min-height:60px}
+  .hn-body.empty{color:#9aa0a8;text-align:center;padding:28px 20px}
+  .hn-when{font-size:12px;color:#9aa0a8;text-align:right;padding:0 20px 16px}
   /* ── 앱형 하단 고정 탭바 ── */
   .app-tabbar{position:fixed;left:0;right:0;bottom:0;z-index:300;display:flex;
               background:#fff;border-top:1px solid #EAECEF;box-shadow:0 -2px 12px rgba(16,24,40,.06);
@@ -517,9 +526,17 @@ tr.row-done td{transition:background .3s}
     </div>
     <div class="mvx-grid">
       <button class="mvx-tile" onclick="homeGoProposal()"><span class="mvx-ic"><img src="/static/images/icon_proposal.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">이달의 제안상품</span><span class="mvx-go g-org">›</span></div></button>
-      <button class="mvx-tile" onclick="homeGo('rate')"><span class="mvx-ic"><img src="/static/images/icon_rate.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">금리 현황</span><span class="mvx-go g-blue">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGoRate()"><span class="mvx-ic"><img src="/static/images/icon_rate.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">금리 현황</span><span class="mvx-go g-blue">›</span></div></button>
       <button class="mvx-tile" onclick="homeGo('credit')"><span class="mvx-ic"><img src="/static/images/icon_credit.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">신용등급</span><span class="mvx-go g-blue">›</span></div></button>
       <button class="mvx-tile" onclick="homeGo('docs')"><span class="mvx-ic"><img src="/static/images/icon_docs.png" alt=""></span><div class="mvx-foot"><span class="mvx-lb">약관·상품설명서</span><span class="mvx-go g-org">›</span></div></button>
+    </div>
+  </div>
+  <!-- 홈 공지 팝업 -->
+  <div id="homeNoticeModal" class="hn-modal" style="display:none" onclick="if(event.target===this)closeHomeNotice()">
+    <div class="hn-card">
+      <div class="hn-head"><b>📢 공지사항</b><button class="hn-x" onclick="closeHomeNotice()">✕</button></div>
+      <div class="hn-body" id="hnBody">불러오는 중…</div>
+      <div class="hn-when" id="hnWhen"></div>
     </div>
   </div>
 </div>
@@ -1589,8 +1606,10 @@ function tabbarGo(which, el){
   }
 }
 function homeGo(tab){ var el=document.querySelector('#appTabbar [data-tab="'+tab+'"]'); tabbarGo(tab, el); }
-function homeGoProposal(){ homeGo('rate'); setTimeout(function(){ try{ var f=document.getElementById('pension-frame'); var d=f&&f.contentDocument; var p=d&&d.getElementById('proposalMobile'); if(p) p.scrollIntoView({block:'start'}); }catch(e){} }, 500); }
-function homeNotice(){ homeGo('rate'); setTimeout(function(){ try{ var f=document.getElementById('pension-frame'); var w=f&&f.contentWindow; if(w&&typeof w.openNotice==='function') w.openNotice(); }catch(e){} }, 500); }
+function homeGoRate(){ homeGo('rate'); [300,700].forEach(function(n){ setTimeout(function(){ try{ var w=document.getElementById('pension-frame').contentWindow; if(w) w.scrollTo(0,0); }catch(e){} }, n); }); }
+function homeGoProposal(){ homeGo('rate'); var _n=0; (function loop(){ _n++; try{ var f=document.getElementById('pension-frame'); var d=f.contentDocument, w=f.contentWindow; var p=d&&d.getElementById('proposalMobile'); if(p && p.offsetHeight>10){ var y=p.getBoundingClientRect().top + (w.pageYOffset||w.scrollY||0) - 6; w.scrollTo(0, Math.max(0,y)); return; } }catch(e){} if(_n<14) setTimeout(loop, 250); })(); }
+function homeNotice(){ var m=document.getElementById('homeNoticeModal'); if(!m) return; var b=document.getElementById('hnBody'); b.className='hn-body'; b.textContent='불러오는 중…'; document.getElementById('hnWhen').textContent=''; m.style.display='flex'; fetch('/api/notice').then(function(r){return r.json();}).then(function(d){ var t=((d&&d.text)||'').trim(); if(t){ b.className='hn-body'; b.textContent=t; } else { b.className='hn-body empty'; b.textContent='등록된 공지사항이 없습니다.'; } document.getElementById('hnWhen').textContent=(d&&d.updated_at)?('업데이트: '+d.updated_at):''; }).catch(function(){ b.className='hn-body empty'; b.textContent='공지를 불러오지 못했습니다.'; }); }
+function closeHomeNotice(){ var m=document.getElementById('homeNoticeModal'); if(m) m.style.display='none'; }
 </script>
 
 <!-- ── 앱형 하단 고정 탭바(모바일 전용) ── -->
