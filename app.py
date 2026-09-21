@@ -610,7 +610,9 @@ def signup():
     emp_id = request.form.get('emp_id', '').strip()
     email = _normalize_email(request.form.get('email', ''))
     affiliation = request.form.get('affiliation', '').strip()
-    form = {'name': name, 'emp_id': emp_id, 'email': email, 'affiliation': affiliation}
+    consent = request.form.get('consent')
+    form = {'name': name, 'emp_id': emp_id, 'email': email,
+            'affiliation': affiliation, 'consent': consent}
 
     def _fail(msg):
         return render_template('signup.html', affiliations=AFFILIATIONS,
@@ -625,6 +627,8 @@ def signup():
                      % ', '.join('@' + d for d in ALLOWED_EMAIL_DOMAINS))
     if affiliation not in AFFILIATIONS:
         return _fail('소속을 목록에서 선택해 주세요.')
+    if not consent:
+        return _fail('개인정보 수집·이용에 동의해야 가입 신청할 수 있습니다.')
 
     with _MEMBERS_LOCK:
         members = _load_members()
@@ -638,6 +642,7 @@ def signup():
             'email': email, 'name': name, 'emp_id': emp_id,
             'affiliation': affiliation, 'status': 'pending', 'role': 'rm',
             'created_at': _now_str(),
+            'privacy_consent': True, 'privacy_consent_at': _now_str(),
         }
         _save_members(members)
 

@@ -33,6 +33,31 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
          color:#8a8f98;text-decoration:none}
 .lg-back:hover{color:#F58220;text-decoration:underline}
 .lg-foot{text-align:center;margin-top:16px;font-size:.72rem;color:#b6bbc2;font-weight:500}
+/* 개인정보 수집·이용 동의 */
+.agree{border:1px solid #e6e8ec;border-radius:12px;padding:13px 14px;margin-bottom:15px}
+.agree-top{display:flex;align-items:center;gap:8px}
+.agree-top input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:0 0 auto;
+        width:20px;height:20px;border:1.5px solid #cfd4da;border-radius:6px;
+        background:#fff;cursor:pointer;position:relative;transition:.15s}
+.agree-top input[type=checkbox]:checked{background:#F58220;border-color:#F58220}
+.agree-top input[type=checkbox]:checked::after{content:"";position:absolute;left:6px;top:2px;
+        width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.agree-top input[type=checkbox]:focus{outline:none;box-shadow:0 0 0 3px rgba(245,130,32,.14)}
+.agree-top label{flex:1;margin:0;font-size:.82rem;font-weight:700;color:#333;line-height:1.5;
+        cursor:pointer;white-space:nowrap}
+.agree-top label .req{color:#F58220;font-weight:800}
+.agree-toggle{display:block;margin:8px 0 0 auto;background:none;border:none;font-family:inherit;
+        font-size:.72rem;font-weight:700;color:#8a8f98;text-decoration:underline;cursor:pointer;
+        padding:0;white-space:nowrap}
+.agree-toggle:hover{color:#F58220}
+.agree-detail{display:none;margin-top:11px;padding-top:11px;border-top:1px solid #eef0f3}
+.agree-detail.show{display:block}
+.agree-detail table{width:100%;border-collapse:collapse;font-size:.72rem;color:#4b5058}
+.agree-detail th,.agree-detail td{border:1px solid #e6e8ec;padding:7px 8px;vertical-align:top;
+        line-height:1.55;text-align:left}
+.agree-detail th{background:#f7f8fa;color:#333;font-weight:800;width:72px;white-space:nowrap}
+.agree-detail .note{margin-top:9px;font-size:.7rem;color:#9aa0a8;line-height:1.6}
+.agree-detail .note b{color:#CB6015}
 /* 신청 완료 */
 .done{text-align:center;padding:10px 4px}
 .done .ico{font-size:2.6rem}
@@ -95,11 +120,33 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
         </select>
       </div>
 
+      <div class="agree">
+        <div class="agree-top">
+          <input type="checkbox" id="consent" name="consent" value="yes" {% if form.consent %}checked{% endif %} required/>
+          <label for="consent">개인정보 수집·이용에 동의합니다. <span class="req">(필수)</span></label>
+        </div>
+        <button type="button" class="agree-toggle" id="agree-toggle" onclick="toggleAgree()">자세히 보기</button>
+        <div class="agree-detail" id="agree-detail">
+          <table>
+            <tr><th>수집 항목</th><td>이름, 사번, 회사 이메일, 소속</td></tr>
+            <tr><th>이용 목적</th><td>회원 식별 및 본인 확인, 가입 승인 심사, 서비스 이용 자격 관리 및 로그인 인증</td></tr>
+            <tr><th>보유·이용<br>기간</th><td>회원 탈퇴 또는 이용 목적 달성 시까지 (관계 법령에 별도 보존 의무가 있는 경우 해당 기간까지 보관)</td></tr>
+          </table>
+          <div class="note">위 항목은 가입에 필요한 <b>필수 정보</b>입니다. 동의를 거부할 권리가 있으나, 거부 시 가입 신청이 제한됩니다.</div>
+        </div>
+      </div>
+
       <button type="submit" class="lg-btn">가입 신청</button>
       <a class="lg-back" href="{{ url_for('login') }}">← 로그인 화면으로</a>
       <div class="lg-foot">System Designed &amp; Built by Goun</div>
     </form>
     {% endif %}
   </div>
+<script>
+function toggleAgree(){
+  var d=document.getElementById('agree-detail'), o=d.classList.toggle('show');
+  document.getElementById('agree-toggle').textContent=o?'닫기':'자세히 보기';
+}
+</script>
 </body>
 </html>
