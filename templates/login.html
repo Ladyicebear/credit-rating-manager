@@ -143,6 +143,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
             <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
             <input type="email" id="email" name="email" placeholder="name@miraeasset.com" autocomplete="email" required/>
           </div>
+          <label class="lg-remember"><input type="checkbox" id="rememberEmail"/> 이메일 저장</label>
         </div>
         <div class="fg">
           <label for="mpassword">비밀번호</label>
@@ -241,6 +242,13 @@ function toggleAdmin(){
 }
 /* 비밀번호 보기/숨기기 */
 function toggleEye(){ const p=$('password'); p.type = (p.type==='password')?'text':'password'; }
+/* 회원 로그인: 이메일 저장(체크 시 브라우저에 이메일 기억) */
+(function(){
+  try{ const s=localStorage.getItem('sf_saved_email'); if(s){ $('email').value=s; $('rememberEmail').checked=true; } }catch(e){}
+})();
+$('memberForm').addEventListener('submit',function(){
+  try{ if($('rememberEmail').checked) localStorage.setItem('sf_saved_email',$('email').value.trim()); else localStorage.removeItem('sf_saved_email'); }catch(e){}
+});
 /* 아이디 저장(체크 시 브라우저에 아이디 기억) */
 (function(){
   try{ const s=localStorage.getItem('sf_saved_id'); if(s){ $('username').value=s; $('remember').checked=true; } }catch(e){}
