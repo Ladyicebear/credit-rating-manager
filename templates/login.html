@@ -26,6 +26,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
          padding:11px 13px;font-size:.82rem;margin-bottom:16px;text-align:center;line-height:1.5}
 .fg{margin-bottom:15px}
 .fg label{display:block;font-size:.92rem;font-weight:800;color:#333;margin-bottom:8px}
+.fg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.fg-head label{margin-bottom:0}
 .inp{position:relative}
 .inp .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9aa0a8;display:flex}
 .inp .ic svg{width:18px;height:18px}
@@ -48,8 +50,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .lg-links a,.lg-links button{background:none;border:none;font-family:inherit;font-size:.84rem;
         font-weight:700;color:#8a8f98;text-decoration:none;cursor:pointer;padding:4px 2px}
 .lg-links a:hover,.lg-links button:hover{color:#F58220;text-decoration:underline}
-.lg-signup{background:#043B72 !important;color:#fff !important;border-radius:10px;padding:9px 18px !important;font-weight:800}
-.lg-signup:hover{background:#032c56 !important;color:#fff !important;text-decoration:none !important}
+.lg-signup{background:#043B72;color:#fff;border-radius:8px;padding:6px 14px;font-size:.76rem;
+           font-weight:800;text-decoration:none;display:inline-block}
+.lg-signup:hover{background:#032c56;color:#fff;text-decoration:none}
 .lg-toplink{text-decoration:underline !important}
 .lg-links button{margin-left:auto}
 .lg-divider{border:none;border-top:1px solid #eee;margin:20px 0 16px}
@@ -132,7 +135,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       <!-- ① 회원(이메일 가입) 로그인: 이메일 + 비밀번호 -->
       <form method="POST" action="{{ url_for('login_member') }}" id="memberForm">
         <div class="fg">
-          <label for="email">회사 이메일</label>
+          <div class="fg-head">
+            <label for="email">회사 이메일</label>
+            <a class="lg-signup" href="{{ url_for('signup') }}">신규가입</a>
+          </div>
           <div class="inp">
             <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
             <input type="email" id="email" name="email" placeholder="name@miraeasset.com" autocomplete="email" required/>
@@ -150,7 +156,6 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       </form>
 
       <div class="lg-links">
-        <a class="lg-signup" href="{{ url_for('signup') }}">신규가입</a>
         <a class="lg-toplink" href="{{ url_for('password_change') }}">비밀번호변경</a>
         <button type="button" onclick="toggleAdmin()">관리자 로그인</button>
       </div>
