@@ -698,27 +698,21 @@ def login():
         error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
         return redirect(url_for('index'))
-    # 로그아웃 상태로 로그인 화면에 왔어도, 신뢰 기기(이메일 인증 후 30일 이내)면 바로 통과.
-    if request.method == 'GET' and _login_from_remember_cookie():
-        return redirect(url_for('index'))
+    # 주의: 여기서 신뢰 기기 쿠키로 자동 로그인시키지 않는다 — 로그인 화면에 왔다는 것은
+    # (특히 방금 로그아웃한 경우) 실제로 로그인 폼을 보고 싶다는 뜻이므로, 이메일+비밀번호를
+    # 입력해야 다음 단계(신뢰 기기면 인증코드 생략)로 넘어간다. 자동 통과시키면 로그아웃
+    # 버튼을 눌러도 즉시 재로그인되어 "로그아웃이 안 된다"처럼 보인다.
     return render_template('login.html', error=error)
 
 
 @app.route('/logout')
 def logout():
-    # 기기 신뢰(remember_token)도 함께 해제 — 그대로 두면 /login이 즉시 자동 재로그인시켜
-    # 로그아웃 버튼이 동작하지 않는 것처럼 보인다. 명시적 로그아웃은 실제로 로그아웃되어야 하며,
-    # 다음 로그인부터는 다시 이메일 인증을 거쳐야 새 30일 신뢰가 시작된다.
-    raw = request.cookies.get(REMEMBER_COOKIE, '')
-    if raw:
-        with _REMEMBER_LOCK:
-            toks = _load_remember_tokens()
-            toks.pop(_hash_token(raw), None)
-            _save_remember_tokens(toks)
+    # 세션만 지운다 — 기기 신뢰(remember_token)는 그대로 둔다. 그래야 로그아웃 직후에도
+    # 이메일+비밀번호를 다시 입력하면(=재로그인) 30일 이내에는 인증코드 재발송 없이 통과된다.
+    # 로그아웃 버튼 자체가 무반응처럼 보이는 문제는 위 login() GET에서 자동 재로그인을
+    # 하지 않도록 해서 해결한다(로그아웃하면 항상 빈 로그인 폼이 보인다).
     session.clear()
-    resp = make_response(redirect(url_for('login')))
-    resp.delete_cookie(REMEMBER_COOKIE)
-    return resp
+    return redirect(url_for('login'))
 
 
 # ── 신규 회원 가입 신청 ────────────────────────────────────────────────
