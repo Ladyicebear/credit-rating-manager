@@ -29,6 +29,10 @@ app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024   # 업로드 최대 300MB(
 # 세션 쿠키 서명 키. 배포 시엔 반드시 SECRET_KEY 환경변수로 고정값 지정
 # (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
+# 회사 이메일 매직링크로 로그인한 세션의 유지 기간. session.permanent=True로 표시된
+# 세션에만 적용되며(=이메일 인증 로그인 전용), 아이디/비밀번호 로그인에는 영향 없음.
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(
+    days=int(os.environ.get('EMAIL_LOGIN_SESSION_DAYS', '30')))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -708,6 +712,10 @@ def auth_verify():
     session['role'] = m.get('role', 'rm')     # 회원은 조회·다운로드 전용(rm)
     session['name'] = m.get('name', '')
     session['view'] = 'web'
+    # 이메일 인증 성공 시점부터 30일간(PERMANENT_SESSION_LIFETIME) 세션 유지 →
+    # 그 기간 동안은 재접속해도 매직링크 재인증 없이 로그인 상태 유지. 30일 경과(또는
+    # 로그아웃) 시 세션이 만료되어 다시 이메일 인증이 필요해진다.
+    session.permanent = True
     return redirect(url_for('index'))
 
 
