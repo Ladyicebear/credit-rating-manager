@@ -44,12 +44,14 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .lg-btn:hover{background:#CB6015}
 .lg-hint{font-size:.78rem;color:#9298a1;margin:2px 2px 16px;line-height:1.5}
 /* 하단 링크 줄(신규가입 / 관리자 로그인 전환) */
-.lg-links{display:flex;justify-content:space-between;align-items:center;margin-top:16px;gap:10px}
+.lg-links{display:flex;align-items:center;margin-top:16px;gap:14px}
 .lg-links a,.lg-links button{background:none;border:none;font-family:inherit;font-size:.84rem;
         font-weight:700;color:#8a8f98;text-decoration:none;cursor:pointer;padding:4px 2px}
 .lg-links a:hover,.lg-links button:hover{color:#F58220;text-decoration:underline}
 .lg-signup{background:#043B72 !important;color:#fff !important;border-radius:10px;padding:9px 18px !important;font-weight:800}
 .lg-signup:hover{background:#032c56 !important;color:#fff !important;text-decoration:none !important}
+.lg-toplink{text-decoration:underline !important}
+.lg-links button{margin-left:auto}
 .lg-divider{border:none;border-top:1px solid #eee;margin:20px 0 16px}
 .lg-pwlink{display:block;width:100%;margin-top:15px;background:none;border:none;font-family:inherit;
            font-size:.82rem;font-weight:700;color:#8a8f98;text-decoration:underline;cursor:pointer}
@@ -127,8 +129,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       {% if error %}<div class="lg-err">{{ error }}</div>{% endif %}
       {% if info %}<div class="lg-info">{{ info }}</div>{% endif %}
 
-      <!-- ① 회사 이메일 매직링크 로그인 (기본) -->
-      <form method="POST" action="{{ url_for('login_email') }}" id="emailForm">
+      <!-- ① 회원(이메일 가입) 로그인: 이메일 + 비밀번호 -->
+      <form method="POST" action="{{ url_for('login_member') }}" id="memberForm">
         <div class="fg">
           <label for="email">회사 이메일</label>
           <div class="inp">
@@ -136,12 +138,20 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
             <input type="email" id="email" name="email" placeholder="name@miraeasset.com" autocomplete="email" required/>
           </div>
         </div>
-        <button type="submit" class="lg-btn">로그인 링크 받기</button>
-        <div class="lg-hint">입력하신 회사 이메일로 로그인 링크를 보내드립니다. 메일의 링크를 누르면 로그인됩니다.</div>
+        <div class="fg">
+          <label for="mpassword">비밀번호</label>
+          <div class="inp">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+            <input type="password" id="mpassword" name="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password" required/>
+          </div>
+        </div>
+        <button type="submit" class="lg-btn">로그인</button>
+        <div class="lg-hint">신뢰되지 않은 기기라면 로그인 후 회사 이메일로 온 인증코드를 한 번 더 입력합니다.</div>
       </form>
 
       <div class="lg-links">
         <a class="lg-signup" href="{{ url_for('signup') }}">신규가입</a>
+        <a class="lg-toplink" href="{{ url_for('password_change') }}">비밀번호변경</a>
         <button type="button" onclick="toggleAdmin()">관리자 로그인</button>
       </div>
 

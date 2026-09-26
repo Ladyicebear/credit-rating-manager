@@ -54,9 +54,10 @@ RM_PASSWORD = os.environ.get('RM_PASSWORD', '')
 # RM 비밀번호 만료 주기(일). 이 기간이 지나면 RM 로그인이 막히고, 연금컨설팅팀이 재설정해야 다시 로그인 가능.
 RM_PW_MAX_AGE_DAYS = int(os.environ.get('RM_PW_MAX_AGE_DAYS', '14'))
 
-# ── 회원가입 + 연금컨설팅팀 승인 + 회사 이메일 매직링크 로그인 ─────────────────
-# 신규 회원(현업 RM 등)은 회사 이메일로 가입 신청 → 연금컨설팅팀 승인 → 이후
-# 로그인할 때마다 회사 이메일로 온 '매직링크'를 클릭해야 세션이 생성된다(비밀번호 없음).
+# ── 회원가입 + 연금컨설팅팀 승인 + 이메일·비밀번호 로그인 ─────────────────────
+# 신규 회원(현업 RM 등)은 가입 시 비밀번호를 직접 설정하고 회사 이메일로 가입 신청 →
+# 연금컨설팅팀 승인 → 이후 이메일+비밀번호로 로그인. 신뢰되지 않은 기기(최초 로그인
+# 포함)면 로그인 직후 회사 이메일로 6자리 인증코드가 자동 발송되어 한 번 더 확인한다.
 # 승인된 회원의 역할은 'rm'(조회·다운로드 전용). 기존 APP_USER/RM_USER(아이디+비밀번호)는 그대로 유지.
 
 # 가입을 허용할 회사 이메일 도메인(쉼표 구분, 소문자 비교). 환경변수로 덮어쓸 수 있음.
@@ -72,9 +73,10 @@ AFFILIATIONS = [
     '공기업솔루션팀', '연금법인RM팀', '글로벌기업솔루션팀', '글로벌기업 RM팀',
 ]
 
-# 매직링크 유효시간(분). 이 시간이 지나면 링크는 무효.
-MAGIC_LINK_TTL_MIN = int(os.environ.get('MAGIC_LINK_TTL_MIN', '30'))
-# 매직링크 절대 URL 생성 기준 주소(프록시/Cloud Run 배포 시 권장, 예: https://앱주소).
+# 이메일 인증코드 유효시간(분) / 최대 시도 횟수. 초과하면 코드 폐기 후 재발급 필요.
+VERIFY_CODE_TTL_MIN = int(os.environ.get('VERIFY_CODE_TTL_MIN', '10'))
+VERIFY_CODE_MAX_ATTEMPTS = 5
+# 안내 메일 속 링크 절대 URL 생성 기준 주소(프록시/Cloud Run 배포 시 권장, 예: https://앱주소).
 # 미설정 시 요청 주소에서 추정한다.
 APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')
 
@@ -115,8 +117,9 @@ MIN_PASSWORD_LEN = 8
 # 로그인 없이 접근 허용할 엔드포인트
 # api_change_password: 로그인 화면에서 비밀번호를 바꿀 수 있게 공개. 대신 아이디+현재 비밀번호를
 # 모두 맞게 입력해야만 통과하므로 로그인 자체와 같은 수준의 검증을 거친다.
-_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password',
-                     'signup', 'login_email', 'auth_verify'}
+_PUBLIC_ENDPOINTS = {'login', 'static', 'api_change_password', 'signup',
+                     'login_member', 'verify_code', 'verify_code_resend',
+                     'password_change', 'password_set'}
 
 # RM(조회 전용)이 접근할 수 없는 쓰기/실행/관리 엔드포인트.
 # (다운로드·조회 GET은 여기 없음 → RM 허용). 서버측 최종 방어선이며 화면 숨김과 별개로 강제된다.
@@ -159,20 +162,22 @@ def _save_auth(data: dict):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-# ── 회원(가입 신청/승인) 저장소 + 매직링크 토큰 + 이메일 발송 ──────────────────
-#   members.json : {이메일(소문자): {email,name,emp_id,affiliation,status,role,created_at,...}}
+# ── 회원(가입 신청/승인) 저장소 + 인증코드 + 이메일 발송 ────────────────────────
+#   members.json : {이메일(소문자): {email,name,emp_id,affiliation,status,role,
+#                                    password_hash,created_at,...}}
 #     status = pending(승인 대기) | approved(승인됨) | rejected(거절됨)
-#   login_tokens.json : {토큰해시: {email, expires_at, created_at}}  ← 매직링크(유효시간 내 재사용 가능)
-#   ⚠️ 둘 다 런타임 데이터 → data/(GCS 버킷)에 저장되어 재배포에도 유지된다.
+#   verify_codes.json : {이메일: {code_hash, purpose, expires_at, attempts}}
+#     purpose = login(신규 기기 로그인 확인) | reset(비밀번호변경 본인확인). 이메일당 코드 1개만 유지.
+#   ⚠️ 셋 다 런타임 데이터 → data/(GCS 버킷)에 저장되어 재배포에도 유지된다.
 MEMBERS_FILE = os.path.join(DATA_DIR, 'members.json')
-TOKENS_FILE = os.path.join(DATA_DIR, 'login_tokens.json')
+VERIFY_CODE_FILE = os.path.join(DATA_DIR, 'verify_codes.json')
 # remember_tokens.json : {토큰해시: {email, expires_at, created_at}}  ← 기기 신뢰(remember-me).
-#   이메일 인증(매직링크) 성공 시 발급되어 브라우저 쿠키(remember_token)로 저장되고,
-#   로그아웃해도 지워지지 않는다 — EMAIL_LOGIN_SESSION_DAYS일간 그 기기는 이메일 재인증 없이 로그인 가능.
+#   인증코드 확인 성공 시 발급되어 브라우저 쿠키(remember_token)로 저장되고,
+#   로그아웃해도 지워지지 않는다 — EMAIL_LOGIN_SESSION_DAYS일간 그 기기는 인증코드 없이 로그인 가능.
 REMEMBER_FILE = os.path.join(DATA_DIR, 'remember_tokens.json')
 REMEMBER_COOKIE = 'remember_token'
 _MEMBERS_LOCK = threading.Lock()
-_TOKENS_LOCK = threading.Lock()
+_VERIFY_CODE_LOCK = threading.Lock()
 _REMEMBER_LOCK = threading.Lock()
 _DT_FMT = '%Y-%m-%d %H:%M:%S'
 # 이메일 형식(간단 검증). 도메인 허용 여부는 _email_domain_ok로 별도 확인.
@@ -222,67 +227,71 @@ def _save_members(data: dict):
     os.replace(tmp, MEMBERS_FILE)
 
 
-def _load_tokens() -> dict:
-    if not os.path.exists(TOKENS_FILE):
-        return {}
-    try:
-        with open(TOKENS_FILE, 'r', encoding='utf-8') as f:
-            d = json.load(f)
-        return d if isinstance(d, dict) else {}
-    except Exception:
-        logger.exception('login_tokens.json 읽기 실패')
-        return {}
-
-
-def _save_tokens(data: dict):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    tmp = TOKENS_FILE + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, TOKENS_FILE)
-
-
 def _hash_token(raw: str) -> str:
-    # 원문 토큰은 저장하지 않고 해시만 저장 → 파일이 유출돼도 그 자체로는 로그인 불가.
+    # 원문 토큰/코드는 저장하지 않고 해시만 저장 → 파일이 유출돼도 그 자체로는 로그인 불가.
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 
-def _create_magic_token(email: str) -> str:
-    """이메일에 대한 매직링크 토큰을 만들어 저장하고 원문 토큰을 반환. 만료분은 함께 정리.
-    (유효시간 내에는 재사용 가능 — 회사 메일 보안이 링크를 미리 열어도 사용자가 정상 로그인.)"""
-    raw = secrets.token_urlsafe(32)
+def _load_verify_codes() -> dict:
+    if not os.path.exists(VERIFY_CODE_FILE):
+        return {}
+    try:
+        with open(VERIFY_CODE_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('verify_codes.json 읽기 실패')
+        return {}
+
+
+def _save_verify_codes(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = VERIFY_CODE_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, VERIFY_CODE_FILE)
+
+
+def _create_verify_code(email: str, purpose: str) -> str:
+    """이메일에 대한 6자리 인증코드를 만들어 해시로 저장하고 원문 코드를 반환.
+    이메일당 코드 1개만 유지(새로 만들면 이전 코드는 무효). purpose: 'login' | 'reset'."""
+    code = f'{secrets.randbelow(1_000_000):06d}'
     now = datetime.now()
-    exp = now + timedelta(minutes=MAGIC_LINK_TTL_MIN)
-    with _TOKENS_LOCK:
-        toks = _load_tokens()
-        # 만료된 토큰 청소(파일이 무한정 커지지 않도록)
-        toks = {k: v for k, v in toks.items()
-                if (_parse_dt(v.get('expires_at', '')) or now) > now}
-        toks[_hash_token(raw)] = {'email': email,
-                                  'expires_at': exp.strftime(_DT_FMT),
-                                  'created_at': now.strftime(_DT_FMT)}
-        _save_tokens(toks)
-    return raw
+    exp = now + timedelta(minutes=VERIFY_CODE_TTL_MIN)
+    with _VERIFY_CODE_LOCK:
+        codes = _load_verify_codes()
+        codes = {k: v for k, v in codes.items()
+                 if (_parse_dt(v.get('expires_at', '')) or now) > now}
+        codes[email] = {'code_hash': _hash_token(code), 'purpose': purpose,
+                        'expires_at': exp.strftime(_DT_FMT), 'attempts': 0}
+        _save_verify_codes(codes)
+    return code
 
 
-def _verify_magic_token(raw: str):
-    """매직링크 토큰 검증. 만료 전이면 이메일을 반환하고 토큰은 유지(유효시간 내 재사용 허용).
-    회사 메일 보안(Safe Links 등)이 링크를 먼저 열어(GET/POST) 소진시켜도 사용자가 15~30분
-    안에 정상 로그인되도록 하기 위함. 만료된 토큰은 제거한다."""
-    if not raw:
-        return None
-    h = _hash_token(raw)
-    with _TOKENS_LOCK:
-        toks = _load_tokens()
-        rec = toks.get(h)
-        if rec is None:
-            return None
+def _check_verify_code(email: str, purpose: str, code: str) -> bool:
+    """인증코드 검증. 맞으면 코드를 소비(삭제)하고 True. 틀리면 시도 횟수를 늘리고,
+    VERIFY_CODE_MAX_ATTEMPTS를 넘으면 무차별 대입 방지를 위해 코드를 즉시 폐기한다."""
+    with _VERIFY_CODE_LOCK:
+        codes = _load_verify_codes()
+        rec = codes.get(email)
+        if not rec or rec.get('purpose') != purpose:
+            return False
         exp = _parse_dt(rec.get('expires_at', ''))
         if not exp or exp < datetime.now():
-            toks.pop(h, None)     # 만료 → 정리
-            _save_tokens(toks)
-            return None
-    return rec.get('email')
+            codes.pop(email, None)
+            _save_verify_codes(codes)
+            return False
+        if _hash_token((code or '').strip()) == rec.get('code_hash'):
+            codes.pop(email, None)
+            _save_verify_codes(codes)
+            return True
+        rec['attempts'] = rec.get('attempts', 0) + 1
+        if rec['attempts'] >= VERIFY_CODE_MAX_ATTEMPTS:
+            codes.pop(email, None)
+        else:
+            codes[email] = rec
+        _save_verify_codes(codes)
+        return False
 
 
 def _load_remember_tokens() -> dict:
@@ -341,21 +350,36 @@ def _verify_remember_token(raw: str):
     return rec.get('email')
 
 
+def _start_member_session(m: dict, email: str):
+    """회원 로그인 세션 생성 공통 로직(인증코드 확인/신뢰 기기 통과 양쪽에서 호출)."""
+    session['logged_in'] = True
+    session['user'] = email
+    session['role'] = m.get('role', 'rm')     # 회원은 조회·다운로드 전용(rm)
+    session['name'] = m.get('name', '')
+    session['view'] = 'web'
+    # 로그인 성공 시점부터 EMAIL_LOGIN_SESSION_DAYS일간 세션 유지 → 그 기간 동안은
+    # 재접속해도 인증코드 재확인 없이 로그인 상태 유지.
+    session.permanent = True
+
+
+def _issue_remember_cookie(resp, email: str):
+    """기기 신뢰 쿠키 발급 — 로그아웃해도 지워지지 않아, 로그아웃 후 재로그인 시에도
+    EMAIL_LOGIN_SESSION_DAYS일이 지나기 전까지는 인증코드 없이 로그인할 수 있다."""
+    resp.set_cookie(REMEMBER_COOKIE, _create_remember_token(email),
+                    max_age=EMAIL_LOGIN_SESSION_DAYS * 86400,
+                    httponly=True, samesite='Lax')
+
+
 def _login_from_remember_cookie() -> bool:
     """remember_token 쿠키가 유효하고 계정이 여전히 승인 상태면 세션을 만들어 로그인 처리.
-    로그아웃 후 재방문한 신뢰 기기를 이메일 재인증 없이 통과시키는 데 쓰인다."""
+    로그아웃 후 재방문한 신뢰 기기를 인증코드 없이 통과시키는 데 쓰인다."""
     email = _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, ''))
     if not email:
         return False
     m = _load_members().get(email)
     if not m or m.get('status') != 'approved':
         return False
-    session['logged_in'] = True
-    session['user'] = email
-    session['role'] = m.get('role', 'rm')
-    session['name'] = m.get('name', '')
-    session['view'] = 'web'
-    session.permanent = True
+    _start_member_session(m, email)
     return True
 
 
@@ -457,21 +481,19 @@ def _send_email(to_addr: str, subject: str, html: str) -> bool:
         return False
 
 
-def _send_magic_link(email: str, name: str, link: str) -> bool:
+def _send_verify_code_email(email: str, name: str, code: str) -> bool:
     html = f"""\
 <div style="font-family:'Malgun Gothic',sans-serif;max-width:520px;margin:0 auto;color:#222">
-  <h2 style="color:#16335B">퇴직연금 원리금보장상품 mobile 서비스 로그인</h2>
-  <p>{Markup.escape(name or '')}님, 아래 버튼을 눌러 로그인하세요.</p>
-  <p style="margin:26px 0">
-    <a href="{Markup.escape(link)}"
-       style="background:#F58220;color:#fff;text-decoration:none;padding:14px 28px;
-              border-radius:10px;font-weight:800;display:inline-block">로그인하기</a>
+  <h2 style="color:#16335B">퇴직연금 원리금보장상품 mobile 서비스 인증코드</h2>
+  <p>{Markup.escape(name or '')}님, 아래 인증코드를 로그인 화면에 입력해 주세요.</p>
+  <p style="text-align:center;margin:20px 0">
+    <span style="display:inline-block;background:#FEF0E2;color:#F58220;font-size:28px;
+                 font-weight:800;letter-spacing:10px;padding:14px 22px;border-radius:10px">{Markup.escape(code)}</span>
   </p>
-  <p style="font-size:.85rem;color:#666">이 링크는 {MAGIC_LINK_TTL_MIN}분간 유효합니다.<br>
+  <p style="font-size:.85rem;color:#666">이 코드는 {VERIFY_CODE_TTL_MIN}분간 유효합니다.<br>
      본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
-  <p style="font-size:.75rem;color:#999;word-break:break-all">{Markup.escape(link)}</p>
 </div>"""
-    return _send_email(email, '[Smart pension] 퇴직연금 원리금보장 mobile 서비스 본인 인증', html)
+    return _send_email(email, '[Smart pension] 로그인 인증코드', html)
 
 
 def _send_approved_mail(email: str, name: str) -> bool:
@@ -480,7 +502,7 @@ def _send_approved_mail(email: str, name: str) -> bool:
 <div style="font-family:'Malgun Gothic',sans-serif;max-width:520px;margin:0 auto;color:#222">
   <h2 style="color:#16335B">가입이 승인되었습니다</h2>
   <p>{Markup.escape(name or '')}님, 연금컨설팅팀 승인이 완료되었습니다.</p>
-  <p>이제 로그인 화면에서 회사 이메일을 입력하면 로그인 링크를 받아 접속할 수 있습니다.</p>
+  <p>이제 로그인 화면에서 가입 시 설정한 회사 이메일과 비밀번호로 로그인할 수 있습니다.</p>
   <p style="margin:22px 0">
     <a href="{Markup.escape(login_url)}"
        style="background:#F58220;color:#fff;text-decoration:none;padding:12px 24px;
@@ -712,6 +734,8 @@ def signup():
     emp_id = request.form.get('emp_id', '').strip()
     email = _normalize_email(request.form.get('email', ''))
     affiliation = request.form.get('affiliation', '').strip()
+    password = request.form.get('password', '')
+    password_confirm = request.form.get('password_confirm', '')
     consent = request.form.get('consent')
     form = {'name': name, 'emp_id': emp_id, 'email': email,
             'affiliation': affiliation, 'consent': consent}
@@ -720,7 +744,7 @@ def signup():
         return render_template('signup.html', affiliations=AFFILIATIONS,
                                domains=ALLOWED_EMAIL_DOMAINS, form=form, error=msg)
 
-    if not (name and emp_id and email and affiliation):
+    if not (name and emp_id and email and affiliation and password and password_confirm):
         return _fail('모든 항목을 입력해 주세요.')
     if not _EMAIL_RE.match(email):
         return _fail('이메일 형식이 올바르지 않습니다.')
@@ -729,6 +753,10 @@ def signup():
                      % ', '.join('@' + d for d in ALLOWED_EMAIL_DOMAINS))
     if affiliation not in AFFILIATIONS:
         return _fail('소속을 목록에서 선택해 주세요.')
+    if len(password) < MIN_PASSWORD_LEN:
+        return _fail(f'비밀번호는 {MIN_PASSWORD_LEN}자 이상으로 설정해 주세요.')
+    if password != password_confirm:
+        return _fail('비밀번호가 일치하지 않습니다.')
     if not consent:
         return _fail('개인정보 수집·이용에 동의해야 가입 신청할 수 있습니다.')
 
@@ -743,6 +771,7 @@ def signup():
         members[email] = {
             'email': email, 'name': name, 'emp_id': emp_id,
             'affiliation': affiliation, 'status': 'pending', 'role': 'rm',
+            'password_hash': generate_password_hash(password),
             'created_at': _now_str(),
             'privacy_consent': True, 'privacy_consent_at': _now_str(),
         }
@@ -764,72 +793,131 @@ def signup():
                            domains=ALLOWED_EMAIL_DOMAINS, form={}, done=True)
 
 
-# ── 회사 이메일 매직링크 로그인 요청(비밀번호 없음) ─────────────────────────
-@app.route('/login/email', methods=['POST'])
-def login_email():
+# ── 회원(이메일 가입) 로그인: 이메일 + 비밀번호 ────────────────────────────
+@app.route('/login/member', methods=['POST'])
+def login_member():
     email = _normalize_email(request.form.get('email', ''))
-    # 계정 존재 여부를 그대로 노출하지 않도록 승인/미존재는 동일한 안내 문구 사용.
-    generic = ('입력하신 이메일이 승인된 계정이면 로그인 링크를 보냈습니다. '
+    password = request.form.get('password', '')
+    wrong = '이메일 또는 비밀번호가 올바르지 않습니다.'
+    if not (_EMAIL_RE.match(email) and _email_domain_ok(email)):
+        return render_template('login.html', error=wrong)
+    m = _load_members().get(email)
+    if m and m.get('status') == 'pending':
+        return render_template('login.html',
+                               info='아직 승인 대기 중입니다. 연금컨설팅팀 승인 후 로그인할 수 있습니다.')
+    if not m or m.get('status') != 'approved':
+        return render_template('login.html', error=wrong)
+    if not m.get('password_hash'):
+        return render_template('login.html',
+                               error="비밀번호가 설정되지 않았습니다. '비밀번호변경'을 눌러 먼저 설정해 주세요.")
+    if not check_password_hash(m['password_hash'], password):
+        return render_template('login.html', error=wrong)
+    # 이 기기가 이미 신뢰된(EMAIL_LOGIN_SESSION_DAYS일 이내 인증 완료) 상태면 코드 없이 바로 로그인.
+    if _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, '')) == email:
+        _start_member_session(m, email)
+        return redirect(url_for('index'))
+    code = _create_verify_code(email, 'login')
+    sent = _send_verify_code_email(email, m.get('name', ''), code)
+    if not sent:
+        logger.info('인증코드(발송 생략/실패, 개발용): %s -> %s', email, code)
+    session['pending_email'] = email
+    session['pending_purpose'] = 'login'
+    return render_template('verify_code.html', email=email)
+
+
+# ── 인증코드 확인: 신규 기기 로그인 / 비밀번호변경 양쪽에서 공용 사용 ──────────
+@app.route('/verify-code', methods=['POST'])
+def verify_code():
+    email = session.get('pending_email')
+    purpose = session.get('pending_purpose')
+    if not email or purpose not in ('login', 'reset'):
+        return redirect(url_for('login'))
+    code = request.form.get('code', '')
+    if not _check_verify_code(email, purpose, code):
+        return render_template('verify_code.html', email=email,
+                               error='인증코드가 올바르지 않거나 만료되었습니다.')
+    if purpose == 'login':
+        m = _load_members().get(email)
+        session.pop('pending_email', None)
+        session.pop('pending_purpose', None)
+        if not m or m.get('status') != 'approved':
+            return render_template('login.html', error='승인되지 않은 계정입니다. 연금컨설팅팀에 문의하세요.')
+        _start_member_session(m, email)
+        resp = make_response(redirect(url_for('index')))
+        _issue_remember_cookie(resp, email)
+        return resp
+    # purpose == 'reset' — 본인 확인 완료, 새 비밀번호 설정 화면으로.
+    session['reset_verified'] = True
+    return render_template('password_change.html', step='new', email=email)
+
+
+@app.route('/verify-code/resend', methods=['POST'])
+def verify_code_resend():
+    email = session.get('pending_email')
+    purpose = session.get('pending_purpose')
+    if not email or purpose not in ('login', 'reset'):
+        return redirect(url_for('login'))
+    m = _load_members().get(email)
+    if not m:
+        return redirect(url_for('login'))
+    code = _create_verify_code(email, purpose)
+    sent = _send_verify_code_email(email, m.get('name', ''), code)
+    if not sent:
+        logger.info('인증코드(재전송 생략/실패, 개발용): %s -> %s', email, code)
+    return render_template('verify_code.html', email=email, info='인증코드를 다시 보냈습니다.')
+
+
+# ── 비밀번호변경(신규가입 이전 기존 회원의 최초 설정 겸용) ────────────────────
+@app.route('/password/change', methods=['GET', 'POST'])
+def password_change():
+    if request.method == 'GET':
+        return render_template('password_change.html', step='email')
+    email = _normalize_email(request.form.get('email', ''))
+    generic = ('입력하신 이메일이 가입된 계정이면 인증코드를 보냈습니다. '
                '메일함(스팸함 포함)을 확인해 주세요.')
     if _EMAIL_RE.match(email) and _email_domain_ok(email):
         m = _load_members().get(email)
-        if m and m.get('status') == 'pending':
-            return render_template('login.html',
-                                   info='아직 승인 대기 중입니다. 연금컨설팅팀 승인 후 로그인할 수 있습니다.')
-        if m and m.get('status') == 'approved':
-            # 이 기기가 이미 신뢰된(30일 이내 이메일 인증 완료) 상태면 메일 없이 바로 로그인.
-            if _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, '')) == email:
-                session['logged_in'] = True
-                session['user'] = email
-                session['role'] = m.get('role', 'rm')
-                session['name'] = m.get('name', '')
-                session['view'] = 'web'
-                session.permanent = True
-                return redirect(url_for('index'))
-            raw = _create_magic_token(email)
-            link = _base_url() + url_for('auth_verify', token=raw)
-            sent = _send_magic_link(email, m.get('name', ''), link)
+        if m and m.get('status') != 'rejected':
+            code = _create_verify_code(email, 'reset')
+            sent = _send_verify_code_email(email, m.get('name', ''), code)
             if not sent:
-                logger.info('매직링크(발송 생략/실패, 개발용): %s', link)
-    return render_template('login.html', info=generic)
+                logger.info('인증코드(비밀번호변경, 발송 생략/실패, 개발용): %s -> %s', email, code)
+            session['pending_email'] = email
+            session['pending_purpose'] = 'reset'
+            session.pop('reset_verified', None)
+            return render_template('verify_code.html', email=email)
+    return render_template('password_change.html', step='email', info=generic)
 
 
-# ── 매직링크 검증 → 세션 생성 ───────────────────────────────────────────
-@app.route('/auth/verify', methods=['GET', 'POST'])
-def auth_verify():
-    # 회사 메일 보안(예: Microsoft Safe Links)은 수신 메일의 링크를 사용자가 누르기 전에
-    # 자동으로 GET해서 검사한다. 1회용 토큰을 GET에서 바로 소비하면 이 사전검사에 소진되어
-    # 정작 사용자가 클릭할 땐 '만료'로 뜬다. → GET에서는 소비하지 않고 '로그인하기' 확인
-    # 페이지만 보여주고, 버튼을 눌러 POST가 올 때만 토큰을 소비한다(스캐너는 GET만 하므로 안전).
-    if request.method == 'GET':
-        token = request.args.get('token', '')
-        if not token:
-            return render_template('login.html',
-                                   error='로그인 링크가 올바르지 않습니다. 다시 시도해 주세요.')
-        return render_template('auth_confirm.html', token=token)
-    email = _verify_magic_token(request.form.get('token', ''))
-    if not email:
-        return render_template('login.html',
-                               error='로그인 링크가 만료되었거나 유효하지 않습니다. 다시 시도해 주세요.')
-    m = _load_members().get(email)
-    if not m or m.get('status') != 'approved':
-        return render_template('login.html', error='승인되지 않은 계정입니다. 연금컨설팅팀에 문의하세요.')
-    session['logged_in'] = True
-    session['user'] = email
-    session['role'] = m.get('role', 'rm')     # 회원은 조회·다운로드 전용(rm)
-    session['name'] = m.get('name', '')
-    session['view'] = 'web'
-    # 이메일 인증 성공 시점부터 30일간(PERMANENT_SESSION_LIFETIME) 세션 유지 →
-    # 그 기간 동안은 재접속해도 매직링크 재인증 없이 로그인 상태 유지. 30일 경과 시
-    # 세션이 만료되어 다시 이메일 인증이 필요해진다.
-    session.permanent = True
-    resp = make_response(redirect(url_for('index')))
-    # 기기 신뢰 쿠키(remember_token) — 로그아웃해도 지워지지 않으므로, 로그아웃 후
-    # 재로그인 시에도 30일이 지나기 전까지는 이메일 재인증 없이 로그인할 수 있다.
-    resp.set_cookie(REMEMBER_COOKIE, _create_remember_token(email),
-                    max_age=EMAIL_LOGIN_SESSION_DAYS * 86400,
-                    httponly=True, samesite='Lax')
-    return resp
+@app.route('/password/set', methods=['POST'])
+def password_set():
+    email = session.get('pending_email')
+    if not email or session.get('pending_purpose') != 'reset' or not session.get('reset_verified'):
+        return redirect(url_for('login'))
+    password = request.form.get('password', '')
+    confirm = request.form.get('password_confirm', '')
+
+    def _fail(msg):
+        return render_template('password_change.html', step='new', email=email, error=msg)
+
+    if not (password and confirm):
+        return _fail('모든 항목을 입력해 주세요.')
+    if len(password) < MIN_PASSWORD_LEN:
+        return _fail(f'비밀번호는 {MIN_PASSWORD_LEN}자 이상으로 설정해 주세요.')
+    if password != confirm:
+        return _fail('비밀번호가 일치하지 않습니다.')
+    with _MEMBERS_LOCK:
+        members = _load_members()
+        m = members.get(email)
+        if not m:
+            return redirect(url_for('login'))
+        m['password_hash'] = generate_password_hash(password)
+        members[email] = m
+        _save_members(members)
+    session.pop('pending_email', None)
+    session.pop('pending_purpose', None)
+    session.pop('reset_verified', None)
+    return render_template('login.html', info='비밀번호가 설정되었습니다. 새 비밀번호로 로그인해 주세요.')
 
 
 # ── 연금컨설팅팀: 회원 가입 승인 관리 ────────────────────────────────────

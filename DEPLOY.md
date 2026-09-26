@@ -67,7 +67,8 @@ gcloud run deploy credit-rating-manager \
 | `SMTP_HOST` / `SMTP_PORT` | 기본 `smtp.gmail.com` / `587`. 다른 서비스(SendGrid 등)로 바꿀 때만 지정 | |
 | `APP_BASE_URL` | 매직링크에 넣을 앱 주소(프록시 뒤 배포 시 권장) | `https://credit-rating-manager-xxxx.a.run.app` |
 | `ALLOWED_EMAIL_DOMAINS` | 가입 허용 도메인(쉼표 구분). 기본 `miraeasset.com` | `miraeasset.com` |
-| `MAGIC_LINK_TTL_MIN` | 매직링크 유효시간(분). 기본 `15` | `15` |
+| `VERIFY_CODE_TTL_MIN` | 로그인/비밀번호변경 인증코드 유효시간(분). 기본 `10` | `10` |
+| `EMAIL_LOGIN_SESSION_DAYS` | 이메일 로그인 세션 + 기기 신뢰 유지 기간(일). 기본 `30` | `30` |
 | `ADMIN_NOTIFY_EMAIL` | 새 가입 신청 알림을 받을 주소(선택) | 담당자 이메일 |
 
 > **Gmail 앱 비밀번호**: Google 계정 → 보안 → 2단계 인증 켜기 → "앱 비밀번호" 생성 → 그 값을 `SMTP_PASSWORD`로.

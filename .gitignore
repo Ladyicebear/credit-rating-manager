@@ -46,11 +46,11 @@ meritz_*.txt
 data/auth.json
 data/auth.json.*
 
-# 회원 가입/승인 정보(이름·사번·이메일 등 개인정보) + 매직링크 토큰 (커밋 금지)
+# 회원 가입/승인 정보(이름·사번·이메일·비밀번호 해시 등) + 인증코드/기기 신뢰 토큰 (커밋 금지)
 data/members.json
 data/members.json.*
-data/login_tokens.json
-data/login_tokens.json.*
+data/verify_codes.json
+data/verify_codes.json.*
 data/remember_tokens.json
 data/remember_tokens.json.*
 
