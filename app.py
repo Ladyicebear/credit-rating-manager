@@ -684,8 +684,19 @@ def login():
 
 @app.route('/logout')
 def logout():
+    # 기기 신뢰(remember_token)도 함께 해제 — 그대로 두면 /login이 즉시 자동 재로그인시켜
+    # 로그아웃 버튼이 동작하지 않는 것처럼 보인다. 명시적 로그아웃은 실제로 로그아웃되어야 하며,
+    # 다음 로그인부터는 다시 이메일 인증을 거쳐야 새 30일 신뢰가 시작된다.
+    raw = request.cookies.get(REMEMBER_COOKIE, '')
+    if raw:
+        with _REMEMBER_LOCK:
+            toks = _load_remember_tokens()
+            toks.pop(_hash_token(raw), None)
+            _save_remember_tokens(toks)
     session.clear()
-    return redirect(url_for('login'))
+    resp = make_response(redirect(url_for('login')))
+    resp.delete_cookie(REMEMBER_COOKIE)
+    return resp
 
 
 # ── 신규 회원 가입 신청 ────────────────────────────────────────────────
