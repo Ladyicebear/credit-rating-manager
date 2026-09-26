@@ -51,6 +51,8 @@ data/members.json
 data/members.json.*
 data/login_tokens.json
 data/login_tokens.json.*
+data/remember_tokens.json
+data/remember_tokens.json.*
 
 # 이메일(SMTP) 발송 설정 — 앱 비밀번호 포함 (커밋 금지)
 data/smtp.json

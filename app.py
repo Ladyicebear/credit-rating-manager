@@ -29,10 +29,11 @@ app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024   # 업로드 최대 300MB(
 # 세션 쿠키 서명 키. 배포 시엔 반드시 SECRET_KEY 환경변수로 고정값 지정
 # (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
-# 회사 이메일 매직링크로 로그인한 세션의 유지 기간. session.permanent=True로 표시된
-# 세션에만 적용되며(=이메일 인증 로그인 전용), 아이디/비밀번호 로그인에는 영향 없음.
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(
-    days=int(os.environ.get('EMAIL_LOGIN_SESSION_DAYS', '30')))
+# 회사 이메일 매직링크로 로그인한 세션 + 기기 신뢰(remember_token) 쿠키의 유지 기간.
+# session.permanent=True로 표시된 세션과 remember_token에만 적용되며(=이메일 인증
+# 로그인 전용), 아이디/비밀번호 로그인에는 영향 없음.
+EMAIL_LOGIN_SESSION_DAYS = int(os.environ.get('EMAIL_LOGIN_SESSION_DAYS', '30'))
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=EMAIL_LOGIN_SESSION_DAYS)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -165,8 +166,14 @@ def _save_auth(data: dict):
 #   ⚠️ 둘 다 런타임 데이터 → data/(GCS 버킷)에 저장되어 재배포에도 유지된다.
 MEMBERS_FILE = os.path.join(DATA_DIR, 'members.json')
 TOKENS_FILE = os.path.join(DATA_DIR, 'login_tokens.json')
+# remember_tokens.json : {토큰해시: {email, expires_at, created_at}}  ← 기기 신뢰(remember-me).
+#   이메일 인증(매직링크) 성공 시 발급되어 브라우저 쿠키(remember_token)로 저장되고,
+#   로그아웃해도 지워지지 않는다 — EMAIL_LOGIN_SESSION_DAYS일간 그 기기는 이메일 재인증 없이 로그인 가능.
+REMEMBER_FILE = os.path.join(DATA_DIR, 'remember_tokens.json')
+REMEMBER_COOKIE = 'remember_token'
 _MEMBERS_LOCK = threading.Lock()
 _TOKENS_LOCK = threading.Lock()
+_REMEMBER_LOCK = threading.Lock()
 _DT_FMT = '%Y-%m-%d %H:%M:%S'
 # 이메일 형식(간단 검증). 도메인 허용 여부는 _email_domain_ok로 별도 확인.
 _EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
@@ -276,6 +283,80 @@ def _verify_magic_token(raw: str):
             _save_tokens(toks)
             return None
     return rec.get('email')
+
+
+def _load_remember_tokens() -> dict:
+    if not os.path.exists(REMEMBER_FILE):
+        return {}
+    try:
+        with open(REMEMBER_FILE, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        logger.exception('remember_tokens.json 읽기 실패')
+        return {}
+
+
+def _save_remember_tokens(data: dict):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = REMEMBER_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, REMEMBER_FILE)
+
+
+def _create_remember_token(email: str) -> str:
+    """기기 신뢰 토큰 발급(원문은 저장하지 않고 해시만 저장). 이메일 인증 성공 시 호출되며,
+    이 기기는 EMAIL_LOGIN_SESSION_DAYS일간 이메일 재인증 없이 로그인할 수 있게 된다."""
+    raw = secrets.token_urlsafe(32)
+    now = datetime.now()
+    exp = now + timedelta(days=EMAIL_LOGIN_SESSION_DAYS)
+    with _REMEMBER_LOCK:
+        toks = _load_remember_tokens()
+        toks = {k: v for k, v in toks.items()
+                if (_parse_dt(v.get('expires_at', '')) or now) > now}
+        toks[_hash_token(raw)] = {'email': email,
+                                  'expires_at': exp.strftime(_DT_FMT),
+                                  'created_at': now.strftime(_DT_FMT)}
+        _save_remember_tokens(toks)
+    return raw
+
+
+def _verify_remember_token(raw: str):
+    """기기 신뢰 토큰 검증. 유효하면 이메일 반환(토큰은 유지 — 재로그인마다 새로 만들 필요 없음).
+    만료됐으면 정리하고 None."""
+    if not raw:
+        return None
+    h = _hash_token(raw)
+    with _REMEMBER_LOCK:
+        toks = _load_remember_tokens()
+        rec = toks.get(h)
+        if rec is None:
+            return None
+        exp = _parse_dt(rec.get('expires_at', ''))
+        if not exp or exp < datetime.now():
+            toks.pop(h, None)
+            _save_remember_tokens(toks)
+            return None
+    return rec.get('email')
+
+
+def _login_from_remember_cookie() -> bool:
+    """remember_token 쿠키가 유효하고 계정이 여전히 승인 상태면 세션을 만들어 로그인 처리.
+    로그아웃 후 재방문한 신뢰 기기를 이메일 재인증 없이 통과시키는 데 쓰인다."""
+    email = _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, ''))
+    if not email:
+        return False
+    m = _load_members().get(email)
+    if not m or m.get('status') != 'approved':
+        return False
+    session['logged_in'] = True
+    session['user'] = email
+    session['role'] = m.get('role', 'rm')
+    session['name'] = m.get('name', '')
+    session['view'] = 'web'
+    session.permanent = True
+    return True
 
 
 # SMTP 설정은 두 곳에서 온다(파일 우선): ① data/smtp.json(연금컨설팅팀이 화면에서 저장 — VM 접근 불필요),
@@ -555,6 +636,9 @@ def _require_login():
     if request.endpoint in _PUBLIC_ENDPOINTS:
         return
     if not session.get('logged_in'):
+        # 신뢰 기기(remember_token 쿠키, 이메일 인증 로그인 전용)면 재인증 없이 통과.
+        if _login_from_remember_cookie():
+            return
         # API(fetch) 요청은 401 JSON, 일반 페이지는 로그인 화면으로 유도
         if request.path.startswith('/api/'):
             return jsonify({'success': False, 'message': '로그인이 필요합니다',
@@ -591,6 +675,9 @@ def login():
             return redirect(nxt)
         error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
+        return redirect(url_for('index'))
+    # 로그아웃 상태로 로그인 화면에 왔어도, 신뢰 기기(이메일 인증 후 30일 이내)면 바로 통과.
+    if request.method == 'GET' and _login_from_remember_cookie():
         return redirect(url_for('index'))
     return render_template('login.html', error=error)
 
@@ -679,6 +766,15 @@ def login_email():
             return render_template('login.html',
                                    info='아직 승인 대기 중입니다. 연금컨설팅팀 승인 후 로그인할 수 있습니다.')
         if m and m.get('status') == 'approved':
+            # 이 기기가 이미 신뢰된(30일 이내 이메일 인증 완료) 상태면 메일 없이 바로 로그인.
+            if _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, '')) == email:
+                session['logged_in'] = True
+                session['user'] = email
+                session['role'] = m.get('role', 'rm')
+                session['name'] = m.get('name', '')
+                session['view'] = 'web'
+                session.permanent = True
+                return redirect(url_for('index'))
             raw = _create_magic_token(email)
             link = _base_url() + url_for('auth_verify', token=raw)
             sent = _send_magic_link(email, m.get('name', ''), link)
@@ -713,10 +809,16 @@ def auth_verify():
     session['name'] = m.get('name', '')
     session['view'] = 'web'
     # 이메일 인증 성공 시점부터 30일간(PERMANENT_SESSION_LIFETIME) 세션 유지 →
-    # 그 기간 동안은 재접속해도 매직링크 재인증 없이 로그인 상태 유지. 30일 경과(또는
-    # 로그아웃) 시 세션이 만료되어 다시 이메일 인증이 필요해진다.
+    # 그 기간 동안은 재접속해도 매직링크 재인증 없이 로그인 상태 유지. 30일 경과 시
+    # 세션이 만료되어 다시 이메일 인증이 필요해진다.
     session.permanent = True
-    return redirect(url_for('index'))
+    resp = make_response(redirect(url_for('index')))
+    # 기기 신뢰 쿠키(remember_token) — 로그아웃해도 지워지지 않으므로, 로그아웃 후
+    # 재로그인 시에도 30일이 지나기 전까지는 이메일 재인증 없이 로그인할 수 있다.
+    resp.set_cookie(REMEMBER_COOKIE, _create_remember_token(email),
+                    max_age=EMAIL_LOGIN_SESSION_DAYS * 86400,
+                    httponly=True, samesite='Lax')
+    return resp
 
 
 # ── 연금컨설팅팀: 회원 가입 승인 관리 ────────────────────────────────────
