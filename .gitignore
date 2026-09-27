@@ -91,6 +91,8 @@ data/rate_history.xlsx
 data/ratings.json
 data/institutions.json
 data/cpi_history.json
+data/base_rate.json
+data/bond_rates.json
 
 # 자동배포 로그
 auto_deploy.log
