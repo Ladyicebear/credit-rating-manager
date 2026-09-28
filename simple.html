@@ -180,7 +180,7 @@
 
 <script>
 const $=id=>document.getElementById(id);
-let STORE={}, months=[], curMonth='', baseRows=null, proposals={};
+let STORE={}, months=[], curMonth='', baseRows=null, liveBaseRate=null, proposals={};
 const MONTH_LABEL={3:'3개월',6:'6개월',12:'1년',18:'18개월',24:'2년',30:'30개월',36:'3년',48:'4년',60:'5년'};
 
 let _tt;
@@ -189,9 +189,13 @@ function htmlEsc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;
 
 function ymLabel(ym){ ym=String(ym||''); return ym.slice(0,4)+'년 '+ym.slice(5,7)+'월'; }
 
+/* 최근 변경월 이후면 한국은행 발표 최신 기준금리(서버 자동 조회), 그 전이면 과거 금리 추이 저장분 */
 function currentBaseRate(){
-  if(!baseRows||!baseRows.length) return null;
   const ym=String(curMonth||'').slice(0,7);
+  const lv=liveBaseRate;
+  if(lv&&lv.ok&&typeof lv.rate==='number'&&lv.since&&ym&&ym>=String(lv.since).slice(0,7))
+    return {rate:lv.rate, year:ym.slice(0,4), month:ym.slice(5,7)};
+  if(!baseRows||!baseRows.length) return null;
   const same=baseRows.filter(r=>String(r[0]).slice(0,7)===ym);
   const row=same.length?same[same.length-1]:baseRows[baseRows.length-1];
   const d=String(row[0]).slice(0,10);
@@ -201,12 +205,14 @@ function currentBaseRate(){
 
 async function boot(){
   try{
-    const [ps,cp,rh,pr]=await Promise.all([
+    const [ps,cp,rh,pr,br]=await Promise.all([
       fetch('/api/pension_store').then(r=>r.json()),
       fetch('/api/cpi').then(r=>r.json()).catch(()=>null),
       fetch('/api/rate_history').then(r=>r.json()).catch(()=>null),
       fetch('/api/proposals').then(r=>r.json()).catch(()=>({})),
+      fetch('/api/base_rate').then(r=>r.json()).catch(()=>null),
     ]);
+    liveBaseRate=(br&&br.ok)?br:null;
     STORE=ps||{}; proposals=pr||{};
     try{ baseRows=rh.sheets.Sheet2.rows; }catch(e){ baseRows=null; }
     // 물가

@@ -831,6 +831,7 @@ let editMode = false;   // 금리 수기 편집 모드(연금컨설팅팀 전용
 let searchTxt = '';
 let cpiData = null;        // 소비자물가지수 최신월 상승률(/api/cpi)
 let baseRateRows = null;   // 과거 금리 추이 Sheet2 rows (한국은행 기준금리 표시용)
+let liveBaseRate = null;   // /api/base_rate — 한국은행 발표 최신 기준금리 {rate, since}
 
 /* ---------- storage ---------- */
 function load(){
@@ -965,10 +966,14 @@ function loadMonth(m){
 /* 제도별 최고금리 요약 표 렌더
    저축은행 제외 / 은행=은행+기타 합산 / 증권=ELB만 / 보험=이율보증형만
    만기: 은행·증권=1년(12), 생보·손보=3년(36). 표 = 상품제공기관·상품구분·금리 */
-/* 현재 기준월의 한국은행 기준금리(과거 금리 추이 저장분). 그달 없으면 최신값 */
+/* 현재 기준월의 한국은행 기준금리. 최근 변경월 이후면 한국은행 발표 최신값(자동 갱신),
+   그 전이면 과거 금리 추이 저장분(그달 없으면 최신값) */
 function currentBaseRate(){
-  if(!baseRateRows || !baseRateRows.length) return null;
   const ym = String(curMonth||'').slice(0,7);
+  const lv = liveBaseRate;
+  if(lv && lv.ok && typeof lv.rate==='number' && lv.since && ym && ym >= String(lv.since).slice(0,7))
+    return {rate: lv.rate, year: ym.slice(0,4), month: parseInt(ym.slice(5,7),10)};
+  if(!baseRateRows || !baseRateRows.length) return null;
   const same = baseRateRows.filter(r=>String(r[0]).slice(0,7)===ym);
   const row = same.length ? same[same.length-1] : baseRateRows[baseRateRows.length-1];
   const d = String(row[0]).slice(0,10);
@@ -2108,7 +2113,9 @@ function openHistAppend(){
   $('histModalTitle').textContent=`과거 금리 추이 · ${yy}년 ${parseInt(mm,10)}월 이력 추가`;
   const rslt=$('histResult'); rslt.style.display='none'; rslt.innerHTML='';
   const inp=$('histBaseRate');
-  // 직전 행의 기준금리를 기본값으로 채워줌(보통 그대로 유지)
+  // 한국은행 최신 기준금리(자동 조회)를 기본값으로, 없으면 직전 행의 기준금리
+  const lvb = currentBaseRate();
+  if(lvb && lvb.rate!=null && liveBaseRate && !inp.value) inp.value=lvb.rate.toFixed(2);
   fetch('/api/rate_history').then(r=>r.json()).then(d=>{
     try{ const rows=d.sheets.Sheet2.rows, last=rows[rows.length-1];
       if(last && last[7]!=null && !inp.value) inp.value=(+last[7]).toFixed(2); }catch(e){}
@@ -2324,6 +2331,11 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
   // 소비자물가지수(e-나라지표) 최신월 상승률 로드 → 요약 갱신
   fetch('/api/cpi').then(r=>r.json()).then(d=>{ cpiData=d; if(curRows.length) renderSummary(); }).catch(()=>{});
   fetch('/api/rate_history').then(r=>r.json()).then(d=>{ try{ baseRateRows=d.sheets.Sheet2.rows; if(curRows.length) renderSummary(); }catch(e){} }).catch(()=>{});
+  // 한국은행 기준금리 최신값(서버가 한국은행에서 자동 조회) → 기준금리 박스 갱신
+  fetch('/api/base_rate').then(r=>r.json()).then(d=>{ if(d && d.ok){ liveBaseRate=d;
+    // 서버가 과거 금리 추이도 맞췄을 수 있으니 다시 받아 그래프·표시 동기화
+    fetch('/api/rate_history').then(r=>r.json()).then(h=>{ try{ baseRateRows=h.sheets.Sheet2.rows; }catch(e){} if(curRows.length) renderSummary(); }).catch(()=>{});
+    if(curRows.length) renderSummary(); } }).catch(()=>{});
   fetch('/api/issue_suspension').then(r=>r.json()).then(d=>{ issueSuspension=d||{}; }).catch(()=>{});
 })();
 /* ── 이달의 주요지표: 시장금리 4종 10초 순환 카드(국고채1·3년/회사채AA-/CD91일) ── */

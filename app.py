@@ -2001,6 +2001,165 @@ def admin_refresh_bond_rates():
     return jsonify({'success': False, 'message': 'ECOS 갱신 실패 — 서버 로그/키 확인'}), 500
 
 
+# ── 한국은행 기준금리 자동 갱신 ──
+#   1순위: 한국은행 홈페이지 '한국은행 기준금리 추이'(키 불필요, 변경일자 목록)
+#   2순위: ECOS 722Y001/0101000(일별) — ecos_key.txt 또는 ECOS_API_KEY 필요
+#   결과는 data/base_rate.json 에 보관하고, 과거 금리 추이(Sheet2) 중 최근 변경월 이후
+#   행의 기준금리를 현재값으로 맞춘다(수기 입력값이 금통위 결정을 못 따라가는 문제 방지).
+BASE_RATE_FILE = os.path.join(DATA_DIR, 'base_rate.json')
+_BOK_BASE_RATE_URL = ('https://www.bok.or.kr/portal/singl/baseRate/list.do'
+                      '?dataSeCd=01&menuNo=200643')
+_BASE_RATE_LOCK = threading.Lock()
+_BASE_RATE_TTL = 3 * 3600   # /api/base_rate 호출 시 이보다 오래됐으면 다시 조회
+
+
+def _base_rate_from_bok():
+    """한국은행 홈페이지 기준금리 추이 표 → [(YYYY-MM-DD, rate)] 변경일자 오름차순."""
+    import requests as _rq
+    from bs4 import BeautifulSoup
+    html = _rq.get(_BOK_BASE_RATE_URL, timeout=15, headers={'User-Agent': 'Mozilla/5.0'}).text
+    soup = BeautifulSoup(html, 'lxml')
+    out = []
+    for tr in soup.select('table tr'):
+        cells = [c.get_text(strip=True) for c in tr.find_all(['th', 'td'])]
+        if len(cells) < 3 or not re.match(r'^\d{4}$', cells[0]):
+            continue
+        md = re.match(r'^(\d{1,2})월\s*(\d{1,2})일$', cells[1])
+        if not md:
+            continue
+        try:
+            rate = float(cells[2])
+        except ValueError:
+            continue
+        out.append(('%s-%02d-%02d' % (cells[0], int(md.group(1)), int(md.group(2))), rate))
+    out.sort()
+    return out
+
+
+def _base_rate_from_ecos():
+    """ECOS 722Y001(한국은행 기준금리, 일별) 최근 1년 → 값이 바뀐 날짜만 [(YYYY-MM-DD, rate)]."""
+    import datetime as _dt
+    import requests as _rq
+    key = _ecos_key()
+    if not key:
+        return []
+    end = _dt.date.today()
+    start = end - _dt.timedelta(days=400)
+    url = ('https://ecos.bok.or.kr/api/StatisticSearch/%s/json/kr/1/1000/722Y001/D/%s/%s/0101000'
+           % (key, start.strftime('%Y%m%d'), end.strftime('%Y%m%d')))
+    rows = ((_rq.get(url, timeout=20).json().get('StatisticSearch') or {}).get('row') or [])
+    pts = []
+    for x in rows:
+        t = str(x.get('TIME', ''))
+        try:
+            pts.append(('%s-%s-%s' % (t[:4], t[4:6], t[6:8]), float(x['DATA_VALUE'])))
+        except (KeyError, ValueError):
+            continue
+    pts.sort()
+    out = []
+    for d, v in pts:
+        if not out or out[-1][1] != v:
+            out.append((d, v))
+    return out
+
+
+def _sync_rate_history_base(rate, since):
+    """과거 금리 추이 Sheet2에서 DATE가 since(최근 변경일)의 달 이후인 행의 기준금리를 rate로 교체.
+    (월 데이터는 월말 기준 — 변경이 있던 달도 결정 이후 금리로 표시) 바뀐 DATE 목록 반환."""
+    if not os.path.exists(_RATE_HISTORY_JSON):
+        return []
+    since_ym = since[:7]
+    with open(_RATE_HISTORY_JSON, encoding='utf-8') as f:
+        hist = json.load(f)
+    changed = []
+    for rr in hist['sheets']['Sheet2']['rows']:
+        d = str(rr[0] or '')[:10]
+        if len(rr) < 8 or not re.match(r'^\d{4}-\d{2}', d) or d[:7] < since_ym:
+            continue
+        try:
+            cur = float(rr[7])
+        except (TypeError, ValueError):
+            cur = None
+        if cur is None or abs(cur - rate) > 1e-9:
+            rr[7] = rate
+            changed.append(d)
+    if not changed:
+        return []
+    tmp = _RATE_HISTORY_JSON + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(hist, f, ensure_ascii=False)
+    os.replace(tmp, _RATE_HISTORY_JSON)
+
+    if os.path.exists(_RATE_HISTORY_XLSX):   # 다운로드용 원본 엑셀도 같은 행을 맞춤
+        try:
+            import openpyxl
+            xb = openpyxl.load_workbook(_RATE_HISTORY_XLSX)
+            xs = xb['Sheet2']
+            targets = set(changed)
+            for r in range(5, xs.max_row + 1):
+                if str(xs.cell(r, 1).value or '')[:10] in targets:
+                    xs.cell(r, 8, rate)
+            xb.save(_RATE_HISTORY_XLSX)
+        except Exception:
+            logger.exception('rate_history.xlsx 기준금리 갱신 실패')
+    return changed
+
+
+def fetch_base_rate():
+    """한국은행 기준금리 최신값 조회 → base_rate.json 저장 + 과거 금리 추이 동기화."""
+    import datetime as _dt
+    with _BASE_RATE_LOCK:
+        changes, source = [], ''
+        for name, fn in (('한국은행', _base_rate_from_bok), ('ECOS', _base_rate_from_ecos)):
+            try:
+                changes = fn()
+            except Exception:
+                logger.exception('기준금리 조회 실패(%s)', name)
+                changes = []
+            if changes:
+                source = name
+                break
+        if not changes:
+            logger.warning('기준금리 조회 실패 — 기존 값 유지')
+            return None
+        since, rate = changes[-1]
+        try:
+            synced = _sync_rate_history_base(rate, since)
+        except Exception:
+            logger.exception('과거 금리 추이 기준금리 동기화 실패')
+            synced = []
+        out = {'ok': True, 'rate': rate, 'since': since, 'source': source,
+               'changes': [{'date': d, 'rate': v} for d, v in changes[-12:]],
+               'updated': _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        _save_json_file(BASE_RATE_FILE, out)
+        logger.info('기준금리 갱신: %.2f%% (%s~, %s) 과거추이 반영 %s', rate, since, source, synced)
+        return out
+
+
+def _load_base_rate():
+    try:
+        with open(BASE_RATE_FILE, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+@app.route('/api/base_rate')
+def api_base_rate():
+    """한국은행 기준금리 최신값 {ok, rate, since(변경일), changes, updated}. 오래됐으면 재조회."""
+    d = _load_base_rate()
+    fresh = False
+    if d and d.get('updated'):
+        try:
+            age = (datetime.now() - datetime.strptime(d['updated'], '%Y-%m-%d %H:%M:%S')).total_seconds()
+            fresh = age < _BASE_RATE_TTL
+        except ValueError:
+            pass
+    if not fresh:
+        d = fetch_base_rate() or d
+    return jsonify(d or {'ok': False})
+
+
 # ── 약관·상품설명서 관리 (상품제공기관별 PDF · 종류별 다중 파일) ─────────
 DOC_DIR = os.path.join(BASE_DIR, 'doc_files')
 DOCS_META_FILE = os.path.join(DATA_DIR, 'docs_meta.json')
@@ -2809,6 +2968,15 @@ def rate_history_append():
             xs.cell(target, ci).number_format = xs.cell(ref, ci).number_format
     xb.save(_RATE_HISTORY_XLSX)
 
+    # 기준금리 최신 변경월 이후 행은 한국은행 발표값으로 맞춤(수기 입력 오류 방지)
+    live = _load_base_rate()
+    if live and live.get('ok') and live.get('since'):
+        try:
+            if _sync_rate_history_base(float(live['rate']), live['since']) and date_str[:7] >= live['since'][:7]:
+                base_rate = float(live['rate'])
+        except Exception:
+            logger.exception('과거 금리 추이 기준금리 동기화 실패')
+
     logger.info('과거금리추이 append %s: 증권=%s 은행=%s 생보=%s 손보=%s 저축=%s 평균=%s 기준=%s (매칭 %d)',
                 date_str, secavg['증권'], secavg['은행'], secavg['생보'], secavg['손보'],
                 secavg['저축'], overall, base_rate, matched)
@@ -3382,8 +3550,10 @@ if __name__ == '__main__':
         from apscheduler.schedulers.background import BackgroundScheduler
         scheduler = BackgroundScheduler(timezone='Asia/Seoul')
         scheduler.add_job(scheduled_job, 'cron', hour=8, minute=0, id='morning_update')
+        # 한국은행 기준금리: 금통위 결정(오전 발표) 당일 바로 반영되도록 3시간마다 확인
+        scheduler.add_job(fetch_base_rate, 'interval', hours=3, id='base_rate_update')
         scheduler.start()
-        logger.info('스케줄러 시작: 매일 오전 8시 자동 조회')
+        logger.info('스케줄러 시작: 매일 오전 8시 자동 조회 · 기준금리 3시간마다 확인')
     except ImportError:
         logger.warning('APScheduler 미설치')
 
@@ -3391,6 +3561,10 @@ if __name__ == '__main__':
         threading.Thread(target=fetch_bond_rates, daemon=True).start()
     except Exception:
         logger.exception('시장금리 시작갱신 실패')
+    try:   # 시작 직후 한국은행 기준금리 1회 갱신
+        threading.Thread(target=fetch_base_rate, daemon=True).start()
+    except Exception:
+        logger.exception('기준금리 시작갱신 실패')
 
     from waitress import serve
     serve(app, host='0.0.0.0', port=PORT)
