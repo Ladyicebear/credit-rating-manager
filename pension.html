@@ -353,6 +353,7 @@
   .mind-wrap{display:none}
   .biz-mobile{display:none}
   .elb-card{display:none}
+  .svm-card{display:none}   /* 제도별 최고금리 카드형(모바일 전용) */
 
   @media(max-width:640px){
     /* CI 색상(미래에셋)은 '내가 추가한' 주요지표·사업자금리현황 영역에만 적용
@@ -400,6 +401,30 @@
     .mind-b{margin-top:9px;background:#FDE8D3;color:#C15E12;border:none;border-radius:14px;font-family:inherit;font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;white-space:nowrap}
     .mind-b:active{background:#FADCC0}
     .sv-row2{display:none !important}   /* 기존 기준금리·물가 박스 → 3카드로 대체 */
+    /* ── 제도별 최고금리(모바일 카드형) : DB·DC/IRP·디폴트 표 3개 → 제도 칩 + 카드 ── */
+    #stats{display:none !important}
+    .svm-card{display:block;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:13px 12px 12px;margin-bottom:14px}
+    .svm-card[hidden]{display:none}
+    .svm-title{font-size:14px;font-weight:800;color:var(--orange);letter-spacing:-.3px;margin:0 2px 10px}
+    .svm-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+    .svm-chip{border:1.5px solid #D5D9E0;background:#fff;color:#4B5563;font-family:inherit;font-size:13px;font-weight:700;
+      padding:7px 15px;border-radius:20px;cursor:pointer;letter-spacing:-.3px}
+    .svm-chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+    .svm-item{background:#F7F8FA;border-radius:12px;padding:11px 12px;margin-bottom:7px;display:flex;align-items:center;gap:8px;cursor:pointer}
+    .svm-item:last-child{margin-bottom:0}
+    .svm-item:active{background:#FFEBD6}
+    .svm-item .si-main{flex:1;min-width:0}
+    .svm-item .si-sec{display:inline-block;font-size:11px;font-weight:700;padding:1px 8px;border-radius:8px;background:#E7E9ED;color:#4B5563}
+    .svm-item .si-org{font-size:13.5px;font-weight:800;color:var(--ink);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .svm-item .si-sub{font-size:11px;color:#8A92A0;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .svm-item .si-side{flex:0 0 auto;text-align:right}
+    .svm-item .si-rate{font-size:18px;font-weight:800;color:var(--orange);white-space:nowrap;font-variant-numeric:tabular-nums}
+    .svm-item .si-rate small{font-size:12px;font-weight:600;color:#8A92A0;margin-right:3px}
+    .svm-item .sell-badge{display:inline-block;margin-top:3px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap;cursor:pointer}
+    .svm-item .sell-ok{background:#E1F5EE;color:#0F6E56}
+    .svm-item .sell-no{background:#FCEBEB;color:#A32D2D}
+    body.role-rm .svm-item .sell-badge{cursor:default}
+    .svm-item.none{cursor:default;color:#9CA3AF;justify-content:center;font-size:12px}
 
     /* ── 사업자 금리현황(모바일 카드형) : 기존 필터/표 대체 ── */
     .filters{display:none !important}
@@ -637,6 +662,8 @@
 
   <!-- 제도별 최고금리 요약 (JS로 렌더) -->
   <div class="stats" id="stats" style="display:none"></div>
+  <!-- 제도별 최고금리 (모바일 전용 카드형) -->
+  <div class="svm-card" id="svMobile" hidden></div>
 
   <!-- filters -->
   <div class="filters" id="filters" style="display:none">
@@ -1081,7 +1108,42 @@ function renderSummary(){
       `<div class="sv-box"><div class="sv-title" style="color:#F58220">디폴트옵션 최고금리</div>${defTbl}</div>`+
       `<div class="sv-row2">`+bokBox+cpiBox+`</div>`+
     `</div>`;
+  // 모바일 카드형: 같은 최고금리 결과를 제도 칩(DB/DC·IRP/디폴트)으로 전환해 보여줌
+  svmData={
+    db: G.map(([n,p,mo])=>({sec:n, t:top(p,'db',mo), per:MONTH_LABEL[mo]||''})),
+    dc: G.map(([n,p,mo])=>({sec:n, t:top(p,'dc',mo), per:MONTH_LABEL[mo]||''})),
+    def:[{sec:defTop?svmSecLabel(defTop.sector):'', t:defTop, per:'3년'}],
+  };
+  renderSummaryMobile();
   renderMobileIndicators();   // 모바일 3카드(이번달 주요 지표) 동기화
+}
+/* ── 제도별 최고금리(모바일 카드형) ── */
+let svmData=null, svmField='db';
+function svmSecLabel(sector){
+  return ({'은행':'은행','기타':'은행','증권':'증권','생명보험':'생보','손해보험':'손보'})[sector]||sector||'';
+}
+function setSvmField(f){
+  svmField=f;
+  document.querySelectorAll('#svMobile .svm-chip').forEach(b=>b.classList.toggle('on',b.dataset.f===f));
+  renderSummaryMobile();
+}
+function renderSummaryMobile(){
+  const box=$('svMobile'); if(!box || !svmData) return;
+  const items=svmData[svmField]||[];
+  const chip=(f,l)=>`<button class="svm-chip${svmField===f?' on':''}" data-f="${f}" onclick="setSvmField('${f}')">${l}</button>`;
+  const cards=items.map(({sec,t,per})=>{
+    if(!t) return `<div class="svm-item none">${htmlEsc(sec)} · 해당 상품 없음</div>`;
+    const idx=summaryTops.length;   // 탭 → 기존 상세 팝업(openSummaryDetail) 재사용
+    const sellable=((((proposalMeta&&proposalMeta[propKey(t)+'|'+svmField])||{}).sellable)!==false);
+    summaryTops.push({sector:t.sector, org:t.org, fam:t.fam, rate:t.rate, period:per, sellable});
+    return `<div class="svm-item" onclick="openSummaryDetail(${idx})">`+
+      `<div class="si-main"><span class="si-sec">${htmlEsc(sec)}</span>`+
+      `<div class="si-org">${htmlEsc(t.org)}</div>`+
+      `<div class="si-sub">${htmlEsc(t.fam)} · ${htmlEsc(per)}</div></div>`+
+      `<div class="si-side"><div class="si-rate"><small>연</small>${t.rate.toFixed(2)}%</div>${sellBadge(t,svmField)}</div></div>`;
+  }).join('');
+  box.innerHTML=`<div class="svm-title">제도별 최고금리</div>`+
+    `<div class="svm-chips">${chip('db','DB')}${chip('dc','DC/IRP')}${chip('def','디폴트')}</div>`+cards;
 }
 
 /* 모바일 전용 '이번달 주요 지표' 3카드 값 채움(기준금리·물가는 실데이터, 국고채는 고정) */
@@ -1100,6 +1162,7 @@ function render(){
   $('emptyState').style.display=has?'none':'';
   $('grid').style.display=has?'':'none';
   $('stats').style.display=has?'':'none';
+  $('svMobile').hidden=!has;
   $('filters').style.display=has?'':'none';
   if(!has){ $('savedInfo').textContent = DB[curMonth]?'':'해당 월 데이터 없음'; return; }
 
