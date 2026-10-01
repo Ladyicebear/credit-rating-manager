@@ -287,7 +287,7 @@
 
   /* ---------- 이달의 제안 가능 상품(모바일) ---------- */
   .prop-card{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;
-    box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+    box-shadow:var(--shadow);margin-bottom:14px}   /* overflow:hidden 제거 → 칩 sticky 동작 */
   .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px}
   .prop-head .prop-title{font-size:12.5px;font-weight:800;color:var(--navy);letter-spacing:-.3px}  /* 네이비 */
   .prop-head .prop-hint{font-size:10.5px;color:var(--muted);font-weight:600;margin-left:auto}
@@ -300,31 +300,42 @@
   .notice-modal-body{padding:4px 4px 6px;white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.7;color:var(--ink);min-height:60px}
   .notice-modal-body.empty{color:var(--muted);text-align:center;padding:24px 4px}
   .notice-modal-when{font-size:11px;color:var(--muted);margin-top:12px;text-align:right}
-  .prop-controls{display:flex;align-items:center;gap:6px;padding:9px 12px}
-  .prop-controls input{flex:1;min-width:0;height:32px;border:1px solid #D5D9E0;border-radius:8px;
-    padding:0 10px;font-size:12px;font-family:inherit}
-  .prop-controls input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-l)}
-  .prop-controls .prop-sch{flex:0 0 auto;width:34px;height:32px;border:1px solid #D5D9E0;background:#fff;
-    border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6B7280}
-  .prop-controls .prop-sch svg{width:15px;height:15px}
-  .prop-controls select{flex:0 0 auto;height:32px;border:1px solid #D5D9E0;border-radius:8px;background:#fff;
-    color:var(--ink);font-size:11.5px;font-weight:700;padding:0 6px;cursor:pointer;font-family:inherit;max-width:118px}
-  .prop-controls select:focus{outline:none;border-color:var(--orange)}
-  /* 제안 표 = 금리표(.mtbl)의 둥근 테두리 박스 + 격자 셀 테두리 + 여백.
-     - .prop-scroll: 1px 테두리 + border-radius(둥근 끝) + margin(여백)
-     - 셀: 격자 테두리(border 4면)
-     - table-layout:fixed + colgroup → 내용이 바뀌어도 열 너비 불변
-     - td nowrap/ellipsis + 빈 행 &nbsp; → 검색·필터에도 행/열 크기 고정 */
-  .prop-scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:8px;margin:10px 12px 12px}
-  .prop-tbl{table-layout:fixed}
-  .prop-tbl th,.prop-tbl td{border:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .prop-tbl td{padding:9px 6px}   /* 5행 균등하게 조금 높임 */
-  .prop-tbl thead th{position:sticky;top:0;z-index:2}
-  .prop-tbl th:nth-child(4),.prop-tbl td:nth-child(4){text-align:center}   /* 금리 열 중앙정렬 */
-  .prop-tbl tbody tr{cursor:pointer}
-  .prop-tbl tbody tr:active td{background:#FFF4E8}
-  .prop-tbl tr.filler td,.prop-tbl tr.filler:active td{cursor:default;background:transparent}
-  .prop-tbl tr.prop-nomatch td{color:#9CA3AF;text-align:center;cursor:default}
+  /* 검색줄: 돋보기 내장 검색창 + 정렬 셀렉트(같은 높이·둥근 테두리) */
+  .prop-controls{display:flex;align-items:center;gap:8px;padding:10px 12px 0}
+  .prop-sbox{flex:1;min-width:0;position:relative}
+  .prop-sbox input{width:100%;box-sizing:border-box;height:42px;border:1.5px solid #D5D9E0;border-radius:12px;background:#fff;
+    color:var(--ink);font-family:inherit;font-size:14px;padding:0 10px 0 36px;outline:none}
+  .prop-sbox input::placeholder{color:#9AA3AF}
+  .prop-sbox input:focus{border-color:var(--navy)}
+  .prop-sbox svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:#8A92A0;pointer-events:none}
+  .prop-sortw{position:relative;flex:0 0 auto}
+  .prop-sortw select{appearance:none;-webkit-appearance:none;height:42px;border:1.5px solid #D5D9E0;border-radius:12px;background:#fff;
+    color:var(--ink);font-family:inherit;font-size:14px;font-weight:700;padding:0 30px 0 13px;cursor:pointer;outline:none}
+  .prop-sortw svg{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;pointer-events:none;color:var(--ink)}
+  /* 상품구분 칩(전체/ELB/정기예금/GIC) — 펼친 목록을 내릴 때 상단 고정 */
+  .prop-chips{display:flex;flex-wrap:wrap;gap:7px;padding:12px 12px 10px;background:#fff;position:sticky;top:0;z-index:5}
+  .prop-chip{border:1.5px solid #D5D9E0;background:#fff;color:#4B5563;font-family:inherit;font-size:13px;font-weight:700;
+    padding:7px 15px;border-radius:20px;cursor:pointer;letter-spacing:-.3px}
+  .prop-chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .prop-cnt{font-size:11px;color:#8A92A0;font-weight:600;margin:0 14px 6px}
+  /* 상품 카드 — 탭하면 제안상세 팝업(openPropDetail) */
+  .prop-list{padding:0 12px}
+  .prop-item{background:#F7F8FA;border-radius:12px;padding:11px 10px 11px 12px;margin-bottom:7px;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .prop-item.top{background:#FFF4E8}
+  .prop-item:active{background:#FFEBD6}
+  .prop-item .pi-main{flex:1;min-width:0}
+  .prop-item .pi-bd{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;border-radius:8px;background:#FDE8D3;color:#C15E12}
+  .prop-item .pi-bd.gic{background:#E3ECF6;color:var(--navy)}
+  .prop-item .pi-bd.dep{background:#E4F4EC;color:#16784A}
+  .prop-item .pi-org{font-size:13.5px;font-weight:800;color:var(--ink);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prop-item .pi-sub{font-size:11px;color:#8A92A0;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prop-item .pi-rate{font-size:18px;font-weight:800;color:var(--orange);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .prop-item .pi-rate small{font-size:12px;font-weight:600;color:#8A92A0;margin-right:3px}
+  .prop-item .pi-chev{width:16px;height:16px;color:#9AA3AF;flex:0 0 auto}
+  .prop-empty{text-align:center;color:#9CA3AF;font-size:12px;padding:22px 0}
+  .prop-more{display:block;width:calc(100% - 24px);margin:2px 12px 12px;border:1px solid #D5D9E0;background:#fff;border-radius:10px;
+    padding:10px;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--navy);cursor:pointer}
+  .prop-more svg{width:13px;height:13px;vertical-align:-2px;margin-left:3px}
   /* RM(조회 전용): 엑셀 업로드·금리편집 버튼 숨김(다운로드·조회는 허용, 권한은 서버서도 강제) */
   body.role-rm #btnUpload,body.role-rm #btnPenEdit,body.role-rm #btnHistAppend,body.role-rm #emptyState .btn.primary{display:none}
 
@@ -351,8 +362,8 @@
     .wrap{padding:10px}
     body{background:#fff}   /* 앱 배경 회색 → 흰색 */
     /* 가로(옆) 스크롤 방지 — 모든 표/컨테이너가 화면 폭을 넘지 않음 */
-    html,body{overflow-x:hidden}
-    .prop-scroll,.sv-scroll,.stats,.biz-list,.biz-mobile{overflow-x:hidden}
+    html,body{overflow-x:hidden;overflow-x:clip}   /* clip: 가로넘침은 막되 스크롤컨테이너를 만들지 않아 제안 칩 sticky 동작 */
+    .sv-scroll,.stats,.biz-list,.biz-mobile{overflow-x:hidden}
     /* 이번달 주요 지표(모바일 3카드) */
     .mind-wrap{display:block;margin:2px 0 12px}
     /* ── 미래에셋증권 ELB 금리 카드 (모바일 전용) ── */
@@ -601,24 +612,27 @@
       <span class="prop-hint">탭하면 상세</span>
     </div>
     <div class="prop-controls">
-      <input type="text" id="propSearch" placeholder="기관·상품·기간 검색" oninput="onPropSearch(this.value)">
-      <button class="prop-sch" id="propSearchBtn" title="검색" onclick="renderProposalMobile()">
+      <div class="prop-sbox">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
-      </button>
-      <select id="propProdSel" onchange="onPropProd(this.value)" title="상품구분">
-        <option value="ALL">상품구분 ▾</option>
-        <option value="정기예금">정기예금</option>
-        <option value="ELB/DLB">ELB/DLB</option>
-        <option value="이율보증형보험">이율보증형보험</option>
-      </select>
+        <input type="text" id="propSearch" placeholder="기관·상품·기간" oninput="onPropSearch(this.value)">
+      </div>
+      <div class="prop-sortw">
+        <select id="propSortSel" onchange="onPropSort(this.value)" title="정렬">
+          <option value="desc">금리순</option>
+          <option value="asc">금리낮은순</option>
+        </select>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
     </div>
-    <div class="prop-scroll" id="propScroll">
-      <table class="sv-tbl prop-tbl">
-        <colgroup><col style="width:29%"><col style="width:31%"><col style="width:17%"><col style="width:23%"></colgroup>
-        <thead id="propThead"><tr><th>기관</th><th>상품구분</th><th class="sv-per">기간</th><th>금리</th></tr></thead>
-        <tbody id="propBody"></tbody>
-      </table>
+    <div class="prop-chips" id="propChips">
+      <button class="prop-chip on" data-v="ALL" onclick="onPropProd('ALL')">전체</button>
+      <button class="prop-chip" data-v="ELB/DLB" onclick="onPropProd('ELB/DLB')">ELB</button>
+      <button class="prop-chip" data-v="정기예금" onclick="onPropProd('정기예금')">정기예금</button>
+      <button class="prop-chip" data-v="이율보증형보험" onclick="onPropProd('이율보증형보험')">GIC</button>
     </div>
+    <div class="prop-cnt" id="propCnt"></div>
+    <div class="prop-list" id="propList"></div>
+    <button class="prop-more" id="propMore" onclick="togglePropMore()" style="display:none"></button>
   </div>
 
   <!-- 제도별 최고금리 요약 (JS로 렌더) -->
@@ -1524,16 +1538,31 @@ let proposalRows=[];      // 화면에 보이는(필터·정렬 후) 제안 목�
 let propSearchTxt='';     // 제안 검색어(기관·상품구분·기간)
 let propProdFilter='ALL'; // 제안 상품구분 필터
 function onPropSearch(v){ propSearchTxt=v; renderProposalMobile(); }
-function onPropProd(v){ propProdFilter=v; renderProposalMobile(); }
-/* 제안 카드 헤더 정렬(기관·상품구분·기간·금리). 같은 헤더 재클릭 시 방향 토글 */
-let propSortKey=null, propSortDir=1;
-const PROP_SORT_FIRST={org:1,fam:1,period:1,rate:-1};   // 첫 클릭 방향(금리는 높은순부터)
-function propSortBy(key){
-  if(propSortKey===key) propSortDir=-propSortDir;
-  else { propSortKey=key; propSortDir=PROP_SORT_FIRST[key]||1; }
+function onPropProd(v){
+  propProdFilter=v; propShowAll=false;   // 칩 바꾸면 다시 5개로 접음
+  document.querySelectorAll('#propChips .prop-chip').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   renderProposalMobile();
 }
-function propSortArrow(key){ return propSortKey===key ? (propSortDir===1?' ▲':' ▼') : ' ▼'; }
+/* 정렬: 금리순(높은순) / 금리낮은순 */
+let propSortDir=-1;
+function onPropSort(v){ propSortDir=(v==='asc')?1:-1; renderProposalMobile(); }
+/* 처음엔 PROP_PREVIEW개만, 「전체 보기」로 펼치기 */
+const PROP_PREVIEW=5;
+let propShowAll=false;
+function togglePropMore(){
+  propShowAll=!propShowAll;
+  renderProposalMobile();
+  if(!propShowAll){ const c=$('proposalMobile'); if(c && c.getBoundingClientRect().top<0) c.scrollIntoView({block:'start'}); }
+}
+/* 카드 배지: 상품구분 → ELB/DLB · 정기예금 · GIC */
+function propBadge(fam){
+  const f=String(fam||'');
+  if(/이율보증형/.test(f)) return {t:'GIC',c:'gic'};
+  if(/정기예금/.test(f)) return {t:'정기예금',c:'dep'};
+  if(/DLB/.test(f)) return {t:'DLB',c:''};
+  if(/ELB/.test(f)) return {t:'ELB',c:''};
+  return {t:f||'-',c:''};
+}
 function propProdMatch(fam){
   if(propProdFilter==='ALL') return true;
   const f=String(fam||'');
@@ -1587,64 +1616,43 @@ function renderProposalMobile(){
   const all=(proposalsAll[curMonth]||[]);
   if(!all.length){ card.style.display='none'; return; }   // 등록된 제안이 없으면 카드 숨김
   card.style.display='block';   /* CSS 기본이 none이라 ''로 두면 다시 숨겨짐 → block 명시 */
-  $('propThead').innerHTML=`<tr>`+
-    `<th onclick="propSortBy('org')">기관${propSortArrow('org')}</th>`+
-    `<th onclick="propSortBy('fam')">상품구분${propSortArrow('fam')}</th>`+
-    `<th class="sv-per" onclick="propSortBy('period')">기간${propSortArrow('period')}</th>`+
-    `<th onclick="propSortBy('rate')">금리${propSortArrow('rate')}</th>`+
-  `</tr>`;
 
-  // 검색(기관·상품구분·기간) + 상품구분 필터
+  // 검색(기관·상품구분·기간) + 상품구분 칩
   const q=propSearchTxt.trim().toLowerCase();
   let rows=all.filter(r=>propProdMatch(r.fam) &&
     (!q || (String(r.org)+' '+String(r.fam)+' '+String(r.period)).toLowerCase().indexOf(q)>=0));
-  // 정렬: 헤더 클릭 열 기준(미선택 기본은 금리 높은순)
-  if(propSortKey){
-    const dir=propSortDir;
-    rows.sort((a,b)=>{
-      if(propSortKey==='rate'){ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return dir*(ra-rb); }
-      if(propSortKey==='period') return dir*(periodMonths(a.period)-periodMonths(b.period));
-      return dir*String(a[propSortKey]??'').localeCompare(String(b[propSortKey]??''),'ko');
-    });
-  }else{
-    rows.sort((a,b)=>{ const ra=typeof a.rate==='number'?a.rate:-Infinity, rb=typeof b.rate==='number'?b.rate:-Infinity; return rb-ra; });
-  }
-  proposalRows=rows;
+  // 정렬: 금리(기본 높은순). 금리 없는 항목은 항상 맨 뒤
+  rows.sort((a,b)=>{
+    const ra=typeof a.rate==='number'?a.rate:null, rb=typeof b.rate==='number'?b.rate:null;
+    if(ra==null||rb==null) return (ra==null)-(rb==null);
+    return propSortDir*(ra-rb);
+  });
+  proposalRows=rows;   // 팝업(openPropDetail)은 이 배열의 인덱스로 상품을 찾음
 
-  // 표는 항상 5행 고정 — 결과가 5개 미만이면 빈 행으로 채우고, 초과면 스크롤
-  const N=5;
-  const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':(v==null?'-':v);
-  // 셀 구조는 DB제도 최고금리 표(renderSummary)와 동일: <b>기관 / 상품구분 / sv-per기간 / sv-rate금리
-  // &nbsp;로 빈 행도 데이터 행과 같은 높이를 유지(내용 없다고 줄어들지 않게)
-  const filler=`<tr class="filler"><td>&nbsp;</td><td>&nbsp;</td><td class="sv-per">&nbsp;</td><td class="sv-rate">&nbsp;</td></tr>`;
-  let body;
-  if(!rows.length){
-    body=`<tr class="filler prop-nomatch"><td colspan="4">조건에 맞는 상품이 없습니다.</td></tr>`;
-    for(let k=1;k<N;k++) body+=filler;
-  }else{
-    body=rows.map((r,i)=>
-      `<tr onclick="openPropDetail(${i})">`+
-        `<td><b>${htmlEsc(r.org)}</b></td>`+
-        `<td>${htmlEsc(r.fam)}</td>`+
-        `<td class="sv-per">${htmlEsc(r.period)}</td>`+
-        `<td class="sv-rate">${fmt(r.rate)}</td>`+
-      `</tr>`).join('');
-    for(let k=rows.length;k<N;k++) body+=filler;   // 5행 미만이면 빈 행 채움
+  $('propCnt').textContent='총 '+rows.length+'개';
+  const showAll=propShowAll || !!q;            // 검색 중엔 결과 전부 표시
+  const shown=showAll?rows:rows.slice(0,PROP_PREVIEW);
+  const fmt=v=>(typeof v==='number')?v.toFixed(2)+'%':'-';
+  const chev=`<svg class="pi-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 6 6 6-6 6"/></svg>`;
+  $('propList').innerHTML = !rows.length
+    ? `<div class="prop-empty">조건에 맞는 상품이 없습니다.</div>`
+    : shown.map((r,i)=>{
+        const bd=propBadge(r.fam);
+        const top=(i===0 && propSortDir===-1 && typeof r.rate==='number')?' top':'';
+        return `<div class="prop-item${top}" onclick="openPropDetail(${i})">`+
+          `<div class="pi-main"><span class="pi-bd ${bd.c}">${htmlEsc(bd.t)}</span>`+
+          `<div class="pi-org">${htmlEsc(r.org)}</div>`+
+          `<div class="pi-sub">${htmlEsc(r.fam)} · ${htmlEsc(r.period)}</div></div>`+
+          `<div class="pi-rate"><small>연</small>${fmt(r.rate)}</div>${chev}</div>`;
+      }).join('');
+  const more=$('propMore');
+  if(q || rows.length<=PROP_PREVIEW){ more.style.display='none'; }
+  else{
+    more.style.display='block';
+    more.innerHTML = propShowAll
+      ? `접기<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 15 6-6 6 6"/></svg>`
+      : `전체 보기<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>`;
   }
-  $('propBody').innerHTML=body;
-  fitPropTable();
-}
-/* 표는 항상 헤더+6행 높이로 '고정'(height) — 6행 초과는 스크롤, 미만은 빈 행으로 이미 6행.
-   검색·필터로 내용이 바뀌어도 이 높이는 변하지 않는다. */
-function fitPropTable(){
-  const sc=$('propScroll'); if(!sc) return;
-  const thead=sc.querySelector('thead'), rows=sc.querySelectorAll('tbody tr');
-  if(!thead||!rows.length){ sc.style.height=''; return; }
-  // 헤더 + 실제 5행 높이를 합산(테두리 반올림 오차로 마지막 행이 잘리던 문제 방지)
-  let h=thead.getBoundingClientRect().height;
-  const n=Math.min(5,rows.length);
-  for(let i=0;i<n;i++) h+=rows[i].getBoundingClientRect().height;
-  sc.style.height=Math.ceil(h)+3+'px';   // 5행 전체 노출 + 여유 3px
 }
 function openPropDetail(i){
   const r=proposalRows[i]; if(!r) return;
