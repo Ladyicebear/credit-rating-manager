@@ -1143,7 +1143,7 @@ function renderSummaryMobile(){
       `<div class="si-side"><div class="si-rate"><small>연</small>${t.rate.toFixed(2)}%</div>${sellBadge(t,svmField)}</div></div>`;
   }).join('');
   box.innerHTML=`<div class="svm-title">제도별 최고금리</div>`+
-    `<div class="svm-chips">${chip('db','DB')}${chip('dc','DC/IRP')}${chip('def','디폴트')}</div>`+cards;
+    `<div class="svm-chips">${chip('db','DB')}${chip('dc','DC/IRP')}${chip('def','디폴트옵션')}</div>`+cards;
 }
 
 /* 모바일 전용 '이번달 주요 지표' 3카드 값 채움(기준금리·물가는 실데이터, 국고채는 고정) */
