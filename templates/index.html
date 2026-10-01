@@ -136,6 +136,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
           display:flex;align-items:center;gap:8px;font-size:.76rem;color:#666;
           box-shadow:0 1px 4px rgba(0,0,0,.07)}
 .info-upd{display:none}   /* 마지막 업데이트: 데스크톱은 credit-subbar, 모바일만 info-bar 우측에 표시 */
+.crm-hdr{display:none}    /* 신용등급 제목(모바일 전용) */
+.tab-scroll{display:contents}   /* 데스크톱: 래퍼 없는 것과 동일 배치. 모바일: 가로 스크롤 칩 줄 */
 .info-upd strong{color:#16335B}
 
 /* ── Tabs ── */
@@ -474,6 +476,28 @@ tr.row-done td{transition:background .3s}
   td.td-agency .ag-type-badge{font-size:.54rem;padding:1px 4px}
   td.td-agency .rbadge{font-size:.64rem;padding:2px 5px;min-width:0}
   td.td-agency .ag-date{font-size:.56rem}
+  /* ── 신용등급 상단: 약관·상품설명서 화면(dvm) 형태 — 제목+개수 / 안내 / 업데이트 한 줄 / 검색 / 가로 칩 ── */
+  .crm-hdr{display:block;padding:6px 4px 0}
+  .crm-title{font-size:1rem;font-weight:800;color:#123E7C;letter-spacing:-.3px;display:flex;align-items:center;gap:7px}
+  .crm-cnt{font-size:.68rem;font-weight:800;color:#CB6015;background:#FEF0E2;border-radius:10px;padding:2px 8px}
+  .crm-desc{font-size:.72rem;color:#9aa2ae;margin-top:3px}
+  .info-bar{background:none;box-shadow:none;border-radius:0;padding:7px 4px 0;margin:0;gap:0 6px;flex-wrap:wrap;align-items:baseline}
+  .info-bar > span:first-child{display:none}   /* ℹ️ 아이콘 */
+  .info-upd{display:inline;order:-1;margin:0;text-align:left;font-size:.66rem;color:#5A6474;line-height:1.4}
+  .info-upd strong{display:inline;font-size:.66rem;margin-left:4px;color:#5A6474;font-weight:700}
+  .info-upd::after{content:'·';margin-left:6px;color:#C3C9D2}
+  #info-text{font-size:.66rem;color:#5A6474;line-height:1.4;white-space:normal;flex:0 1 auto;overflow:visible}
+  .tabs{display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:0;margin:0 0 10px}
+  .rating-search{order:-1;position:relative;margin:11px 4px 0;flex:none;min-width:0}
+  .rating-search input{width:100%;box-sizing:border-box;height:44px;border:1.5px solid #E0E3E8;border-radius:11px;padding:0 12px 0 38px;font-size:.85rem}
+  .rating-search input:focus{border-color:#123E7C;box-shadow:none}
+  .rating-search .rs-btn{position:absolute;left:5px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:none;background:none;font-size:15px}
+  .tab-scroll{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px -10px 0;padding:11px 14px 10px;background:#F7F8FA}
+  .tab-btn{flex:0 0 auto;border:1.5px solid #E0E3E8;background:#fff;color:#6B7280;border-radius:15px;padding:5px 12px;font-size:.74rem;font-weight:700;box-shadow:none;white-space:nowrap}
+  .tab-btn:hover{border-color:#E0E3E8;color:#6B7280}
+  .tab-btn.active,.tab-btn.active:hover{background:#123E7C;color:#fff;border-color:#123E7C}
+  .tab-btn .tab-badge,.tab-btn:not(.active) .tab-badge{background:none;color:#9AA2AE;padding:0;margin-left:4px;font-size:.66rem}
+  .tab-btn.active .tab-badge{background:none;color:#B5C7DC}
 }
 </style>
 </head>
@@ -604,6 +628,12 @@ tr.row-done td{transition:background .3s}
 <!-- ═══ MAIN (신용등급관리 본문) ═══ -->
 <div class="main{% if role == 'rm' %} role-rm{% endif %}">
 
+  <!-- 신용등급 제목(모바일 전용, 약관·상품설명서 화면과 같은 형태) -->
+  <div class="crm-hdr">
+    <div class="crm-title">신용등급<span class="crm-cnt">{{ data.values() | map('length') | sum }}곳</span></div>
+    <div class="crm-desc">기관을 찾아 신용등급을 확인하세요</div>
+  </div>
+
   <!-- Alert -->
   <div class="alert-bar {% if total_changed == 0 %}hidden{% endif %}" id="alert-bar">
     <span style="font-size:1.1rem">🔔</span>
@@ -640,6 +670,7 @@ tr.row-done td{transition:background .3s}
 
   <!-- Tabs -->
   <div class="tabs">
+    <div class="tab-scroll">
     {% for category, rows in panel_groups %}
     {% set n_chg = rows | selectattr('any_changed') | list | length %}
     <button class="tab-btn {% if loop.first %}active{% endif %}"
@@ -651,6 +682,7 @@ tr.row-done td{transition:background .3s}
     <button class="tab-btn tab-history" data-tab="__history__" onclick="switchTab('__history__')">
       📜 변경이력<span class="tab-badge">{{ history|length }}</span>
     </button>
+    </div>
     <div class="rating-search">
       <input type="text" id="ratingSearch" placeholder="기관명 검색" oninput="filterRatingRows()" autocomplete="off">
       <button class="rs-btn" onclick="filterRatingRows()" title="검색">🔍</button>
