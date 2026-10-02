@@ -1116,7 +1116,10 @@ function pollDeploy(){
 function fitPensionFrame(){
   const hdr = document.querySelector('.hdr');
   if(!hdr) return;
-  const tabbar = (window.matchMedia && window.matchMedia('(max-width:768px)').matches) ? 64 : 0;
+  // 하단 탭바 실제 높이(아이폰 홈 인디케이터 여백 포함)만큼 빼야 iframe 하단이 탭바에 가려지지 않는다
+  const tb = document.getElementById('appTabbar');
+  const tabbar = (window.matchMedia && window.matchMedia('(max-width:768px)').matches)
+    ? Math.max(64, tb ? Math.ceil(tb.getBoundingClientRect().height) : 0) : 0;
   const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height) - tabbar) + 'px';
   ['pension-frame','proposal-frame','visitors-frame','docs-frame'].forEach(id=>{
     const fr = document.getElementById(id);
