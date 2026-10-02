@@ -363,7 +363,8 @@
     body{background:#fff}   /* 앱 배경 회색 → 흰색 */
     /* 가로(옆) 스크롤 방지 — 모든 표/컨테이너가 화면 폭을 넘지 않음 */
     html,body{overflow-x:hidden;overflow-x:clip}   /* clip: 가로넘침은 막되 스크롤컨테이너를 만들지 않아 제안 칩 sticky 동작 */
-    .sv-scroll,.stats,.biz-list,.biz-mobile{overflow-x:hidden}
+    .sv-scroll,.stats,.biz-list{overflow-x:hidden}
+    .biz-mobile{overflow-x:hidden;overflow-x:clip}   /* clip: 스크롤컨테이너가 아니어야 [접기] sticky가 화면 기준으로 붙는다 */
     /* 이번달 주요 지표(모바일 3카드) */
     .mind-wrap{display:block;margin:2px 0 12px}
     /* ── 미래에셋증권 ELB 금리 카드 (모바일 전용) ── */
@@ -429,7 +430,7 @@
     .filters{display:none !important}
     #mobileTable{display:none !important}
     .hscroll-top{display:none !important}   /* 표 상단 가로스크롤 띠: 모바일 카드형에선 불필요 → 숨김 */
-    .tablecard{background:none;border:none;box-shadow:none;padding:0;margin:0}
+    .tablecard{background:none;border:none;box-shadow:none;padding:0;margin:0;overflow:clip}   /* hidden이면 [접기] sticky가 안 붙음 */
     .biz-mobile{display:block;margin-top:2px}
     /* 검색/필터 박스 */
     .biz-panel{background:#F5F7FA;border:1px solid var(--line);border-radius:18px;padding:16px 15px 18px;box-shadow:0 2px 10px rgba(16,24,40,.04);margin-bottom:8px}
@@ -474,6 +475,9 @@
     .biz-more{width:100%;margin-top:12px;background:var(--white);border:1px solid var(--line);border-radius:12px;
         font-family:inherit;font-size:13.5px;font-weight:700;color:var(--muted);padding:12px;cursor:pointer}
     .biz-more:active{background:#F3F5F9}
+    /* 펼친 상태: [접기]를 화면 하단(탭바 바로 위)에 붙여, 목록을 스크롤하는 중에도 바로 접을 수 있게 한다 */
+    .biz-more.stuck{position:sticky;bottom:8px;z-index:5;color:var(--navy);border-color:var(--navy);
+        box-shadow:0 -2px 12px rgba(16,24,40,.10),0 2px 10px rgba(16,24,40,.08)}
     .biz-dl{display:flex;gap:9px;margin-top:16px}
     .biz-dl-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--navy-l);
         color:var(--navy);border:none;border-radius:12px;font-family:inherit;font-size:13px;font-weight:800;
@@ -1497,7 +1501,7 @@ function renderBizCards(){
     `</div>`;
   }).join('');
   if(more) more.style.display = rows.length>3 ? '' : 'none';
-  if(more) more.textContent = bizExpanded ? '접기 ▲' : '더보기 ▼';
+  if(more){ more.textContent = bizExpanded ? '접기 ▲' : '더보기 ▼'; more.classList.toggle('stuck', bizExpanded); }
   applyBizHeight(rows.length);
 }
 /* 고정 높이: 접힘=3개 / 펼침=6개 높이로 고정하고 내부 스크롤 (그 아래 [접기]·다운로드 노출) */
@@ -1513,9 +1517,11 @@ function applyBizHeight(total){
 }
 function toggleBizMore(){
   bizExpanded=!bizExpanded;
-  const more=$('bizMore'); if(more) more.textContent=bizExpanded?'접기 ▲':'더보기 ▼';
+  const more=$('bizMore'); if(more){ more.textContent=bizExpanded?'접기 ▲':'더보기 ▼'; more.classList.toggle('stuck', bizExpanded); }
   applyBizHeight(bizCurRows.length);
-  if(!bizExpanded){ const l=$('bizList'); if(l) l.scrollTop=0; }
+  if(!bizExpanded){ const l=$('bizList'); if(l){ l.scrollTop=0;
+    // 하단에 붙은 [접기]를 누른 경우 목록 위치가 화면 밖일 수 있으므로 목록 머리로 돌아간다
+    if(l.getBoundingClientRect().top<0) l.scrollIntoView({block:'start',behavior:'smooth'}); } }
 }
 
 /* ---------- 모바일 금리 상세 팝업 ---------- */
