@@ -368,6 +368,10 @@ tr.row-done td{transition:background .3s}
   .app-tabbar .tab-item span{font-size:10px;font-weight:700;letter-spacing:-.4px;white-space:nowrap}
   .app-tabbar .tab-item.active{color:#F58220}
   body{font-size:12.5px;background:#fff}   /* 앱 배경 회색 → 흰색 */
+  /* 모바일 브라우저의 100vh는 주소창이 숨은 '최대' 높이라 실제 보이는 높이보다 크다.
+     그만큼 바깥 페이지가 스크롤되며 금리현황 iframe이 위로 밀려 하단 탭바 위에 빈 여백이 생겼다.
+     현재 보이는 높이(100dvh)로 맞춰 바깥 페이지가 스크롤되지 않게 한다(미지원 브라우저는 100vh 유지). */
+  body{min-height:100dvh}
   .hdr{padding:9px 13px 0;background:#fff}   /* 헤더 하단 회색 → 흰색 */
   /* 헤더: 제목·Goun로고·로그아웃을 한 줄에(제목 축소로 맞춤) */
   /* 로고: 넓은 폰은 .74rem, 좁아지면 글씨만 줄여 항상 1줄 유지(System 안 내려가게) */
