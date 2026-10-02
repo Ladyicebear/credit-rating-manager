@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024   # 업로드 최대 300MB(약관 ZIP 등)
+# 폼 데이터 메모리 한도. Flask 3.1부터 기본 500KB이고, Werkzeug 3.1.x 일부 버전은 일반 폼(urlencoded)
+# 본문 전체에도 이 한도를 건다. 엑셀 다운로드(전체 금리 등)는 모든 월 데이터를 폼 하나로 보내므로
+# 월이 쌓여 500KB를 넘자 413(Request Entity Too Large)이 났다 → 50MB로 늘림.
+app.config['MAX_FORM_MEMORY_SIZE'] = 50 * 1024 * 1024
 # 세션 쿠키 서명 키. 배포 시엔 반드시 SECRET_KEY 환경변수로 고정값 지정
 # (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
