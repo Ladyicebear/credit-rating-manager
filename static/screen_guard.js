@@ -3,12 +3,9 @@
  *  1) 창이 포커스를 잃거나 숨겨지면 화면 가림(캡처 도구 Win+Shift+S·캡처 앱 실행 시 대부분 포커스 이동)
  *  2) PrintScreen 키 감지 → 순간 가림 + 클립보드 덮어쓰기
  *  3) 인쇄(Ctrl+P·PDF 저장) 차단, Ctrl+S 저장 차단
- *  4) 사용자 아이디·시각 워터마크 → 휴대폰 촬영 등 막을 수 없는 경우에도 유출자 식별 가능
- * iframe 안에서는 키 감지만 하고, 가림/워터마크는 최상위 창이 담당(iframe 내용까지 함께 가려짐). */
+ * iframe 안에서는 키 감지만 하고, 가림막은 최상위 창이 담당(iframe 내용까지 함께 가려짐). */
 (function () {
   'use strict';
-  var me = document.currentScript;
-  var label = (me && me.getAttribute('data-user')) || '';
   var isTop = window.top === window;
 
   function topGuard() {
@@ -44,8 +41,8 @@
 
   if (!isTop) return;
 
-  // ── 가림막 + 워터마크 (최상위 창) ──
-  var shield, mark, hidden = false, flashTimer = null;
+  // ── 가림막 (최상위 창) ──
+  var shield, hidden = false, flashTimer = null;
 
   function build() {
     shield = document.createElement('div');
@@ -55,22 +52,6 @@
       'text-align:center;padding:24px';
     shield.textContent = '보안을 위해 화면이 가려졌습니다. 화면을 클릭하면 다시 표시됩니다.';
     document.documentElement.appendChild(shield);
-
-    if (label) {
-      var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; };
-      var stamp = label + ' · ' + d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) +
-        ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200">' +
-        '<text x="10" y="110" transform="rotate(-25 160 100)" fill="rgba(120,120,120,0.13)" ' +
-        'font-family="sans-serif" font-size="15">' +
-        stamp.replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }) +
-        '</text></svg>';
-      mark = document.createElement('div');
-      mark.setAttribute('aria-hidden', 'true');
-      mark.style.cssText = 'position:fixed;inset:0;z-index:2147483646;pointer-events:none;' +
-        'background-image:url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
-      document.documentElement.appendChild(mark);
-    }
   }
 
   function setHidden(h) {

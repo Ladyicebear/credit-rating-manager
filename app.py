@@ -692,13 +692,10 @@ def _inject_screen_guard(resp):
     resp.headers['Cache-Control'] = 'no-store'
     resp.headers.pop('ETag', None)
     resp.headers.pop('Last-Modified', None)
-    from markupsafe import escape
     tag = ('<script src="%s" data-idle-min="%d"></script>'
            % (url_for('static', filename='session_guard.js'), IDLE_TIMEOUT_MINUTES))
     if session.get('role') != 'consulting':
-        tag += ('<script src="%s" data-user="%s"></script>'
-                % (url_for('static', filename='screen_guard.js'),
-                   escape(' '.join(x for x in (session.get('name'), session.get('user')) if x))))
+        tag += '<script src="%s"></script>' % url_for('static', filename='screen_guard.js')
     resp.direct_passthrough = False   # send_file 응답도 본문 수정 가능하게
     html = resp.get_data(as_text=True)
     pos = html.lower().rfind('</body>')
