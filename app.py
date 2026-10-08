@@ -422,6 +422,8 @@ def _smtp_settings() -> dict:
         'from_addr': str(g('from_addr', SMTP_FROM or user)).strip(),
         'from_name': g('from_name', SMTP_FROM_NAME),
         'base_url': str(g('base_url', APP_BASE_URL)).strip(),
+        # 가입 신청 알림 받을 관리자 이메일(쉼표로 여러 명). 화면 저장값 우선, 없으면 환경변수.
+        'admin_notify': str(g('admin_notify', ADMIN_NOTIFY_EMAIL)).strip(),
     }
 
 
@@ -815,10 +817,11 @@ def signup():
         _save_members(members)
 
     logger.info('가입 신청 접수: %s (%s / %s)', email, name, affiliation)
-    if ADMIN_NOTIFY_EMAIL:
+    notify_to = [a.strip() for a in re.split(r'[,;\s]+', _smtp_settings()['admin_notify']) if a.strip()]
+    for admin_addr in notify_to:
         try:
             _send_email(
-                ADMIN_NOTIFY_EMAIL, '[Smart pension] 신규 가입 신청',
+                admin_addr, '[Smart pension] 신규 가입 신청',
                 '<div style="font-family:sans-serif">신규 가입 신청이 접수되었습니다.<br><br>'
                 f'이름: {Markup.escape(name)}<br>사번: {Markup.escape(emp_id)}<br>'
                 f'이메일: {Markup.escape(email)}<br>소속: {Markup.escape(affiliation)}<br><br>'
@@ -972,6 +975,7 @@ def admin_members():
         'host': s['host'], 'port': s['port'], 'user': s['user'],
         'from_addr': s['from_addr'], 'from_name': s['from_name'],
         'base_url': s['base_url'], 'has_password': bool(s['password']),
+        'admin_notify': s['admin_notify'],
     }
     return render_template('admin_members.html', members=rows, pending_n=pending_n, smtp=smtp_view)
 
@@ -1026,7 +1030,7 @@ def api_email_settings():
     d = request.get_json(silent=True) or {}
     with _SMTP_LOCK:
         cfg = _load_smtp_cfg()
-        for k in ('host', 'user', 'from_addr', 'from_name', 'base_url'):
+        for k in ('host', 'user', 'from_addr', 'from_name', 'base_url', 'admin_notify'):
             if k in d:
                 cfg[k] = (d.get(k) or '').strip()
         if str(d.get('port', '')).strip():

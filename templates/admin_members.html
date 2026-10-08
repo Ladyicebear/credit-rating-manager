@@ -92,6 +92,7 @@ tr:last-child td{border-bottom:none}
         <label>SMTP 서버<input id="m_host" type="text" value="{{ smtp.host }}" placeholder="smtp.gmail.com"></label>
         <label>포트<input id="m_port" type="number" value="{{ smtp.port }}" placeholder="587"></label>
         <label class="mail-wide">앱 주소(매직링크용)<input id="m_base" type="text" value="{{ smtp.base_url }}" placeholder="https://retirementpension.co.kr"></label>
+        <label class="mail-wide">가입 신청 알림 받을 관리자 이메일(쉼표로 여러 명)<input id="m_notify" type="text" value="{{ smtp.admin_notify }}" placeholder="admin1@miraeasset.com, admin2@miraeasset.com"></label>
       </div>
       <div class="mail-acts">
         <button class="btn b-approve" onclick="saveEmail()">설정 저장</button>
@@ -159,7 +160,7 @@ function mailMsg(text,type){
 const _mv=id=>document.getElementById(id).value.trim();
 async function saveEmail(){
   const body={host:_mv('m_host'),port:_mv('m_port'),user:_mv('m_user'),
-              from_addr:_mv('m_from'),from_name:_mv('m_fromname'),base_url:_mv('m_base')};
+              from_addr:_mv('m_from'),from_name:_mv('m_fromname'),base_url:_mv('m_base'),admin_notify:_mv('m_notify')};
   const pw=document.getElementById('m_pw').value;   // 빈칸이면 기존 유지
   if(pw) body.password=pw;
   mailMsg('저장 중…','ok');
