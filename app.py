@@ -677,6 +677,36 @@ def _require_login():
         return redirect(url_for('index'))
 
 
+# ── 화면 캡처 억제: 관리자(연금컨설팅팀) 외 로그인 사용자의 HTML 에 static/screen_guard.js 삽입 ──
+#   같은 URL 이 역할별로 다른 HTML 을 받으므로 조건부 요청(304)·캐시를 끄고 매번 새로 내려준다.
+@app.before_request
+def _no_conditional_html():
+    if not request.path.startswith('/static/'):
+        request.environ.pop('HTTP_IF_NONE_MATCH', None)
+        request.environ.pop('HTTP_IF_MODIFIED_SINCE', None)
+
+
+@app.after_request
+def _inject_screen_guard(resp):
+    if resp.mimetype != 'text/html' or resp.status_code != 200 or not session.get('logged_in'):
+        return resp
+    resp.headers['Cache-Control'] = 'no-store'
+    resp.headers.pop('ETag', None)
+    resp.headers.pop('Last-Modified', None)
+    if session.get('role') == 'consulting':
+        return resp
+    from markupsafe import escape
+    tag = ('<script src="%s" data-user="%s"></script>'
+           % (url_for('static', filename='screen_guard.js'),
+              escape(' '.join(x for x in (session.get('name'), session.get('user')) if x))))
+    resp.direct_passthrough = False   # send_file 응답도 본문 수정 가능하게
+    html = resp.get_data(as_text=True)
+    pos = html.lower().rfind('</body>')
+    html = html[:pos] + tag + html[pos:] if pos >= 0 else html + tag
+    resp.set_data(html)
+    return resp
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = ''
