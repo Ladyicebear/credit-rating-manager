@@ -2694,6 +2694,14 @@ _PENSION_ALIAS = {  # 레포트 표기 -> 데이터 표기(예외)
 _PEN_RATING_ALIAS = {
     '한국스탠다드차타드은행': 'SC제일은행',
     'IBK투자증권': '아이비케이투자증권',
+    '국민은행': 'KB국민은행',
+    '수협은행': '수협',
+    '중소기업은행': '기업은행',
+    '한국산업은행': '산업은행',
+    '에스비아이저축은행': 'SBI저축은행',
+    'IBK저축은행': '아이비케이저축은행',
+    '(주)비엔케이투자증권': 'BNK투자증권',
+    'DB증권주식회사': 'DB금융투자',
 }
 _PENSION_SECMAP = {'증권': '증권', '은행': '은행', '생보': '생명보험', '손보': '손해보험', '저축은행': '저축은행'}
 _ROMAN = [('Ⅲ', '3'), ('Ⅱ', '2'), ('Ⅰ', '1'), ('Ⅳ', '4'), ('Ⅴ', '5'),
@@ -3035,6 +3043,80 @@ def rate_history_append():
 def best_proposal():
     """상품제안 탭 — 이달의 제안상품에서 조건별 최고금리 상품 추천(RM 포함 전원 조회)."""
     return send_file(os.path.join(BASE_DIR, 'best_proposal.html'))
+
+
+# ── 마이페이지: 저장한 제안상품(본인 전용) ─────────────────────────────────
+#   saved_proposals.json : {로그인ID: [{id, saved_at, month, grade, sel, items}]}
+#     month = 제안상품 기준월(YYYY-MM). 마이페이지는 이 기준월로 묶어 보여준다.
+#     사용자당 최종 저장 1건만 보관(다시 저장하면 대체). 기준월이 지나면(현재 달 > 기준월) 자동 삭제한다.
+#   ⚠️ 런타임 데이터 → data/ 에 저장(커밋 금지).
+_SAVED_PROPOSALS_FILE = os.path.join(DATA_DIR, 'saved_proposals.json')
+_SAVED_PROPOSALS_LOCK = threading.Lock()
+_YM_RE = re.compile(r'^\d{4}-\d{2}$')
+
+
+def _purge_saved(lst: list) -> list:
+    """기준월이 지난 저장분 제거."""
+    cur = datetime.now().strftime('%Y-%m')
+    return [x for x in lst if str(x.get('month', '')) >= cur]
+
+
+@app.route('/my_proposals')
+def my_proposals_page():
+    """모바일 마이페이지 — 저장한 제안상품을 기준월별로 조회."""
+    return send_file(os.path.join(BASE_DIR, 'my_proposals.html'))
+
+
+@app.route('/api/my_proposals', methods=['GET'])
+def api_my_proposals_get():
+    user = session.get('user', '')
+    with _SAVED_PROPOSALS_LOCK:
+        store = _load_json_file(_SAVED_PROPOSALS_FILE)
+        lst = store.get(user, [])
+        kept = _purge_saved(lst)
+        if len(kept) != len(lst):
+            store[user] = kept
+            _save_json_file(_SAVED_PROPOSALS_FILE, store)
+    # 마이페이지 상단 프로필(이름·소속). 회원가입 계정은 members.json, 그 외 계정은 이름만(없으면 ID).
+    m = _load_members().get(_normalize_email(user)) or {}
+    me = {'name': session.get('name') or m.get('name') or user, 'affiliation': m.get('affiliation', '')}
+    return jsonify({'items': sorted(kept, key=lambda x: x.get('saved_at', ''), reverse=True), 'me': me})
+
+
+@app.route('/api/my_proposals', methods=['POST'])
+def api_my_proposals_post():
+    user = session.get('user', '')
+    d = request.get_json(silent=True) or {}
+    month = str(d.get('month') or '')
+    items = d.get('items')
+    if not _YM_RE.match(month) or not isinstance(items, list) or not items:
+        return jsonify({'success': False, 'message': '저장할 제안상품이 없습니다.'}), 400
+    rec = {
+        'id': secrets.token_hex(8),
+        'saved_at': _now_str(),
+        'month': month,
+        'grade': str(d.get('grade') or '')[:10],
+        'sel': d.get('sel') if isinstance(d.get('sel'), dict) else {},
+        'items': [{k: it.get(k) for k in ('cat', 'months', 'period', 'org', 'fam', 'rate', 'grade')}
+                  for it in items[:100] if isinstance(it, dict)],
+    }
+    with _SAVED_PROPOSALS_LOCK:
+        store = _load_json_file(_SAVED_PROPOSALS_FILE)
+        # 최종안만 보관 — 다시 저장하면 이전 저장분을 대체한다.
+        store[user] = [rec]
+        _save_json_file(_SAVED_PROPOSALS_FILE, store)
+    return jsonify({'success': True, 'id': rec['id']})
+
+
+@app.route('/api/my_proposals/<rid>', methods=['DELETE'])
+def api_my_proposals_delete(rid):
+    user = session.get('user', '')
+    with _SAVED_PROPOSALS_LOCK:
+        store = _load_json_file(_SAVED_PROPOSALS_FILE)
+        lst = store.get(user, [])
+        store[user] = _purge_saved([x for x in lst if x.get('id') != rid])
+        _save_json_file(_SAVED_PROPOSALS_FILE, store)
+    return jsonify({'success': True})
 
 
 @app.route('/simple2')

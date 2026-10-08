@@ -548,6 +548,10 @@ tr.row-done td{transition:background .3s}
 <div id="super-best" class="super-panel" style="display:none">
   <iframe id="best-frame" class="pension-frame" src="/best_proposal" title="상품제안 · 최적상품 찾기"></iframe>
 </div>
+<!-- ═══ 마이페이지(저장한 제안상품) ═══ 모바일 하단탭 · 본인 저장분만 -->
+<div id="super-mypage" class="super-panel" style="display:none">
+  <iframe id="mypage-frame" class="pension-frame" src="/my_proposals" title="마이페이지 · 저장한 제안상품"></iframe>
+</div>
 
 <!-- 모바일 홈(카드 메뉴) — 하단탭 '홈'에서 표시 -->
 <div id="super-home" class="super-panel" style="display:none">
@@ -1127,7 +1131,7 @@ function fitPensionFrame(){
   const tabbar = (window.matchMedia && window.matchMedia('(max-width:768px)').matches)
     ? Math.max(64, tb ? Math.ceil(tb.getBoundingClientRect().height) : 0) : 0;
   const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height) - tabbar) + 'px';
-  ['pension-frame','proposal-frame','visitors-frame','docs-frame','best-frame'].forEach(id=>{
+  ['pension-frame','proposal-frame','visitors-frame','docs-frame','best-frame','mypage-frame'].forEach(id=>{
     const fr = document.getElementById(id);
     if(fr) fr.style.height = h;
   });
@@ -1160,6 +1164,7 @@ function switchSuper(which){
   const members = which==='members';
   const credit = which==='credit';
   const best = which==='best';
+  const mypage = which==='mypage';
   // 요소가 없을 수도 있으므로(예: RM은 상품제안관리 패널 미렌더) null-safe로 처리.
   // 이렇게 하지 않으면 중간에서 오류가 나 .main(신용등급 본문)을 숨기는 줄이 실행되지 않아
   // 원리금 탭에 신용등급 화면이 겹쳐 보이는 버그가 생긴다.
@@ -1173,6 +1178,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-docs'), docs);
   setDisp(document.getElementById('super-home'), which==='home');
   setDisp(document.getElementById('super-best'), best);
+  setDisp(document.getElementById('super-mypage'), mypage);
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
   if(credit){ fitRatingTable(); setTimeout(fitRatingTable, 80); }   // .main 표시 후 5행 고정(레이아웃 안정 후 재보정)
@@ -1183,7 +1189,7 @@ function switchSuper(which){
   setAct(document.getElementById('stab-members'), members);
   setAct(document.getElementById('stab-docs'), docs);
   setAct(document.getElementById('stab-best'), best);
-  if(pen || prop || visit || docs || members || best) fitPensionFrame();
+  if(pen || prop || visit || docs || members || best || mypage) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
 (function initSuper(){
@@ -1191,7 +1197,7 @@ function switchSuper(which){
   try{ t = localStorage.getItem('goun_super_tab') || 'pension'; }catch(e){}
   var _mob = window.matchMedia && window.matchMedia('(max-width:768px)').matches;
   if(_mob) t='home';                 // 모바일: 항상 홈(카드 메뉴)로 시작
-  else if(t==='home') t='pension';   // 데스크톱엔 홈이 없음 → 원리금으로
+  else if(t==='home'||t==='mypage') t='pension';   // 데스크톱엔 홈·마이페이지가 없음 → 원리금으로
   switchSuper(t);
   fitPensionFrame();
 })();
@@ -1624,15 +1630,13 @@ function tapDocm(org,kind){
 }
 function closeDocmSheet(){ document.getElementById('dvmSheetOv').classList.remove('open'); }
 
-/* ── 하단 탭바: 홈·금리현황→원리금, 상품제안→최적상품 찾기, 신용등급→신용등급, 상품설명서→문서 목록, 마이페이지→준비중 ── */
+/* ── 하단 탭바: 홈·금리현황→원리금, 상품제안→최적상품 찾기, 신용등급→신용등급, 상품설명서→문서 목록, 마이페이지→저장한 제안상품 ── */
 function tabbarGo(which, el){
-  // 마이페이지: 준비중 — 화면 전환 없이 현재 화면·현재 탭을 그대로 두고 안내만 표시
-  if(which==='my'){ if(typeof showToast==='function') showToast('준비 중입니다','ok'); return; }
   document.querySelectorAll('#appTabbar .tab-item').forEach(function(b){ b.classList.remove('active'); });
   if(el) el.classList.add('active');
   var dm=document.getElementById('super-docsm');
   if(which==='docs'){   // 상품설명서: 다른 화면 숨기고 문서 목록 표시
-    ['super-pension','super-proposal','super-visitors','super-docs','super-home','super-best'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
+    ['super-pension','super-proposal','super-visitors','super-docs','super-home','super-best','super-mypage'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
     var mn=document.querySelector('.main'); if(mn)mn.style.display='none';
     var cs=document.getElementById('credit-subbar'); if(cs)cs.style.display='none';
     document.querySelectorAll('.super-tab').forEach(function(t){t.classList.remove('active');});
@@ -1647,6 +1651,9 @@ function tabbarGo(which, el){
     try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
   } else if(which==='rate'){
     if(typeof switchSuper==='function') switchSuper('pension');
+  } else if(which==='my'){   // 마이페이지: 저장한 제안상품 — 열 때마다 최신 저장분으로 새로고침
+    if(typeof switchSuper==='function') switchSuper('mypage');
+    try{ var mf=document.getElementById('mypage-frame'); if(mf && mf.contentWindow) mf.contentWindow.location.reload(); }catch(e){}
   } else if(which==='best'){
     if(typeof switchSuper==='function') switchSuper('best');
   } else if(which==='credit'){

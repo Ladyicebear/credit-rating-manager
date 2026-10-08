@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<title>상품제안 · 최적상품 찾기</title>
+<title>상품제안하기</title>
 <style>
   /* 최적상품 찾기(상품제안 탭) — 이달의 제안상품에서 조건별 최고금리 상품 추천.
      1 신용등급 → 2 상품분류(다중) → 3 기간(다중) → 4 분류별 제안 개수 → 결과 */
@@ -19,6 +19,7 @@
   .ttl h1{font-size:19px;font-weight:800;color:var(--navy)}
   .ttl small{font-size:12px;color:var(--muted);white-space:nowrap}
   .sub{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .sub .must{color:var(--orange);font-weight:700}
   .prog{display:flex;gap:5px;margin-bottom:6px}
   .prog i{flex:1;height:5px;border-radius:5px;background:var(--line)}
   .prog i.on{background:var(--orange)}
@@ -38,6 +39,12 @@
   .chip:focus-visible,.btn:focus-visible,.stp button:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
   .cnt{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}
   .cnt:last-child{border-bottom:0}
+  .cat{padding:14px 0;border-top:1px solid var(--line)}
+  .cat:first-of-type{border-top:0;padding-top:4px}
+  .cat-h{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:10px}
+  .cat .chips{margin-bottom:4px}
+  .chips.per{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+  .chips.per .chip{padding:8px 0;font-size:13px;text-align:center;border-radius:9px;min-width:0}
   .cnt b{font-size:15px}
   .cnt small{display:block;font-size:12px;color:var(--muted);font-weight:400;margin-top:2px}
   .stp{display:flex;align-items:center;gap:12px}
@@ -50,15 +57,10 @@
        background:var(--orange);color:#fff}
   .btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--navy);flex:0 0 auto;padding:14px 18px}
   .btn:disabled{background:#D1D5DB;cursor:default}
+  .saved{margin-top:10px;text-align:center;font-size:13px;font-weight:700;color:var(--navy)}
   .msg{font-size:12.5px;color:#B4561A;margin-top:10px;min-height:1em}
   /* 결과 */
-  .sum{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--muted);
-       margin-bottom:12px;line-height:1.6}
-  .sum b{color:var(--ink)}
   .grp{margin-bottom:14px}
-  .grp-h{display:flex;justify-content:space-between;align-items:baseline;margin:0 2px 7px}
-  .grp-h b{font-size:15px;color:var(--navy)}
-  .grp-h small{font-size:12px;color:var(--muted)}
   .row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:10px;align-items:center;background:#fff;
        border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:7px}
   .row.top{border-color:var(--orange)}
@@ -70,9 +72,9 @@
   .gr{display:inline-block;font-size:11px;font-weight:800;color:var(--good);background:#E8F5EE;border-radius:5px;padding:1px 6px;margin-right:5px}
   .rt{text-align:right;font-size:17px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;white-space:nowrap}
   .rt small{font-size:11px;color:var(--muted);font-weight:600;margin-right:2px}
+  .rt .sc{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-top:1px}
   .short{font-size:12.5px;color:#B4561A;background:#FFF5EC;border-radius:10px;padding:9px 12px;margin-bottom:7px}
   .none{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
-  .note{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.6}
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0F2647;color:#fff;padding:10px 18px;
          border-radius:22px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;white-space:nowrap}
   #toast.on{opacity:1}
@@ -81,11 +83,11 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="ttl"><h1>최적상품 찾기</h1><small id="asof">불러오는 중…</small></div>
-  <p class="sub">이달의 제안상품 중 조건에 맞는 최고금리 상품을 골라 드립니다.</p>
+  <div class="ttl"><h1>상품제안하기</h1><small id="asof">불러오는 중…</small></div>
+  <p class="sub">이달의 제안상품 중 선택하신 조건에 맞는 상품을 금리순으로 보여드립니다.<br><b class="must">(상품 제안전 연금컨설팅팀 사전 문의 필수)</b></p>
 
   <div id="wizard">
-    <div class="prog" id="prog"><i></i><i></i><i></i><i></i></div>
+    <div class="prog" id="prog"><i></i><i></i><i></i></div>
     <div class="prog-lb"><span id="progTxt"></span><b id="progSel"></b></div>
     <div class="card" id="stepCard"></div>
     <div class="acts">
@@ -96,14 +98,12 @@
   </div>
 
   <div id="result" hidden>
-    <div class="sum" id="sum"></div>
     <div id="resList"></div>
     <div class="acts">
       <button class="btn ghost" onclick="editCond()">조건 수정</button>
-      <button class="btn" onclick="copyText()">제안 문구 복사</button>
+      <button class="btn" id="bSave" onclick="saveResult()">제안상품 저장</button>
     </div>
-    <p class="note">· 금리는 해당 기준월 금리관리 데이터 기준(DB형, 연 %)입니다. 신용등급은 신용등급관리의 최종등급이며, 우체국은 국가전액보장으로 AAA로 봅니다.<br>
-       · 같은 분류 안에서 같은 기관은 금리가 가장 높은 상품 1개만 추천합니다. 판매불가 상품은 제외됩니다.</p>
+    <p class="saved" id="savedMsg" hidden>마이페이지에 저장한 상품 정보를 확인할 수 있습니다</p>
   </div>
 </div>
 <div id="toast"></div>
@@ -117,8 +117,8 @@ function toast(m){ const el=$('toast'); el.textContent=m; el.classList.add('on')
 
 /* ── 신용등급(최종등급) — pension.html penCore/penSecTok/penRatingOf와 동일 규칙(app.py _pen_core와 짝) ── */
 const RATING_SCALE=['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-','BB+','BB','BB-','B+','B','B-','CCC+','CCC','CCC-','CC','C','D'];
-const GRADE_OPTS=[{v:'AAA',t:'AAA'},{v:'AA+',t:'AA+ 이상'},{v:'AA',t:'AA0 이상'},{v:'AA-',t:'AA- 이상'},
-                  {v:'A+',t:'A+ 이상'},{v:'A',t:'A0 이상'},{v:'A-',t:'A- 이상'},{v:'ALL',t:'등급 무관'}];
+const GRADE_OPTS=[{v:'AAA',t:'AAA'},{v:'AA+',t:'AA+'},{v:'AA',t:'AA0'},{v:'AA-',t:'AA-'},
+                  {v:'A+',t:'A+'},{v:'A',t:'A0'},{v:'A-',t:'A-'},{v:'ALL',t:'무관'}];
 function penCore(s){
   let v=String(s==null?'':s).toLowerCase().replace(/주식회사|㈜|\(주\)|\s/g,'');
   v=v.replace(/(생명보험|손해보험|화재보험|연금보험)$/,'');
@@ -134,20 +134,20 @@ function ratingOf(r){
 }
 function gradeLabel(g){ return g==='AA'?'AA0':(g==='A'?'A0':(g==='BBB'?'BBB0':g)); }
 
-/* ── 상품분류: 예금 / ELB / DLB / GIC (RP·발행어음·디폴트옵션 제외) ── */
-const CATS=['예금','ELB','DLB','GIC'];
+/* ── 상품분류: 정기예금 / ELB / DLB / GIC (RP·발행어음·디폴트옵션 제외) ── */
+const CATS=['정기예금','ELB','DLB','GIC'];
 function catOf(r){
   const f=String(r.fam||'');
   if(/디폴트/.test(f)) return '';
   if(r.sector==='증권'){ if(/ELB/i.test(f)) return 'ELB'; if(/DLB/i.test(f)) return 'DLB'; return ''; }
-  if((r.sector==='은행'||r.sector==='저축은행') && f.indexOf('정기예금')>=0) return '예금';
+  if((r.sector==='은행'||r.sector==='저축은행') && f.indexOf('정기예금')>=0) return '정기예금';
   if((r.sector==='생명보험'||r.sector==='손해보험') && /이율보증형/.test(f)) return 'GIC';
   return '';
 }
 
 /* ── 데이터 ── */
 let RATINGS={}, ITEMS=[], MONTH='';
-const S={grade:'', cats:[], months:[], counts:{}};   // 선택값
+const S={grade:'', cats:[], per:{}};   // 선택값 · per = {분류: {기간(개월): 개수}}
 let step=1;
 
 async function boot(){
@@ -181,117 +181,120 @@ function gradeOk(r){
   return k>=0 && k<=RATING_SCALE.indexOf(S.grade);   // 등급을 모르는 기관은 확인 불가 → 제외
 }
 const pool=()=>ITEMS.filter(gradeOk);
-const poolCats=()=>pool().filter(r=>S.cats.includes(r.cat));
-const poolFinal=()=>poolCats().filter(r=>S.months.includes(r.months));
+const catPool=c=>pool().filter(r=>r.cat===c);
+const PERIODS=[3,6,12,18,24,30,36,60];   // 선택 가능한 기간(개월) — 3개월·6개월·1년·18개월·2년·30개월·3년·5년
+const PERIOD_SHORT={3:'3M',6:'6M',12:'1Y',18:'18M',24:'2Y',30:'30M',36:'3Y',60:'5Y'};   // 칩 한 줄 표시용 약칭
 function orgCount(rows){ return new Set(rows.map(r=>r.org)).size; }
 
 /* ── 단계 화면 ── */
 function chip(on, label, onclick, extra, disabled){
   return `<button class="chip${on?' on':''}" onclick="${onclick}"${disabled?' disabled':''}>${esc(label)}${extra?`<small>${esc(extra)}</small>`:''}</button>`;
 }
+/* 선택 요약: 정기예금 1년×2 · ELB 1년×1,2년×1 */
+function selText(){
+  return S.cats.map(c=>{ const per=S.per[c]||{}; const ms=Object.keys(per).map(Number).sort((a,b)=>a-b);
+    return c+(ms.length?' '+ms.map(m=>MONTH_LABEL[m]+'×'+per[m]).join(','):''); }).join(' · ');
+}
 function render(){
   $('prog').querySelectorAll('i').forEach((el,i)=>el.classList.toggle('on', i<step));
-  $('progTxt').textContent=step+' / 4 단계';
-  $('progSel').textContent=[S.grade?(GRADE_OPTS.find(g=>g.v===S.grade)||{}).t:'', S.cats.join('·'),
-                            S.months.map(m=>MONTH_LABEL[m]).join('·')].filter(Boolean).join(' | ');
+  $('progTxt').textContent=step+' / 3 단계';
+  $('progSel').textContent=[S.grade?(GRADE_OPTS.find(g=>g.v===S.grade)||{}).t:'', step>=3?selText():S.cats.join('·')].filter(Boolean).join(' | ');
   $('msg').textContent='';
   $('bPrev').hidden=step<=1;
-  $('bNext').textContent=step<4?'다음':'최적상품 보기';
+  $('bNext').textContent=step<3?'다음':'제안상품 보기';
   const card=$('stepCard');
   if(!ITEMS.length){
     card.innerHTML=`<div class="none">이달의 제안상품이 아직 등록되지 않았습니다.</div>`;
     $('bNext').disabled=true; return;
   }
   if(step===1){
-    card.innerHTML=`<div class="q"><em>1</em>신용등급</div><div class="qd">고객이 허용하는 최저 신용등급을 고르세요. (신용등급관리 최종등급 기준)</div>`+
-      `<div class="chips">${GRADE_OPTS.map(g=>{
+    card.innerHTML=`<div class="q"><em>1</em>신용등급</div><div class="qd">상품의 신용등급제한을 선택해주세요(선택한 신용등급 이상 적용)</div>`+
+      `<div class="chips per">${GRADE_OPTS.map(g=>{
           const save=S.grade; S.grade=g.v; const n=orgCount(pool()); S.grade=save;
-          return chip(S.grade===g.v, g.t, `pick('grade','${g.v}')`, n+'곳', !n);
+          return chip(S.grade===g.v, g.t, `pick('${g.v}')`, '', !n);
         }).join('')}</div>`;
     $('bNext').disabled=!S.grade;
   }else if(step===2){
-    const p=pool();
     card.innerHTML=`<div class="q"><em>2</em>상품분류</div><div class="qd">제안할 상품분류를 모두 고르세요. (여러 개 선택 가능)</div>`+
-      `<div class="chips">${CATS.map(c=>{ const n=p.filter(r=>r.cat===c).length;
-          return chip(S.cats.includes(c), c, `toggle('cats','${c}')`, n+'개', !n); }).join('')}</div>`;
+      `<div class="chips">${CATS.map(c=>chip(S.cats.includes(c), c, `toggleCat('${c}')`)).join('')}</div>`;
     $('bNext').disabled=!S.cats.length;
-  }else if(step===3){
-    const p=poolCats();
-    const avail=MONTHS.filter(m=>p.some(r=>r.months===m));
-    card.innerHTML=`<div class="q"><em>3</em>기간</div><div class="qd">제안할 기간을 모두 고르세요. (여러 개 선택 가능)</div>`+
-      `<div class="chips">${avail.map(m=>{ const n=p.filter(r=>r.months===m).length;
-          return chip(S.months.includes(m), MONTH_LABEL[m], `toggle('months',${m})`, n+'개'); }).join('')}</div>`;
-    $('bNext').disabled=!S.months.length;
   }else{
-    const p=poolFinal();
-    card.innerHTML=`<div class="q"><em>4</em>제안 개수</div><div class="qd">분류별로 몇 개씩 제안할지 정하세요. (분류별 최대 5개)</div>`+
-      S.cats.map(c=>{ const v=S.counts[c]||1; const n=orgCount(p.filter(r=>r.cat===c));
-        return `<div class="cnt"><div><b>${c}</b><small>조건에 맞는 기관 ${n}곳</small></div>`+
-               `<div class="stp"><button aria-label="${c} 줄이기" onclick="cnt('${c}',-1)"${v<=1?' disabled':''}>−</button>`+
-               `<span>${v}</span><button aria-label="${c} 늘리기" onclick="cnt('${c}',1)"${v>=5?' disabled':''}>+</button></div></div>`;
+    card.innerHTML=`<div class="q"><em>3</em>기간·제안 개수</div><div class="qd">분류마다 기간을 고르고, 기간별로 몇 개씩 제안할지 정하세요. (기간별 최대 5개)</div>`+
+      S.cats.map(c=>{ const per=S.per[c]||{};
+        const ms=Object.keys(per).map(Number).sort((a,b)=>a-b);
+        return `<div class="cat"><div class="cat-h">${esc(c)}</div>`+
+          `<div class="chips per">${PERIODS.map(m=>chip(per[m]!=null, PERIOD_SHORT[m], `togglePer('${c}',${m})`)).join('')}</div>`+
+          ms.map(m=>{ const v=per[m];
+            return `<div class="cnt"><div><b>${esc(c)} ${MONTH_LABEL[m]}</b></div>`+
+              `<div class="stp"><button aria-label="${c} ${MONTH_LABEL[m]} 줄이기" onclick="cnt('${c}',${m},-1)"${v<=1?' disabled':''}>−</button>`+
+              `<span>${v}</span><button aria-label="${c} ${MONTH_LABEL[m]} 늘리기" onclick="cnt('${c}',${m},1)"${v>=5?' disabled':''}>+</button></div></div>`;
+          }).join('')+`</div>`;
       }).join('');
-    $('bNext').disabled=false;
+    $('bNext').disabled=!S.cats.every(c=>Object.keys(S.per[c]||{}).length);
   }
 }
-function pick(k,v){ S[k]=v; prune(); render(); }
-function toggle(k,v){ const a=S[k]; const i=a.indexOf(v); if(i>=0) a.splice(i,1); else a.push(v);
-  if(k==='months') a.sort((x,y)=>x-y); if(k==='cats') a.sort((x,y)=>CATS.indexOf(x)-CATS.indexOf(y)); prune(); render(); }
-function cnt(c,d){ S.counts[c]=Math.min(5,Math.max(1,(S.counts[c]||1)+d)); render(); }
+function pick(v){ S.grade=v; prune(); render(); }
+function toggleCat(c){ const i=S.cats.indexOf(c); if(i>=0) S.cats.splice(i,1); else S.cats.push(c);
+  S.cats.sort((x,y)=>CATS.indexOf(x)-CATS.indexOf(y)); prune(); render(); }
+function togglePer(c,m){ const per=S.per[c]=S.per[c]||{}; if(per[m]!=null) delete per[m]; else per[m]=1; render(); }
+function cnt(c,m,d){ const per=S.per[c]; per[m]=Math.min(5,Math.max(1,per[m]+d)); render(); }
 /* 앞 단계를 바꿔 더 이상 고를 수 없게 된 뒤 단계 선택값은 정리 */
 function prune(){
-  const p=pool();
-  S.cats=S.cats.filter(c=>p.some(r=>r.cat===c));
-  const pc=poolCats();
-  S.months=S.months.filter(m=>pc.some(r=>r.months===m));
+  for(const c of Object.keys(S.per)){
+    if(!S.cats.includes(c)){ delete S.per[c]; continue; }
+  }
 }
 function go(d){
-  if(d>0 && step===4){ showResult(); return; }
-  step=Math.min(4,Math.max(1,step+d)); render(); window.scrollTo(0,0);
+  if(d>0 && step===3){ showResult(); return; }
+  step=Math.min(3,Math.max(1,step+d)); render(); window.scrollTo(0,0);
 }
 
-/* ── 결과: 분류별 금리 높은 순 · 같은 기관 1개 · 개수만큼 ── */
+/* GIC(이율보증형보험, 연복리) 단리환산: ((1+금리/100)^년-1)/년*100 — pension.html simpleConv와 동일 */
+function simpleConv(rate,months){ const y=(+months)/12; if(!(y>0)||typeof rate!=='number') return null; return (Math.pow(1+rate/100,y)-1)/y*100; }
+/* ── 결과: 분류·기간별 금리 높은 순 · 같은 기관 1개 · 개수만큼 ── */
 let RESULT=[];
-function pickBest(c){
-  const rows=poolFinal().filter(r=>r.cat===c).sort((a,b)=>
+function pickBest(c,m,want){
+  const rows=catPool(c).filter(r=>r.months===m).sort((a,b)=>
     (b.rate-a.rate) || (RATING_SCALE.indexOf(a.grade)-RATING_SCALE.indexOf(b.grade)) ||
-    String(a.org).localeCompare(b.org,'ko') || (a.months-b.months));
+    String(a.org).localeCompare(b.org,'ko'));
   const seen=new Set(), out=[];
-  for(const r of rows){ if(seen.has(r.org)) continue; seen.add(r.org); out.push(r); if(out.length>=(S.counts[c]||1)) break; }
+  for(const r of rows){ if(seen.has(r.org)) continue; seen.add(r.org); out.push(r); if(out.length>=want) break; }
   return out;
 }
 function showResult(){
-  RESULT=S.cats.map(c=>({cat:c, want:S.counts[c]||1, rows:pickBest(c)}));
-  const gt=(GRADE_OPTS.find(g=>g.v===S.grade)||{}).t;
-  $('sum').innerHTML=`<b>${esc(gt)}</b> · <b>${esc(S.months.map(m=>MONTH_LABEL[m]).join(', '))}</b><br>`+
-    RESULT.map(g=>`${esc(g.cat)} ${g.want}개`).join(' · ')+` · ${esc(MONTH.slice(0,4)+'년 '+MONTH.slice(5,7)+'월')} 기준`;
+  RESULT=[];
+  S.cats.forEach(c=>{ const per=S.per[c]||{};
+    Object.keys(per).map(Number).sort((a,b)=>a-b).forEach(m=>RESULT.push({cat:c, months:m, want:per[m], rows:pickBest(c,m,per[m])})); });
   $('resList').innerHTML=RESULT.map(g=>{
-    const head=`<div class="grp-h"><b>${esc(g.cat)}</b><small>${g.rows.length} / ${g.want}개</small></div>`;
-    const short=g.rows.length<g.want?`<div class="short">조건에 맞는 ${esc(g.cat)} 상품이 ${g.rows.length}개뿐입니다.</div>`:'';
-    const body=g.rows.length?g.rows.map((r,i)=>
+    const nm=g.cat+' '+MONTH_LABEL[g.months];
+    const short=!g.rows.length?`<div class="short">조건에 맞는 ${esc(nm)} 상품이 없습니다.</div>`
+               :(g.rows.length<g.want?`<div class="short">조건에 맞는 ${esc(nm)} 상품이 ${g.rows.length}개뿐입니다.</div>`:'');
+    const body=g.rows.map((r,i)=>
       `<div class="row${i===0?' top':''}"><span class="rk">${i+1}</span>`+
       `<div class="nm"><b>${esc(r.org)}</b><small><span class="gr">${esc(gradeLabel(r.grade)||'-')}</span>${esc(r.fam)} · ${esc(r.period||MONTH_LABEL[r.months])}</small></div>`+
-      `<div class="rt"><small>연</small>${r.rate.toFixed(2)}%</div></div>`).join(''):'';
-    return `<div class="grp">${head}${short}${body}</div>`;
+      `<div class="rt"><small>연</small>${r.rate.toFixed(2)}%${r.cat==='GIC'&&simpleConv(r.rate,r.months)!=null?`<span class="sc">단리환산 ${simpleConv(r.rate,r.months).toFixed(2)}%</span>`:''}</div></div>`).join('');
+    return `<div class="grp">${short}${body}</div>`;
   }).join('') || `<div class="none">조건에 맞는 상품이 없습니다.</div>`;
+  $('savedMsg').hidden=true;
   $('wizard').hidden=true; $('result').hidden=false; window.scrollTo(0,0);
 }
-function editCond(){ $('result').hidden=true; $('wizard').hidden=false; step=1; render(); window.scrollTo(0,0); }
+function editCond(){ $('savedMsg').hidden=true; $('result').hidden=true; $('wizard').hidden=false; step=1; render(); window.scrollTo(0,0); }
 
-function resultText(){
-  const lines=['[미래에셋증권] '+MONTH.slice(0,4)+'년 '+MONTH.slice(5,7)+'월 퇴직연금 제안상품'];
-  let n=0;
-  RESULT.forEach(g=>g.rows.forEach(r=>{ n++;
-    lines.push(`${n}. ${r.org} ${r.fam} ${r.period||MONTH_LABEL[r.months]} 연 ${r.rate.toFixed(2)}% (신용등급 ${gradeLabel(r.grade)||'-'})`); }));
-  lines.push('※ 금리는 '+MONTH.slice(0,4)+'년 '+MONTH.slice(5,7)+'월 기준이며 가입 시점에 따라 달라질 수 있습니다.');
-  return lines.join('\n');
-}
-function copyText(){
-  const t=resultText();
-  const fallback=()=>{ const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
-    document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e){} ta.remove();
-    toast(ok?'제안 문구를 복사했습니다':'복사하지 못했습니다'); };
-  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(()=>toast('제안 문구를 복사했습니다'), fallback);
-  else fallback();
+/* 결과 저장 → 마이페이지(본인 전용, 제안상품 기준월별) */
+async function saveResult(){
+  const items=[]; RESULT.forEach(g=>g.rows.forEach(r=>items.push({cat:g.cat, months:r.months, period:r.period||MONTH_LABEL[r.months],
+    org:r.org, fam:r.fam, rate:r.rate, grade:r.grade})));
+  if(!items.length){ toast('저장할 상품이 없습니다'); return; }
+  const b=$('bSave'); b.disabled=true;
+  try{
+    const res=await fetch('/api/my_proposals',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({month:MONTH, grade:S.grade, sel:S.per, items})});
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||!d.success) throw new Error(d.message||('서버 '+res.status));
+    $('savedMsg').hidden=false; toast('마이페이지에 저장했습니다');
+    try{ parent.postMessage({type:'myProposalsSaved'}, location.origin); }catch(e){}
+  }catch(e){ toast('저장하지 못했습니다: '+e.message); }
+  finally{ b.disabled=false; }   // 버튼은 항상 다시 누를 수 있음(다시 저장하면 최종안으로 대체)
 }
 boot();
 </script>
