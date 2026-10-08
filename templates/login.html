@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<script>/* 세션 만료로 iframe 안에 로그인 화면이 뜨면 전체 창을 로그인 화면으로 전환 */
+if (window.top !== window) { try { window.top.location.href = location.href; } catch (e) {} }</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>로그인 · 퇴직연금 원리금보장상품 Mobile 서비스</title>

@@ -33,11 +33,11 @@ app.config['MAX_FORM_MEMORY_SIZE'] = 50 * 1024 * 1024
 # 세션 쿠키 서명 키. 배포 시엔 반드시 SECRET_KEY 환경변수로 고정값 지정
 # (여러 인스턴스가 같은 키를 써야 로그인 세션이 공유됨).
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
-# 회사 이메일 매직링크로 로그인한 세션 + 기기 신뢰(remember_token) 쿠키의 유지 기간.
-# session.permanent=True로 표시된 세션과 remember_token에만 적용되며(=이메일 인증
-# 로그인 전용), 아이디/비밀번호 로그인에는 영향 없음.
+# 기기 신뢰(remember_token) 쿠키 유지 기간 — 이 기간 안에는 재로그인 시 인증코드를 생략한다.
+# 로그인 세션 자체는 브라우저 세션 쿠키(창/브라우저 종료 시 소멸) + 아래 미사용 자동 로그아웃.
 EMAIL_LOGIN_SESSION_DAYS = int(os.environ.get('EMAIL_LOGIN_SESSION_DAYS', '30'))
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=EMAIL_LOGIN_SESSION_DAYS)
+# 미사용 자동 로그아웃(분) — 이 시간 동안 사용자 조작이 없으면 세션 만료.
+IDLE_TIMEOUT_MINUTES = int(os.environ.get('IDLE_TIMEOUT_MINUTES', '30'))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -361,30 +361,15 @@ def _start_member_session(m: dict, email: str):
     session['role'] = m.get('role', 'rm')     # 회원은 조회·다운로드 전용(rm)
     session['name'] = m.get('name', '')
     session['view'] = 'web'
-    # 로그인 성공 시점부터 EMAIL_LOGIN_SESSION_DAYS일간 세션 유지 → 그 기간 동안은
-    # 재접속해도 인증코드 재확인 없이 로그인 상태 유지.
-    session.permanent = True
+    session['last_active'] = time.time()
 
 
 def _issue_remember_cookie(resp, email: str):
-    """기기 신뢰 쿠키 발급 — 로그아웃해도 지워지지 않아, 로그아웃 후 재로그인 시에도
-    EMAIL_LOGIN_SESSION_DAYS일이 지나기 전까지는 인증코드 없이 로그인할 수 있다."""
+    """기기 신뢰 쿠키 발급 — 로그아웃해도 지워지지 않아, 로그아웃 후 이메일+비밀번호로 재로그인 시
+    EMAIL_LOGIN_SESSION_DAYS일이 지나기 전까지는 인증코드를 생략한다(자동 로그인은 하지 않음)."""
     resp.set_cookie(REMEMBER_COOKIE, _create_remember_token(email),
                     max_age=EMAIL_LOGIN_SESSION_DAYS * 86400,
                     httponly=True, samesite='Lax')
-
-
-def _login_from_remember_cookie() -> bool:
-    """remember_token 쿠키가 유효하고 계정이 여전히 승인 상태면 세션을 만들어 로그인 처리.
-    로그아웃 후 재방문한 신뢰 기기를 인증코드 없이 통과시키는 데 쓰인다."""
-    email = _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, ''))
-    if not email:
-        return False
-    m = _load_members().get(email)
-    if not m or m.get('status') != 'approved':
-        return False
-    _start_member_session(m, email)
-    return True
 
 
 # SMTP 설정은 두 곳에서 온다(파일 우선): ① data/smtp.json(연금컨설팅팀이 화면에서 저장 — VM 접근 불필요),
@@ -661,20 +646,63 @@ def _rm_days_left():
 def _require_login():
     if request.endpoint in _PUBLIC_ENDPOINTS:
         return
+    # 미사용 자동 로그아웃: 마지막 사용자 활동 후 IDLE_TIMEOUT_MINUTES분 지나면 세션 만료.
+    # 활동 시각은 화면(HTML) 이동과 /api/heartbeat(화면 내 클릭·키 입력 시 session_guard.js 가 전송)로만
+    # 갱신한다 — 그 외 /api/* 는 화면의 주기적 자동 조회일 수 있어 세션을 연장하지 않는다.
+    expired = False
+    if session.get('logged_in'):
+        now = time.time()
+        last = session.get('last_active')
+        if last and now - last > IDLE_TIMEOUT_MINUTES * 60:
+            session.clear()
+            expired = True
+        elif not last or not request.path.startswith('/api/') or request.endpoint == 'api_heartbeat':
+            session['last_active'] = now
     if not session.get('logged_in'):
-        # 신뢰 기기(remember_token 쿠키, 이메일 인증 로그인 전용)면 재인증 없이 통과.
-        if _login_from_remember_cookie():
-            return
         # API(fetch) 요청은 401 JSON, 일반 페이지는 로그인 화면으로 유도
         if request.path.startswith('/api/'):
             return jsonify({'success': False, 'message': '로그인이 필요합니다',
                             'login_required': True}), 401
+        if expired:
+            return redirect(url_for('login', expired=1))
         return redirect(url_for('login', next=request.path))
     # 로그인됨 — RM(조회 전용)은 관리 엔드포인트 차단(서버측 강제)
     if session.get('role') == 'rm' and request.endpoint in _ADMIN_ONLY_ENDPOINTS:
         if request.path.startswith('/api/'):
             return jsonify({'success': False, 'message': '조회 전용 계정은 이 기능을 사용할 수 없습니다.'}), 403
         return redirect(url_for('index'))
+
+
+# ── 로그인 사용자 HTML 에 static/session_guard.js(미사용 자동 로그아웃) 삽입,
+#    관리자(연금컨설팅팀) 외에는 static/screen_guard.js(화면 캡처 억제)도 삽입 ──
+#   같은 URL 이 역할별로 다른 HTML 을 받으므로 조건부 요청(304)·캐시를 끄고 매번 새로 내려준다.
+@app.before_request
+def _no_conditional_html():
+    if not request.path.startswith('/static/'):
+        request.environ.pop('HTTP_IF_NONE_MATCH', None)
+        request.environ.pop('HTTP_IF_MODIFIED_SINCE', None)
+
+
+@app.after_request
+def _inject_screen_guard(resp):
+    if resp.mimetype != 'text/html' or resp.status_code != 200 or not session.get('logged_in'):
+        return resp
+    resp.headers['Cache-Control'] = 'no-store'
+    resp.headers.pop('ETag', None)
+    resp.headers.pop('Last-Modified', None)
+    from markupsafe import escape
+    tag = ('<script src="%s" data-idle-min="%d"></script>'
+           % (url_for('static', filename='session_guard.js'), IDLE_TIMEOUT_MINUTES))
+    if session.get('role') != 'consulting':
+        tag += ('<script src="%s" data-user="%s"></script>'
+                % (url_for('static', filename='screen_guard.js'),
+                   escape(' '.join(x for x in (session.get('name'), session.get('user')) if x))))
+    resp.direct_passthrough = False   # send_file 응답도 본문 수정 가능하게
+    html = resp.get_data(as_text=True)
+    pos = html.lower().rfind('</body>')
+    html = html[:pos] + tag + html[pos:] if pos >= 0 else html + tag
+    resp.set_data(html)
+    return resp
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -693,6 +721,7 @@ def login():
             session['logged_in'] = True
             session['user'] = u
             session['role'] = role     # consulting=전체관리, rm=조회·다운로드만
+            session['last_active'] = time.time()
             # 조회 방식: simple=간편조회(모바일 v2 신규), web=웹버전조회(기존 v1). 기본 web.
             session['view'] = 'simple' if request.form.get('view') == 'simple' else 'web'
             nxt = request.args.get('next') or '/'
@@ -702,6 +731,10 @@ def login():
         error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
         return redirect(url_for('index'))
+    if request.args.get('expired'):
+        return render_template('login.html', error='',
+                               info='%d분 동안 사용하지 않아 자동 로그아웃되었습니다. 다시 로그인해 주세요.'
+                               % IDLE_TIMEOUT_MINUTES)
     # 주의: 여기서 신뢰 기기 쿠키로 자동 로그인시키지 않는다 — 로그인 화면에 왔다는 것은
     # (특히 방금 로그아웃한 경우) 실제로 로그인 폼을 보고 싶다는 뜻이므로, 이메일+비밀번호를
     # 입력해야 다음 단계(신뢰 기기면 인증코드 생략)로 넘어간다. 자동 통과시키면 로그아웃
@@ -716,7 +749,13 @@ def logout():
     # 로그아웃 버튼 자체가 무반응처럼 보이는 문제는 위 login() GET에서 자동 재로그인을
     # 하지 않도록 해서 해결한다(로그아웃하면 항상 빈 로그인 폼이 보인다).
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('login', expired=1) if request.args.get('expired') else url_for('login'))
+
+
+@app.route('/api/heartbeat', methods=['POST'])
+def api_heartbeat():
+    # 화면 내 사용자 활동 알림(session_guard.js) — 시각 갱신은 _require_login 에서 처리.
+    return jsonify({'ok': True})
 
 
 # ── 신규 회원 가입 신청 ────────────────────────────────────────────────
