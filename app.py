@@ -94,7 +94,7 @@ SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 SMTP_FROM = os.environ.get('SMTP_FROM', SMTP_USER)          # 발신 주소(미설정 시 SMTP_USER)
 SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', '연금컨설팅 신용등급 시스템')
 # 신규 가입 신청이 들어오면 알림을 받을 관리자 이메일(선택). 미설정 시 알림 생략.
-ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_NOTIFY_EMAIL', '')
+ADMIN_NOTIFY_EMAIL = os.environ.get('ADMIN_NOTIFY_EMAIL', 'hguroo2@naver.com')
 
 
 def _role_for(username: str):
