@@ -219,7 +219,7 @@ function render(){
       `<div class="chips">${CATS.map(c=>chip(S.cats.includes(c), c, `toggleCat('${c}')`)).join('')}</div>`;
     $('bNext').disabled=!S.cats.length;
   }else{
-    card.innerHTML=`<div class="q"><em>3</em>기간·제안 개수</div><div class="qd">분류마다 기간을 고르고, 기간별로 몇 개씩 제안할지 정하세요. (기간별 최대 5개)</div>`+
+    card.innerHTML=`<div class="q"><em>3</em>기간·제안 개수</div><div class="qd">분류마다 기간을 고르고, 기간별로 몇 개씩 제안할지 선택하세요. (기간별 최대 5개)</div>`+
       S.cats.map(c=>{ const per=S.per[c]||{};
         const ms=Object.keys(per).map(Number).sort((a,b)=>a-b);
         return `<div class="cat"><div class="cat-h">${esc(c)}</div>`+
