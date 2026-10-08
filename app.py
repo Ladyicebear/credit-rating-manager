@@ -729,7 +729,7 @@ def login():
             nxt = request.args.get('next') or '/'
             if not nxt.startswith('/'):   # 오픈 리다이렉트 방지
                 nxt = '/'
-            return redirect(url_for('intro', next=nxt))
+            return redirect(nxt)
         error = '아이디 또는 비밀번호가 올바르지 않습니다.'
     if session.get('logged_in'):
         return redirect(url_for('index'))
@@ -742,15 +742,6 @@ def login():
     # 입력해야 다음 단계(신뢰 기기면 인증코드 생략)로 넘어간다. 자동 통과시키면 로그아웃
     # 버튼을 눌러도 즉시 재로그인되어 "로그아웃이 안 된다"처럼 보인다.
     return render_template('login.html', error=error)
-
-
-@app.route('/intro')
-def intro():
-    # 로그인 성공 직후 1회: 접속 인트로 영상 재생 → 끝나면(또는 건너뛰기) 홈 화면으로 이동.
-    nxt = request.args.get('next') or '/'
-    if not nxt.startswith('/') or nxt.startswith('//'):   # 오픈 리다이렉트 방지
-        nxt = '/'
-    return render_template('intro.html', next_url=nxt)
 
 
 @app.route('/logout')
@@ -864,7 +855,7 @@ def login_member():
     # 이 기기가 이미 신뢰된(EMAIL_LOGIN_SESSION_DAYS일 이내 인증 완료) 상태면 코드 없이 바로 로그인.
     if _verify_remember_token(request.cookies.get(REMEMBER_COOKIE, '')) == email:
         _start_member_session(m, email)
-        return redirect(url_for('intro'))
+        return redirect(url_for('index'))
     code = _create_verify_code(email, 'login')
     sent = _send_verify_code_email(email, m.get('name', ''), code)
     if not sent:
@@ -892,7 +883,7 @@ def verify_code():
         if not m or m.get('status') != 'approved':
             return render_template('login.html', error='승인되지 않은 계정입니다. 연금컨설팅팀에 문의하세요.')
         _start_member_session(m, email)
-        resp = make_response(redirect(url_for('intro')))
+        resp = make_response(redirect(url_for('index')))
         _issue_remember_cookie(resp, email)
         return resp
     # purpose == 'reset' — 본인 확인 완료, 새 비밀번호 설정 화면으로.
