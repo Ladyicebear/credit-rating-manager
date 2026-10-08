@@ -3031,6 +3031,12 @@ def rate_history_append():
                     'base_rate': base_rate, 'matched': matched})
 
 
+@app.route('/best_proposal')
+def best_proposal():
+    """상품제안 탭 — 이달의 제안상품에서 조건별 최고금리 상품 추천(RM 포함 전원 조회)."""
+    return send_file(os.path.join(BASE_DIR, 'best_proposal.html'))
+
+
 @app.route('/simple2')
 def simple2_preview():
     # 모바일 ver2 미리보기(개발용) — 로그인 세션 공유로 /api/* 정상 동작

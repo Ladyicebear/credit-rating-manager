@@ -529,6 +529,7 @@ tr.row-done td{transition:background .3s}
   <div class="super-tabs">
     <button id="stab-pension" class="super-tab active" onclick="switchSuper('pension')"><span class="stab-ic"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="13" width="4" height="7" rx="1"/><rect x="10" y="9" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg></span>원리금보장상품 금리</button>
     <button id="stab-credit"  class="super-tab"        onclick="switchSuper('credit')"><span class="stab-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.3v5.4c0 4.6 3.2 7.9 7.5 9.3 4.3-1.4 7.5-4.7 7.5-9.3V5.3L12 2.5Z"/><path d="m8.7 11.9 2.2 2.2 4.4-4.5"/></svg></span>신용등급관리</button>
+    <button id="stab-best"     class="super-tab"       onclick="switchSuper('best')">상품제안</button>
     {% if role != 'rm' %}
     <button id="stab-proposal" class="super-tab"       onclick="switchSuper('proposal')">상품제안관리</button>
     <button id="stab-docs"     class="super-tab"       onclick="switchSuper('docs')">약관·상품설명서</button>
@@ -541,6 +542,11 @@ tr.row-done td{transition:background .3s}
 <!-- ═══ [통합탭1] 원리금보장상품 금리 ═══ -->
 <div id="super-pension" class="super-panel">
   <iframe id="pension-frame" class="pension-frame" src="/pension" title="원리금보장상품 금리관리"></iframe>
+</div>
+
+<!-- ═══ 상품제안(최적상품 찾기) ═══ RM 포함 전원 · PC 상단탭 + 모바일 하단탭 -->
+<div id="super-best" class="super-panel" style="display:none">
+  <iframe id="best-frame" class="pension-frame" src="/best_proposal" title="상품제안 · 최적상품 찾기"></iframe>
 </div>
 
 <!-- 모바일 홈(카드 메뉴) — 하단탭 '홈'에서 표시 -->
@@ -1121,7 +1127,7 @@ function fitPensionFrame(){
   const tabbar = (window.matchMedia && window.matchMedia('(max-width:768px)').matches)
     ? Math.max(64, tb ? Math.ceil(tb.getBoundingClientRect().height) : 0) : 0;
   const h = Math.max(320, window.innerHeight - Math.round(hdr.getBoundingClientRect().height) - tabbar) + 'px';
-  ['pension-frame','proposal-frame','visitors-frame','docs-frame'].forEach(id=>{
+  ['pension-frame','proposal-frame','visitors-frame','docs-frame','best-frame'].forEach(id=>{
     const fr = document.getElementById(id);
     if(fr) fr.style.height = h;
   });
@@ -1153,6 +1159,7 @@ function switchSuper(which){
   const docs = which==='docs';
   const members = which==='members';
   const credit = which==='credit';
+  const best = which==='best';
   // 요소가 없을 수도 있으므로(예: RM은 상품제안관리 패널 미렌더) null-safe로 처리.
   // 이렇게 하지 않으면 중간에서 오류가 나 .main(신용등급 본문)을 숨기는 줄이 실행되지 않아
   // 원리금 탭에 신용등급 화면이 겹쳐 보이는 버그가 생긴다.
@@ -1165,6 +1172,7 @@ function switchSuper(which){
   setDisp(document.getElementById('super-members'), members);
   setDisp(document.getElementById('super-docs'), docs);
   setDisp(document.getElementById('super-home'), which==='home');
+  setDisp(document.getElementById('super-best'), best);
   setDisp(document.getElementById('credit-subbar'),  credit, 'flex');
   setDisp(document.querySelector('.main'),           credit);
   if(credit){ fitRatingTable(); setTimeout(fitRatingTable, 80); }   // .main 표시 후 5행 고정(레이아웃 안정 후 재보정)
@@ -1174,7 +1182,8 @@ function switchSuper(which){
   setAct(document.getElementById('stab-visitors'), visit);
   setAct(document.getElementById('stab-members'), members);
   setAct(document.getElementById('stab-docs'), docs);
-  if(pen || prop || visit || docs || members) fitPensionFrame();
+  setAct(document.getElementById('stab-best'), best);
+  if(pen || prop || visit || docs || members || best) fitPensionFrame();
   try{ localStorage.setItem('goun_super_tab', which); }catch(e){}
 }
 (function initSuper(){
@@ -1615,7 +1624,7 @@ function tapDocm(org,kind){
 }
 function closeDocmSheet(){ document.getElementById('dvmSheetOv').classList.remove('open'); }
 
-/* ── 하단 탭바: 홈·금리현황→원리금, 신용등급→신용등급, 상품설명서→문서 목록, 마이페이지→준비중 ── */
+/* ── 하단 탭바: 홈·금리현황→원리금, 상품제안→최적상품 찾기, 신용등급→신용등급, 상품설명서→문서 목록, 마이페이지→준비중 ── */
 function tabbarGo(which, el){
   // 마이페이지: 준비중 — 화면 전환 없이 현재 화면·현재 탭을 그대로 두고 안내만 표시
   if(which==='my'){ if(typeof showToast==='function') showToast('준비 중입니다','ok'); return; }
@@ -1623,7 +1632,7 @@ function tabbarGo(which, el){
   if(el) el.classList.add('active');
   var dm=document.getElementById('super-docsm');
   if(which==='docs'){   // 상품설명서: 다른 화면 숨기고 문서 목록 표시
-    ['super-pension','super-proposal','super-visitors','super-docs','super-home'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
+    ['super-pension','super-proposal','super-visitors','super-docs','super-home','super-best'].forEach(function(id){var e=document.getElementById(id); if(e)e.style.display='none';});
     var mn=document.querySelector('.main'); if(mn)mn.style.display='none';
     var cs=document.getElementById('credit-subbar'); if(cs)cs.style.display='none';
     document.querySelectorAll('.super-tab').forEach(function(t){t.classList.remove('active');});
@@ -1638,6 +1647,8 @@ function tabbarGo(which, el){
     try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(e){ window.scrollTo(0,0); }
   } else if(which==='rate'){
     if(typeof switchSuper==='function') switchSuper('pension');
+  } else if(which==='best'){
+    if(typeof switchSuper==='function') switchSuper('best');
   } else if(which==='credit'){
     if(typeof switchSuper==='function') switchSuper('credit');
   } else {
@@ -1658,6 +1669,9 @@ function closeHomeNotice(){ var m=document.getElementById('homeNoticeModal'); if
   </button>
   <button class="tab-item" data-tab="rate" onclick="tabbarGo('rate',this)">
     <svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="13" width="4" height="7" rx="1"/><rect x="10" y="9" width="4" height="11" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/></svg><span>금리현황</span>
+  </button>
+  <button class="tab-item" data-tab="best" onclick="tabbarGo('best',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z"/></svg><span>상품제안</span>
   </button>
   <button class="tab-item" data-tab="credit" onclick="tabbarGo('credit',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 4.5 5.3v5.4c0 4.6 3.2 7.9 7.5 9.3 4.3-1.4 7.5-4.7 7.5-9.3V5.3L12 2.5Z"/><path d="m8.7 11.9 2.2 2.2 4.4-4.5"/></svg><span>신용등급</span>
