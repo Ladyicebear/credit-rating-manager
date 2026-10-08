@@ -288,13 +288,15 @@
   /* ---------- 이달의 제안 가능 상품(모바일) ---------- */
   .prop-card{display:none;background:#fff;border:1px solid var(--line);border-radius:12px;
     box-shadow:var(--shadow);margin-bottom:14px}   /* overflow:hidden 제거 → 칩 sticky 동작 */
-  .prop-head{display:flex;align-items:center;gap:8px;padding:11px 14px}
+  .prop-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding:11px 14px}
   .prop-head .prop-title{font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.4px;white-space:nowrap}  /* 네이비 · 크기=사업자 금리현황 제목 */
   /* 공지 버튼(모바일 제안카드) */
   .prop-head .prop-notice-btn{background:#E7E9ED;color:#5A6474;border:none;border-radius:7px;
       font-size:11px;font-weight:800;padding:4px 11px;cursor:pointer;font-family:inherit;letter-spacing:-.2px;flex:0 0 auto;display:inline-flex;align-items:center;gap:5px}
   .prop-head .prop-notice-btn svg{width:15px;height:15px;flex:0 0 auto}
   .prop-head .prop-notice-btn:hover{background:#DBDEE4}
+  /* 공지 옆 안내 문구(좁은 화면에선 다음 줄로 내려감) */
+  .prop-head .prop-warn{font-size:11.5px;font-weight:800;color:#D9480F;letter-spacing:-.3px;white-space:nowrap}
   /* 공지사항 팝업 본문 */
   .notice-modal-body{padding:4px 4px 6px;white-space:pre-wrap;word-break:break-word;font-size:13.5px;line-height:1.7;color:var(--ink);min-height:60px}
   .notice-modal-body.empty{color:var(--muted);text-align:center;padding:24px 4px}
@@ -637,6 +639,7 @@
     <div class="prop-head">
       <span class="prop-title">이달의 제안 가능 상품(DB제도)</span>
       <button class="prop-notice-btn" onclick="openNotice()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.2 9.1C4.0 9.1 3 10.1 3 11.3v1.4c0 1.2 1.0 2.2 2.2 2.2h.8l.9 3.05c.27.9 1.6.83 1.77-.1L9 15.3l7.4 2.5c1.15.4 2.35-.46 2.35-1.68V7.88c0-1.22-1.2-2.08-2.35-1.68L9 8.7H5.2Z"/><circle cx="20.4" cy="12" r="1.35"/></svg>공지</button>
+      <span class="prop-warn">제안전 반드시 사전문의</span>
     </div>
     <div class="prop-controls">
       <div class="prop-sbox">
