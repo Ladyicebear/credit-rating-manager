@@ -9,11 +9,12 @@ if (window.top !== window) { try { window.top.location.href = location.href; } c
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;color:#222;
-     min-height:100vh;background:#FCD4B0 url('/static/images/login_bg.jpg?v=4') no-repeat center -20vw;background-size:100% auto}
+     min-height:100vh;background:#FCD4B0 url('/static/images/login_bg_m.jpg?v=1') no-repeat center -15vw;background-size:100% auto}
 .lg-wrap{min-height:100vh;min-height:100dvh;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
 /* 상단: 로고 + 타이틀 (모바일은 배경 이미지에 로고·문구가 포함되어 있어 글자는 화면에서 숨기고 자리만 확보) */
-/* 배경 그림(로고·문구·아이콘)이 카드에 가려지지 않도록 그림 하단(아이콘·구슬)까지 높이 확보 */
-.lg-top{padding:40px 28px 0;min-height:82vw;box-sizing:border-box}
+/* 배경 그림(로고·문구·아이콘)이 카드에 가려지지 않도록 그림 하단(아이콘·구슬)까지 높이 확보.
+   login_bg_m.jpg는 login_bg.jpg 양옆에 가장자리 색을 이어 붙여 넓힌 것(그림이 화면 폭의 80%로 보임) */
+.lg-top{padding:40px 28px 0;min-height:67vw;box-sizing:border-box}
 .lg-top .lg-logo,.lg-top .lg-title,.lg-top .lg-sub{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .lg-logo{height:30px;width:auto;display:block;margin-bottom:20px}
 .lg-title{font-size:1.4rem;font-weight:800;color:#1a1a1a;letter-spacing:-.5px;line-height:1.3}
