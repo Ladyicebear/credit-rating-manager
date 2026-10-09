@@ -685,6 +685,15 @@ def _no_conditional_html():
         request.environ.pop('HTTP_IF_MODIFIED_SINCE', None)
 
 
+# 로그인 화면 등 비로그인 HTML 도 브라우저(특히 모바일 인앱 브라우저)가 예전 화면을 캐시해
+# 보여주지 않도록 매번 새로 받게 한다. (로그인 사용자 HTML 은 아래에서 따로 no-store 처리)
+@app.after_request
+def _no_cache_html(resp):
+    if resp.mimetype == 'text/html' and 'Cache-Control' not in resp.headers:
+        resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
 @app.after_request
 def _inject_screen_guard(resp):
     if resp.mimetype != 'text/html' or resp.status_code != 200 or not session.get('logged_in'):
