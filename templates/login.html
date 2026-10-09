@@ -96,7 +96,16 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .intro{position:fixed;inset:0;z-index:100;background:#FAF1E8;display:flex;align-items:center;justify-content:center;
        transition:opacity .5s ease}
 .intro.out{opacity:0;pointer-events:none}
-.intro video{width:100%;height:100%;object-fit:contain}   /* 세로(9:16) 영상 — 모바일 브라우저도 위아래 잘림 없이 전체 표시(로고 상단 잘림 방지) */
+.intro video{position:relative;width:100%;height:100%;object-fit:cover}
+.intro-bg{position:absolute;inset:-6%;width:112%;height:112%;filter:blur(18px);display:none}
+/* 화면이 9:16 영상보다 가로로 넓으면(주소창 있는 모바일 브라우저·웹) cover 시 위아래(로고)가 잘리므로
+   영상은 전체를 보이게 두고, 양옆은 같은 영상을 흐리게 채운 배경과 경계를 부드럽게 섞어 여백이 보이지 않게 함 */
+@media (min-aspect-ratio:9/16){
+  .intro video{width:auto;aspect-ratio:9/16;object-fit:contain;
+    -webkit-mask-image:linear-gradient(to right,transparent 0,#000 12%,#000 88%,transparent 100%);
+            mask-image:linear-gradient(to right,transparent 0,#000 12%,#000 88%,transparent 100%)}
+  .intro-bg{display:block}
+}
 .intro-skip{position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));padding:7px 14px;border:none;
             border-radius:999px;background:rgba(0,0,0,.28);color:#fff;font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
 .intro-skip:hover{background:rgba(0,0,0,.42)}
@@ -131,7 +140,6 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
   .lg-links a,.lg-links button{font-size:.92rem}
   .lg-pwlink{margin-top:18px;font-size:.9rem}
   .lg-foot{margin-top:18px;font-size:.78rem}
-  .intro video{width:auto;max-width:100%;object-fit:contain}   /* 세로 영상 — 웹에선 잘리지 않게 */
 }
 </style>
 </head>
@@ -139,6 +147,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
   {% if not (error or info or rm_expired) %}
   <!-- 접속 인트로 영상: 브라우저 세션당 1회. 오류/안내 메시지가 있는 재표시 화면에서는 생략 -->
   <div class="intro" id="intro" aria-hidden="true">
+    <canvas class="intro-bg" id="intro-bg"></canvas>
     <video id="intro-video" src="/static/video/smartpension_intro.mp4" muted playsinline preload="auto"></video>
     <button type="button" class="intro-skip" id="intro-skip">건너뛰기</button>
   </div>
@@ -158,6 +167,19 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
     v.addEventListener('error',close);
     document.getElementById('intro-skip').addEventListener('click',close);
     setTimeout(close,10000);   // 로딩 지연/자동재생 차단 대비 안전장치
+    // 양옆 배경: 재생 중인 영상 프레임을 작은 캔버스에 cover로 그려 흐리게 확대(영상과 항상 동기)
+    var bg=document.getElementById('intro-bg'), cx=bg.getContext&&bg.getContext('2d');
+    function paint(){
+      if(done||!cx) return;
+      if(bg.offsetWidth&&v.videoWidth){
+        var cw=64, ch=Math.max(1,Math.round(64*bg.offsetHeight/bg.offsetWidth));
+        if(bg.width!==cw||bg.height!==ch){ bg.width=cw; bg.height=ch; }
+        var sc=Math.max(cw/v.videoWidth,ch/v.videoHeight), w=v.videoWidth*sc, h=v.videoHeight*sc;
+        try{ cx.drawImage(v,(cw-w)/2,(ch-h)/2,w,h); }catch(e){}
+      }
+      requestAnimationFrame(paint);
+    }
+    requestAnimationFrame(paint);
     var p=v.play(); if(p&&p.catch) p.catch(close);
   })();
   </script>
