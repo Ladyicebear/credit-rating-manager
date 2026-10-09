@@ -19,9 +19,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .brand-logo .b-org{color:#F68121}
 .brand-logo .b-gray{color:#b3bac4}
 .brand-sub{font-size:.82rem;color:#6b7280;margin-top:5px;font-weight:600}
-/* 헤더 로고 — 데스크톱·모바일 모두 SMART PENSION 이미지를 쓴다(텍스트 제목 대체) */
+/* 헤더 로고 — 데스크톱·모바일 모두 Pension Mate 이미지를 쓴다(텍스트 제목 대체).
+   로고 아래 미소 곡선이 있어 글자가 이미지 높이의 약 절반이므로 높이를 넉넉히 둔다 */
 .brand-smart{display:block;line-height:0}
-.brand-smart img{height:36px;width:auto;display:block}
+.brand-smart img{height:48px;width:auto;display:block}
 .hdr-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
 /* Goun 곰 로고(brand-mark)는 hdr-actions 인라인 아이템(RM 비번 버튼과 로그아웃 사이) */
 /* RM 비밀번호 만료 안내(연금컨설팅팀 전용): 평소 회색, 임박(3일 이하)·만료 시 주황 */
@@ -401,10 +402,10 @@ tr.row-done td{transition:background .3s}
   .super-tab{flex:1;text-align:center;padding:9px 4px;font-size:.82rem}
   /* 상품제안관리·방문자 통계·회원 승인은 관리자용 데스크톱 화면 → 모바일에서는 탭 숨김 */
   #stab-proposal,#stab-visitors,#stab-docs,#stab-members{display:none}
-  /* ── 모바일 상단 변경(요청): SMART FUTURE 로고 + 원리금/신용등급 알약 탭 ── */
+  /* ── 모바일 상단 변경(요청): Pension Mate 로고 + 원리금/신용등급 알약 탭 ── */
   .brand-logo,.brand-sub{display:none}
   .brand-smart{display:block;line-height:0}
-  .brand-smart img{height:22px;width:auto;display:block}
+  .brand-smart img{height:30px;width:auto;display:block}
   /* 탭 겹침(레이어) 5:5 — 선택 탭이 위로 올라와 옆 탭을 덮음 */
   /* 탭: 라운드 레일 + 아이콘 배지 + 겹침(5:5) */
   .super-tabs{border-bottom:none;gap:0;background:#E7E9ED;border-radius:28px;padding:5px}
@@ -514,7 +515,7 @@ tr.row-done td{transition:background .3s}
 <header class="hdr">
   <div class="hdr-row1">
     <div>
-      <div class="brand-smart"><img src="/static/images/smart_future.png" alt="SMART PENSION"></div>
+      <div class="brand-smart"><img src="/static/images/pension_mate_logo.png?v=1" alt="Pension Mate"></div>
     </div>
     <div class="hdr-actions">
       {% if role != 'rm' %}
