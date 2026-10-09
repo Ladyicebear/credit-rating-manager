@@ -101,7 +101,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 /* 화면이 9:16 영상보다 가로로 넓으면(주소창 있는 모바일 브라우저·웹) cover 시 위아래(로고)가 잘리므로
    영상은 전체를 보이게 두고, 양옆은 같은 영상을 흐리게 채운 배경과 경계를 부드럽게 섞어 여백이 보이지 않게 함 */
 @media (min-aspect-ratio:9/16){
-  .intro video{width:auto;aspect-ratio:9/16;object-fit:contain;
+  /* 영상은 1.2배 확대(위아래 빈 배경만 잘리고 로고·진행바는 보임). 단 화면 폭을 넘으면 폭에 맞춤 */
+  .intro video{flex:none;width:auto;height:min(120%,177.78vw);aspect-ratio:9/16;object-fit:contain;
     -webkit-mask-image:linear-gradient(to right,transparent 0,#000 12%,#000 88%,transparent 100%);
             mask-image:linear-gradient(to right,transparent 0,#000 12%,#000 88%,transparent 100%)}
   .intro-bg{display:block}
