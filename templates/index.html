@@ -566,6 +566,8 @@ tr.row-done td{transition:background .3s}
       <button class="mvx-tile" onclick="homeGoRate()"><span class="mvx-ic"><img src="/static/images/icon_rate.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">금리 현황</span><span class="mvx-go g-blue">›</span></div></button>
       <button class="mvx-tile" onclick="homeGo('credit')"><span class="mvx-ic"><img src="/static/images/icon_credit.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">신용등급</span><span class="mvx-go g-blue">›</span></div></button>
       <button class="mvx-tile" onclick="homeGo('docs')"><span class="mvx-ic"><img src="/static/images/icon_docs.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">약관·상품설명서</span><span class="mvx-go g-org">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGo('best')"><span class="mvx-ic"><img src="/static/images/icon_recommend.png?v=1" alt=""></span><div class="mvx-foot"><span class="mvx-lb">상품제안하기</span><span class="mvx-go g-org">›</span></div></button>
+      <button class="mvx-tile" onclick="homeGoIndicator()"><span class="mvx-ic"><img src="/static/images/icon_indicator.png?v=1" alt=""></span><div class="mvx-foot"><span class="mvx-lb">주요지표</span><span class="mvx-go g-blue">›</span></div></button>
     </div>
   </div>
   <!-- 홈 공지 팝업 -->
@@ -1665,6 +1667,7 @@ function tabbarGo(which, el){
 function homeGo(tab){ var el=document.querySelector('#appTabbar [data-tab="'+tab+'"]'); tabbarGo(tab, el); }
 function homeGoRate(){ homeGo('rate'); [300,700].forEach(function(n){ setTimeout(function(){ try{ var w=document.getElementById('pension-frame').contentWindow; if(w) w.scrollTo(0,0); }catch(e){} }, n); }); }
 function homeGoProposal(){ homeGo('rate'); var _n=0; (function loop(){ _n++; try{ var f=document.getElementById('pension-frame'); var d=f.contentDocument, w=f.contentWindow; var p=d&&d.getElementById('proposalMobile'); if(p && p.offsetHeight>10){ var y=p.getBoundingClientRect().top + (w.pageYOffset||w.scrollY||0) - 6; w.scrollTo(0, Math.max(0,y)); return; } }catch(e){} if(_n<14) setTimeout(loop, 250); })(); }
+function homeGoIndicator(){ homeGo('rate'); var _n=0; (function loop(){ _n++; try{ var f=document.getElementById('pension-frame'); var d=f.contentDocument, w=f.contentWindow; var p=d&&d.getElementById('mIndWrap'); if(p && p.offsetHeight>10){ var y=p.getBoundingClientRect().top + (w.pageYOffset||w.scrollY||0) - 6; w.scrollTo(0, Math.max(0,y)); return; } }catch(e){} if(_n<14) setTimeout(loop, 250); })(); }
 function homeNotice(){ var m=document.getElementById('homeNoticeModal'); if(!m) return; var b=document.getElementById('hnBody'); b.className='hn-body'; b.textContent='불러오는 중…'; document.getElementById('hnWhen').textContent=''; m.style.display='flex'; fetch('/api/notice').then(function(r){return r.json();}).then(function(d){ var t=((d&&d.text)||'').trim(); if(t){ b.className='hn-body'; b.textContent=t; } else { b.className='hn-body empty'; b.textContent='등록된 공지사항이 없습니다.'; } document.getElementById('hnWhen').textContent=(d&&d.updated_at)?('업데이트: '+d.updated_at):''; }).catch(function(){ b.className='hn-body empty'; b.textContent='공지를 불러오지 못했습니다.'; }); }
 function closeHomeNotice(){ var m=document.getElementById('homeNoticeModal'); if(m) m.style.display='none'; }
 </script>
