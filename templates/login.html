@@ -95,17 +95,12 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .pw-save:hover{background:#CB6015}
 .pw-save:disabled{background:#f0b988;cursor:default}
 /* 접속 인트로 영상(첫 접속 시 1회 재생 후 로그인 화면으로 전환) */
-.intro{position:fixed;inset:0;z-index:100;background:#F1D7BC;display:flex;align-items:center;justify-content:center;
-       transition:opacity .5s ease}
+.intro{position:fixed;inset:0;z-index:100;background:#FCE9D8;overflow:hidden;transition:opacity .5s ease}
 .intro.out{opacity:0;pointer-events:none}
-/* 영상은 원본 그대로(흐림·페이드 처리 없음) 화면을 가득 채움.
-   내용(로고~진행률 숫자)은 영상 높이의 18%~87% 구간이라, 가로가 조금 넓은 화면(주소창 있는 모바일 브라우저)에서
-   cover로 위아래가 잘려도 빈 배경만 잘리도록 세로 기준점을 58%로 둠 */
-.intro video{width:100%;height:100%;object-fit:cover;object-position:50% 58%}
-/* 화면이 4:5보다 넓으면(태블릿 가로·웹) cover 시 로고·진행바가 잘리므로 영상 전체를 그대로 표시 */
-@media (min-aspect-ratio:4/5){
-  .intro video{object-fit:contain;object-position:50% 50%}
-}
+/* 영상(1080×1920)은 원본 그대로 표시. 크기·위치는 아래 스크립트(fit)가 화면 비율에 맞춰 계산:
+   가능한 한 화면을 가득 채우되(cover), 내용 영역(로고~진행률 숫자, 가로 12~92%·세로 12~93%, 여백 포함)은
+   어떤 화면에서도 잘리지 않도록 그보다 작게 맞춤. 스크립트 전에는 영상 전체가 보이도록 contain */
+.intro video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;display:block}
 .intro-skip{position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));padding:7px 14px;border:none;
             border-radius:999px;background:rgba(0,0,0,.28);color:#fff;font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
 .intro-skip:hover{background:rgba(0,0,0,.42)}
@@ -147,7 +142,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
   {% if not (error or info or rm_expired) %}
   <!-- 접속 인트로 영상: 브라우저 세션당 1회. 오류/안내 메시지가 있는 재표시 화면에서는 생략 -->
   <div class="intro" id="intro" aria-hidden="true">
-    <video id="intro-video" src="/static/video/pension_mate_intro.mp4" muted playsinline preload="auto"></video>
+    <video id="intro-video" src="/static/video/pension_mate_loading.mp4" muted playsinline preload="auto"></video>
     <button type="button" class="intro-skip" id="intro-skip">건너뛰기</button>
   </div>
   <script>
@@ -157,11 +152,29 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       if(done) return; done=true;
       try{ sessionStorage.setItem('sp_intro_seen','1'); }catch(e){}
       ov.classList.add('out');
+      window.removeEventListener('resize',fit);
       setTimeout(function(){ ov.remove(); },500);
     }
     var seen=false;
     try{ seen=sessionStorage.getItem('sp_intro_seen')==='1'; }catch(e){}
     if(seen){ ov.remove(); return; }
+    // 영상 배치: cover 배율과 '내용 영역이 화면에 다 들어오는 배율' 중 작은 값 사용
+    var VW=1080, VH=1920, BX0=.12, BX1=.92, BY0=.12, BY1=.93;
+    function fit(){
+      var sw=ov.clientWidth||window.innerWidth, sh=ov.clientHeight||window.innerHeight;
+      var cover=Math.max(sw/VW, sh/VH);
+      var inside=Math.min(sw/(VW*(BX1-BX0)), sh/(VH*(BY1-BY0)));
+      var k=Math.min(cover, inside), w=VW*k, h=VH*k;
+      function pos(screen, size, c){          // 내용 중심을 화면 중앙에, 단 영상 가장자리 밖 빈 공간은 최소화
+        if(size<=screen) return (screen-size)/2;
+        return Math.min(0, Math.max(screen-size, screen/2-size*c));
+      }
+      v.style.objectFit='fill';
+      v.style.width=w+'px'; v.style.height=h+'px';
+      v.style.left=pos(sw,w,(BX0+BX1)/2)+'px'; v.style.top=pos(sh,h,(BY0+BY1)/2)+'px';
+    }
+    fit();
+    window.addEventListener('resize',fit);
     v.addEventListener('ended',close);
     v.addEventListener('error',close);
     document.getElementById('intro-skip').addEventListener('click',close);
