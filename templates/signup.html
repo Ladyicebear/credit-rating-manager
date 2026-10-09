@@ -18,6 +18,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .lg-sub{font-size:.9rem;color:#9298a1;margin-top:9px;font-weight:500}
 .lg-card{background:#fff;border-radius:22px;margin:22px 16px 24px;padding:26px 22px 22px;
          box-shadow:0 12px 44px rgba(90,66,30,.16)}
+/* 모바일: 제목·안내 문구를 흰색 카드 안 맨 위에 표시(위쪽 .lg-top 제목은 숨김). 데스크톱은 기존처럼 카드 위에 표시 */
+.lg-top .lg-title,.lg-top .lg-sub{display:none}
+.lg-card-head{margin-bottom:20px}
 .lg-err{background:#fff0f0;border:1px solid #f5c6cb;color:#c0392b;border-radius:10px;
         padding:10px 12px;font-size:.8rem;margin-bottom:16px;text-align:center;line-height:1.5}
 .fg{margin-bottom:15px}
@@ -66,6 +69,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .done h2{font-size:1.15rem;font-weight:800;color:#16335B;margin:14px 0 10px}
 .done p{font-size:.9rem;color:#555;line-height:1.6}
 @media(min-width:768px){
+  .lg-top .lg-title,.lg-top .lg-sub{display:block}
+  .lg-card-head{display:none}
   body{background:#F3EEE6 url('/static/images/login_bg2.png') no-repeat center center;background-size:cover}
   .lg-wrap{max-width:620px;padding:36px 24px;justify-content:center}
   .lg-top{padding:36px 28px 0}
@@ -88,6 +93,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 
     {% if done %}
     <div class="lg-card">
+      <div class="lg-card-head">
+        <div class="lg-title">신규 가입 신청</div>
+        <div class="lg-sub">가입 후 연금컨설팅팀 승인이 완료되면 이용할 수 있습니다.</div>
+      </div>
       <div class="done">
         <div class="ico">✅</div>
         <h2>가입 신청이 접수되었습니다</h2>
@@ -99,6 +108,10 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
     </div>
     {% else %}
     <form class="lg-card" method="POST" action="{{ url_for('signup') }}">
+      <div class="lg-card-head">
+        <div class="lg-title">신규 가입 신청</div>
+        <div class="lg-sub">가입 후 연금컨설팅팀 승인이 완료되면 이용할 수 있습니다.</div>
+      </div>
       {% if error %}<div class="lg-err">{{ error }}</div>{% endif %}
 
       <div class="fg">
