@@ -96,7 +96,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .intro{position:fixed;inset:0;z-index:100;background:#FAF1E8;display:flex;align-items:center;justify-content:center;
        transition:opacity .5s ease}
 .intro.out{opacity:0;pointer-events:none}
-.intro video{width:100%;height:100%;object-fit:cover}
+.intro video{width:100%;height:100%;object-fit:contain}   /* 세로(9:16) 영상 — 모바일 브라우저도 위아래 잘림 없이 전체 표시(로고 상단 잘림 방지) */
 .intro-skip{position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));padding:7px 14px;border:none;
             border-radius:999px;background:rgba(0,0,0,.28);color:#fff;font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
 .intro-skip:hover{background:rgba(0,0,0,.42)}
