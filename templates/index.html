@@ -335,7 +335,7 @@ tr.row-done td{transition:background .3s}
   /* ── 모바일 홈(카드 메뉴) ── */
   /* 아래 여백 = 하단 고정 탭바 높이(약 60px + 안전영역) + 16px → 마지막 줄 카드가 탭바에 가리지 않고 끝까지 스크롤됨 */
   #super-home{display:block;height:auto;overflow:visible;background:#fff;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
-  .mvx-notice{display:flex;align-items:center;gap:12px;margin:14px 16px 0;background:#EAF1FC;border-radius:18px;padding:16px 16px;cursor:pointer}
+  .mvx-notice{display:flex;align-items:center;gap:12px;margin:14px 16px 0;background:#FCF9F6;border:1px solid #FFEBDB;border-radius:18px;padding:16px 16px;cursor:pointer}   /* 연한 주황 톤(아이콘 시트 주황 계열 배경과 동일) */
   .mvx-mi{flex:none;width:48px;height:48px;border-radius:50%;background:#F58220;color:#fff;display:flex;align-items:center;justify-content:center}
   .mvx-mi svg{width:25px;height:25px}
   .mvx-tt{font-size:16px;font-weight:800;color:#16335B;letter-spacing:-.3px}
@@ -560,7 +560,7 @@ tr.row-done td{transition:background .3s}
     <div class="mvx-notice" onclick="homeNotice()">
       <span class="mvx-mi"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg></span>
       <div><div class="mvx-tt">이달의 공지</div><div class="mvx-sb">중요한 소식을 확인해보세요.</div></div>
-      <img class="mvx-nimg" src="/static/images/notice_illust.png?v=2" alt="">
+      <img class="mvx-nimg" src="/static/images/notice_megaphone.png?v=1" alt="">
     </div>
     <div class="mvx-grid">
       <button class="mvx-tile" onclick="homeGoProposal()"><span class="mvx-ic"><img src="/static/images/icon_proposal.png?v=2" alt=""></span><div class="mvx-foot"><span class="mvx-lb">이달의 제안상품</span><span class="mvx-go g-org">›</span></div></button>
