@@ -9,10 +9,11 @@ if (window.top !== window) { try { window.top.location.href = location.href; } c
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;color:#222;
-     min-height:100vh;background:#F7F4EF url('/static/images/login_bg.png?v=2') no-repeat center top;background-size:100% auto}
+     min-height:100vh;background:#FBC18B url('/static/images/login_bg.png?v=3') no-repeat center top;background-size:100% auto}
 .lg-wrap{min-height:100vh;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
-/* 상단: 로고 + 타이틀 */
-.lg-top{padding:40px 28px 0;min-height:66vw;box-sizing:border-box}
+/* 상단: 로고 + 타이틀 (모바일은 배경 이미지에 로고·문구가 포함되어 있어 글자는 화면에서 숨기고 자리만 확보) */
+.lg-top{padding:40px 28px 0;min-height:70vw;box-sizing:border-box}
+.lg-top .lg-logo,.lg-top .lg-title,.lg-top .lg-sub{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .lg-logo{height:30px;width:auto;display:block;margin-bottom:20px}
 .lg-title{font-size:1.4rem;font-weight:800;color:#1a1a1a;letter-spacing:-.5px;line-height:1.3}
 .lg-title .m{color:#F58220}
@@ -104,6 +105,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
   body{background:#F3EEE6 url('/static/images/login_bg2.png') no-repeat center center;background-size:cover}
   .lg-wrap{max-width:840px;margin:0 auto;padding:40px 24px;justify-content:center}
   .lg-top{position:relative;min-height:auto;padding:8px 30px 0}
+  .lg-top .lg-logo,.lg-top .lg-title,.lg-top .lg-sub{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal}
+  .lg-top .lg-logo{height:56px}
   .lg-logo{height:56px;margin-bottom:30px}
   .lg-title{font-size:2.55rem;line-height:1.26}
   .lg-sub{font-size:1.18rem;margin-top:16px}
