@@ -17,7 +17,6 @@
   .wrap{max-width:560px;margin:0 auto;padding:16px 16px 40px}
   .ttl{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px}
   .ttl h1{font-size:19px;font-weight:800;color:var(--navy)}
-  .ttl small{font-size:12px;color:var(--muted);white-space:nowrap}
   .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .me{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0 12px}
   .ava{width:52px;height:52px;flex:0 0 auto;border-radius:50%;object-fit:cover;background:var(--orange-soft);border:2px solid var(--orange-soft)}
@@ -54,7 +53,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="ttl"><h1>마이페이지</h1><small>저장한 제안상품</small></div>
+  <div class="ttl"><h1>마이페이지</h1></div>
   <div class="me" id="me" hidden><img class="ava" src="/static/images/mypage_avatar.png?v=1" alt=""><b id="meName"></b></div>
   <p class="sub">최종 저장한 제안상품입니다 · 기준월이 지나면 자동 삭제됩니다</p>
   <div class="chips" id="months"></div>
