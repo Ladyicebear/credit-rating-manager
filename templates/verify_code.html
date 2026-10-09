@@ -7,9 +7,11 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFont,sans-serif;color:#222;
-     min-height:100vh;background:#F7F4EF url('/static/images/login_bg.png') no-repeat center top;background-size:cover}
+     min-height:100vh;background:#FCD4B0 url('/static/images/login_bg.jpg?v=4') no-repeat center -20vw;background-size:100% auto}
 .lg-wrap{min-height:100vh;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
-.lg-top{padding:40px 28px 0;box-sizing:border-box}
+/* 모바일: 배경 그림(Pension Mate 로고·문구·아이콘)이 가려지지 않도록 그림 아래부터 제목 표시, 로고 이미지는 숨김 */
+.lg-top{padding:82vw 28px 0;box-sizing:border-box}
+.lg-top .lg-logo{display:none}
 .lg-logo{height:30px;width:auto;display:block;margin-bottom:20px}
 .lg-title{font-size:1.35rem;font-weight:800;color:#1a1a1a;letter-spacing:-.5px}
 .lg-sub{font-size:.9rem;color:#9298a1;margin-top:9px;font-weight:500}
@@ -38,6 +40,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 @media(min-width:768px){
   body{background:#F3EEE6 url('/static/images/login_bg2.png') no-repeat center center;background-size:cover}
   .lg-wrap{max-width:620px;padding:36px 24px;justify-content:center}
+  .lg-top{padding:40px 28px 0}
+  .lg-top .lg-logo{display:block}
   .lg-logo{height:48px}
   .lg-title{font-size:1.8rem}
   .lg-card{max-width:520px;margin:24px auto;padding:38px 46px 30px;border-radius:24px}
