@@ -1,4 +1,4 @@
-/* 미사용 자동 로그아웃 — app.py 의 _inject_screen_guard 가 로그인 사용자 HTML 에 삽입.
+/* 미사용 자동 로그아웃 — app.py 의 _inject_session_guard 가 로그인 사용자 HTML 에 삽입.
  * 클릭·키 입력·스크롤·터치가 있으면 서버에 /api/heartbeat 를 보내(최대 1분에 1회) 세션을 연장하고,
  * 마지막 활동 후 data-idle-min 분이 지나면 /logout 으로 이동한다.
  * 마지막 활동 시각은 localStorage 로 같은 브라우저의 모든 탭·iframe 이 공유한다. */
