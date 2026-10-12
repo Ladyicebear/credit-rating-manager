@@ -139,7 +139,7 @@ _ADMIN_ONLY_ENDPOINTS = {
     'api_update_rating',         # 신용등급 수정
     'api_acknowledge', 'api_acknowledge_all',   # 변경 확인
     'api_add_institution', 'api_delete_institution',   # 기관 추가/삭제
-    'admin_visitors', 'api_visit_stats', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
+    'admin_visitors', 'api_visit_stats', 'api_visit_users', 'download_visit_stats',   # 방문자 통계(연금컨설팅팀 전용 관리자)
     'admin_deploy', 'admin_deploy_status',   # 서버 배포/상태(연금컨설팅팀 전용)
     'admin_refresh_bond_rates',  # 시장금리 수동 갱신(연금컨설팅팀 전용)
     'docs_page', 'api_docs_upload', 'api_docs_delete', 'api_docs_bulk',  # 약관·상품설명서 관리(연금컨설팅팀 전용)
@@ -544,7 +544,8 @@ def _record_visit(resp):
         if new_vid:
             vid = uuid.uuid4().hex
         dev = 'mob' if _MOBILE_UA_RE.search(request.headers.get('User-Agent', '') or '') else 'web'
-        today = datetime.now().strftime('%Y-%m-%d')
+        now = datetime.now()
+        today, now_hms = now.strftime('%Y-%m-%d'), now.strftime('%H:%M:%S')
         with _VISIT_LOCK:
             data = _load_visits()
             day = data['days'].setdefault(
@@ -553,6 +554,14 @@ def _record_visit(resp):
             uids = day.setdefault(dev + '_uids', [])
             if vid not in uids:
                 uids.append(vid)
+            # 누가 방문했는지(사번·이름) — 로그인 계정 단위로 하루 1행, 접속수·첫/마지막 시각 누적
+            who = _visitor_identity()
+            if who:
+                users = day.setdefault('users', {})
+                u = users.setdefault(who['user'], {'web': 0, 'mob': 0, 'first': now_hms})
+                u.update({k: v for k, v in who.items() if k != 'user'})
+                u[dev] = u.get(dev, 0) + 1
+                u['last'] = now_hms
             _save_visits(data)
         if new_vid:
             # 2년짜리 방문자 식별 쿠키(개인정보 아님: 무작위 id) → 순방문자 추정용
@@ -560,6 +569,39 @@ def _record_visit(resp):
     except Exception:
         logger.exception('방문자 집계 실패')  # 집계 실패가 페이지 로드를 막지 않도록
     return resp
+
+
+def _visitor_identity():
+    """현재 로그인 사용자의 방문자 기록용 신원(계정·이름·사번·소속).
+    회원가입 계정은 members.json 기준, 공용 계정(연금컨설팅팀/RM)은 사번 없이 계정명으로 표시."""
+    user = session.get('user', '')
+    if not user:
+        return None
+    m = _load_members().get(_normalize_email(user)) or {}
+    if m:
+        name, aff = m.get('name') or session.get('name') or '', m.get('affiliation', '')
+    else:
+        name = session.get('name') or ''
+        aff = {'consulting': '연금컨설팅팀(공용)', 'rm': 'RM(공용)'}.get(session.get('role', ''), '')
+    return {'user': user, 'name': name, 'emp_id': m.get('emp_id', ''), 'affiliation': aff}
+
+
+def _visit_users(day: str = None) -> list:
+    """방문자 상세(계정별). day 지정 시 그 날짜만, 없으면 전체 일자(최신순)."""
+    data = _load_visits().get('days', {})
+    days = [day] if day else sorted(data.keys(), reverse=True)
+    out = []
+    for dt in days:
+        users = (data.get(dt) or {}).get('users', {})
+        rows = []
+        for user, u in users.items():
+            w, mb = int(u.get('web', 0)), int(u.get('mob', 0))
+            rows.append({'date': dt, 'user': user, 'name': u.get('name', ''),
+                         'emp_id': u.get('emp_id', ''), 'affiliation': u.get('affiliation', ''),
+                         'web': w, 'mob': mb, 'total': w + mb,
+                         'first': u.get('first', ''), 'last': u.get('last', '')})
+        out.extend(sorted(rows, key=lambda r: r['last'], reverse=True))
+    return out
 
 
 def _visit_series() -> list:
@@ -572,7 +614,8 @@ def _visit_series() -> list:
         wu, mu = len(d.get('web_uids', [])), len(d.get('mob_uids', []))
         out.append({'date': day,
                     'web_total': wt, 'mob_total': mt, 'total': wt + mt,
-                    'web_uniq': wu, 'mob_uniq': mu, 'uniq': wu + mu})
+                    'web_uniq': wu, 'mob_uniq': mu, 'uniq': wu + mu,
+                    'users': len(d.get('users', {}))})
     return out
 
 
@@ -3201,6 +3244,13 @@ def api_visit_stats():
     return jsonify({'series': _visit_series()})
 
 
+@app.route('/api/visit_users')
+def api_visit_users():
+    """방문자 상세: ?date=YYYY-MM-DD 지정 시 그 날짜, 없으면 전체."""
+    day = (request.args.get('date') or '').strip() or None
+    return jsonify({'items': _visit_users(day)})
+
+
 @app.route('/download/visit_stats.xlsx')
 def download_visit_stats():
     from openpyxl import Workbook
@@ -3230,6 +3280,25 @@ def download_visit_stats():
     for col in ('B', 'C', 'D', 'E', 'F', 'G'):
         ws.column_dimensions[col].width = 13
     ws.freeze_panes = 'A2'
+    # 시트2: 방문자 상세(누가 방문했는지 — 일자·사번·이름별)
+    ws2 = wb.create_sheet('방문자상세')
+    ws2.append(['일자', '사번', '이름', '소속', '계정', '웹 접속수', '모바일 접속수', '총 접속수',
+                '첫 접속', '마지막 접속'])
+    for c in ws2[1]:
+        c.font = Font(bold=True, color='FFFFFF')
+        c.fill = navy
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        c.border = border
+    for r in _visit_users():
+        ws2.append([r['date'], r['emp_id'], r['name'], r['affiliation'], r['user'],
+                    r['web'], r['mob'], r['total'], r['first'], r['last']])
+    for row in ws2.iter_rows(min_row=2):
+        for i, c in enumerate(row):
+            c.border = border
+            c.alignment = Alignment(horizontal='right' if 5 <= i <= 7 else 'left')
+    for col, w in zip('ABCDEFGHIJ', (13, 12, 12, 18, 30, 11, 13, 11, 11, 11)):
+        ws2.column_dimensions[col].width = w
+    ws2.freeze_panes = 'A2'
     bio = io.BytesIO()
     wb.save(bio)
     bio.seek(0)
