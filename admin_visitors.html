@@ -51,6 +51,10 @@
   tbody td:first-child{text-align:left;font-weight:700;color:var(--navy)}
   tbody td.tot{font-weight:800}
   .tbl-wrap{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  tbody tr.pick{cursor:pointer} tbody tr.pick:hover td{background:#FFF8F1}
+  tbody tr.sel td{background:#FCEAD8}
+  #userTbl td:nth-child(-n+4){text-align:left} #userTbl th:nth-child(-n+4){text-align:left}
+  #userTbl td:first-child{font-weight:700;color:var(--navy)}
   .empty{text-align:center;color:var(--muted);padding:50px 20px;font-size:14px}
   .note{font-size:11.5px;color:#9CA3AF;line-height:1.6;margin-top:6px}
   @media(max-width:720px){ .kpis{grid-template-columns:repeat(2,1fr)} }
@@ -82,7 +86,8 @@
 </div>
 
 <script>
-var SERIES=[], METRIC='total', PERIOD='14';
+var SERIES=[], METRIC='total', PERIOD='14', SEL_DATE=null;
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
 var nf=function(n){return (n||0).toLocaleString('ko-KR');};
 
 function setMetric(m){
@@ -132,7 +137,8 @@ function render(){
 
   var trs=rows.slice().reverse().map(function(d){
     var w=val(d,'web'), m=val(d,'mob');
-    return '<tr><td>'+d.date+'</td><td>'+nf(w)+'</td><td>'+nf(m)+'</td><td class="tot">'+nf(w+m)+'</td></tr>';
+    return '<tr class="pick'+(d.date===SEL_DATE?' sel':'')+'" onclick="selectDate(\''+d.date+'\')" title="클릭하면 이 날짜 방문자 상세">'+
+           '<td>'+d.date+'</td><td>'+nf(w)+'</td><td>'+nf(m)+'</td><td class="tot">'+nf(w+m)+'</td><td>'+nf(d.users||0)+'</td></tr>';
   }).join('');
 
   box.innerHTML=
@@ -155,10 +161,31 @@ function render(){
     '</div>'+
     '<div class="card">'+
       '<div class="card-h"><div class="card-t">일자별 상세</div></div>'+
-      '<div class="tbl-wrap"><table><thead><tr><th>일자</th><th>웹</th><th>모바일</th><th>합계</th></tr></thead>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>일자</th><th>웹</th><th>모바일</th><th>합계</th><th>방문자(명)</th></tr></thead>'+
       '<tbody>'+trs+'</tbody></table></div>'+
-      '<div class="note">* 논문용 기초자료: 총 접속수와 순방문자를 함께 저장합니다. 순방문자는 브라우저 쿠키 기준 하루 1회 집계이며, 계정 공용 특성상 \'사람\' 단위가 아닌 \'기기·브라우저\' 단위 근사치입니다.</div>'+
-    '</div>';
+      '<div class="note">* 논문용 기초자료: 총 접속수와 순방문자를 함께 저장합니다. 순방문자는 브라우저 쿠키 기준 하루 1회 집계이며, 계정 공용 특성상 \'사람\' 단위가 아닌 \'기기·브라우저\' 단위 근사치입니다. 방문자(명)는 로그인 계정 기준이며, 행을 클릭하면 아래에 사번·이름별 상세가 표시됩니다.</div>'+
+    '</div>'+
+    '<div class="card"><div class="card-h"><div class="card-t" id="userTitle">방문자 상세</div></div>'+
+      '<div id="userBox"><div class="empty">일자를 선택하세요.</div></div></div>';
+  if(!SEL_DATE) SEL_DATE=SERIES[SERIES.length-1].date;
+  loadUsers();
+}
+function selectDate(dt){ SEL_DATE=dt; render(); }
+function loadUsers(){
+  var dt=SEL_DATE;
+  document.getElementById('userTitle').textContent='방문자 상세 — '+dt;
+  fetch('/api/visit_users?date='+encodeURIComponent(dt)).then(function(r){return r.json();}).then(function(d){
+    if(dt!==SEL_DATE) return;
+    var items=(d&&d.items)||[], box=document.getElementById('userBox');
+    if(!items.length){ box.innerHTML='<div class="empty">이 날짜의 방문자 기록이 없습니다.<br>(사번·이름 기록은 이 기능 적용 이후 접속부터 쌓입니다)</div>'; return; }
+    box.innerHTML='<div class="tbl-wrap"><table id="userTbl"><thead><tr><th>사번</th><th>이름</th><th>소속</th><th>계정</th>'+
+      '<th>웹</th><th>모바일</th><th>합계</th><th>첫 접속</th><th>마지막 접속</th></tr></thead><tbody>'+
+      items.map(function(u){
+        return '<tr><td>'+(esc(u.emp_id)||'-')+'</td><td>'+(esc(u.name)||'-')+'</td><td>'+(esc(u.affiliation)||'-')+'</td><td>'+esc(u.user)+'</td>'+
+          '<td>'+nf(u.web)+'</td><td>'+nf(u.mob)+'</td><td class="tot">'+nf(u.total)+'</td><td>'+esc(u.first)+'</td><td>'+esc(u.last)+'</td></tr>';
+      }).join('')+'</tbody></table></div>'+
+      '<div class="note">* 총 '+items.length+'명 방문. 엑셀 다운로드 시 「방문자상세」 시트에 전체 기간이 함께 저장됩니다.</div>';
+  }).catch(function(){ document.getElementById('userBox').innerHTML='<div class="empty">방문자 상세를 불러오지 못했습니다.</div>'; });
 }
 function kpi(lb,v,unit){
   return '<div class="kpi"><div class="lb">'+lb+'</div><div class="vl">'+nf(v)+'<small>'+unit+'</small></div></div>';
