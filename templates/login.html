@@ -104,6 +104,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
 .intro-skip{position:absolute;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));padding:7px 14px;border:none;
             border-radius:999px;background:rgba(0,0,0,.28);color:#fff;font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
 .intro-skip:hover{background:rgba(0,0,0,.42)}
+/* 웹(마우스를 쓰는 768px 이상 화면)에서는 인트로 영상을 표시하지 않음 — 모바일 접속 시에만 재생 */
+@media(min-width:768px) and (hover:hover) and (pointer:fine){.intro{display:none}}
 
 /* ════════ 웹(데스크톱 ≥768px) 전용 — 모바일은 위 기본 스타일 그대로 ════════ */
 @media(min-width:768px){
@@ -155,6 +157,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',-apple-system,BlinkMacSystemFon
       window.removeEventListener('resize',fit);
       setTimeout(function(){ ov.remove(); },500);
     }
+    // 웹(데스크톱) 접속이면 영상 없이 바로 로그인 화면 — 위 CSS 미디어쿼리와 같은 조건
+    var web=window.matchMedia && window.matchMedia('(min-width:768px) and (hover:hover) and (pointer:fine)').matches;
+    if(web){ v.removeAttribute('src'); ov.remove(); return; }
     var seen=false;
     try{ seen=sessionStorage.getItem('sp_intro_seen')==='1'; }catch(e){}
     if(seen){ ov.remove(); return; }
