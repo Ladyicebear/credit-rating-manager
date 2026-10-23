@@ -484,7 +484,7 @@ def _send_verify_code_email(email: str, name: str, code: str) -> bool:
   <p style="font-size:.85rem;color:#666">이 코드는 {VERIFY_CODE_TTL_MIN}분간 유효합니다.<br>
      본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
 </div>"""
-    return _send_email(email, '[Smart pension] 로그인 인증코드', html)
+    return _send_email(email, '[Pension Mate] 로그인 인증코드', html)
 
 
 def _send_approved_mail(email: str, name: str) -> bool:
@@ -500,7 +500,7 @@ def _send_approved_mail(email: str, name: str) -> bool:
               border-radius:10px;font-weight:800;display:inline-block">로그인 화면으로</a>
   </p>
 </div>"""
-    return _send_email(email, '[Smart pension] 가입이 승인되었습니다', html)
+    return _send_email(email, '[Pension Mate] 가입이 승인되었습니다', html)
 
 
 # ── 방문자 접속 집계 (일자별) ──────────────────────────────────────────
@@ -867,7 +867,7 @@ def signup():
     for admin_addr in notify_to:
         try:
             _send_email(
-                admin_addr, '[Smart pension] 신규 가입 신청',
+                admin_addr, '[Pension Mate] 신규 가입 신청',
                 '<div style="font-family:sans-serif">신규 가입 신청이 접수되었습니다.<br><br>'
                 f'이름: {Markup.escape(name)}<br>사번: {Markup.escape(emp_id)}<br>'
                 f'이메일: {Markup.escape(email)}<br>소속: {Markup.escape(affiliation)}<br><br>'
@@ -1105,7 +1105,7 @@ def api_email_test():
             '이 메일이 도착했다면 발송 설정이 정상입니다. '
             '이제 로그인 매직링크와 가입 승인 메일이 이 계정으로 발송됩니다.</div>')
     try:
-        _smtp_send_raw(to, '[Smart pension] 발송 테스트', html)
+        _smtp_send_raw(to, '[Pension Mate] 발송 테스트', html)
         return jsonify({'success': True})
     except Exception as e:
         msg = str(e)[:300] or '발송 실패'
