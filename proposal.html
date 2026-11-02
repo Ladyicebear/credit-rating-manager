@@ -277,15 +277,58 @@ async function boot(){
   loadNotice();
   loadSuspension();
 
-  // 이번 달(오늘 기준) 금리가 아직 서버에 없으면 눈에 띄게 알린다.
-  // ('업로드했는데 9월이 안 뜬다' = 브라우저에만 저장되고 서버 저장이 실패한 경우를 바로 구분)
-  const tm=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
-  if(!STORE[tm]){
-    monthWarn=`이번 달(${tm}) 금리가 서버에 없습니다. 서버에 저장된 기준월: ${months.join(', ')} — 금리 화면에서 다시 업로드하고 「서버 저장」 완료 메시지를 확인하세요.`;
-  }
+  setMonthWarn(months);
 
   await loadProposalsForMonth();   // 최초 진입 시 이달의 제안상품 자동 승계까지 수행
   render();
+
+  // 이 화면을 연 뒤에 금리 화면에서 이번 달을 올리면(또는 금리 화면이 브라우저에만 있던 달을
+  // 서버로 복구하면) 새로고침 없이도 반영되도록, 화면으로 돌아올 때·1분마다 서버를 다시 확인한다.
+  window.addEventListener('focus', recheckServerMonths);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) recheckServerMonths(); });
+  setInterval(()=>{ if(monthWarn) recheckServerMonths(); }, 60000);
+}
+
+function thisMonthKey(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+
+/* 이번 달(오늘 기준) 금리가 아직 서버에 없으면 눈에 띄게 알린다.
+   ('업로드했는데 9월이 안 뜬다' = 브라우저에만 저장되고 서버 저장이 실패한 경우를 바로 구분) */
+function setMonthWarn(months){
+  const tm=thisMonthKey();
+  monthWarn = STORE[tm] ? '' :
+    `이번 달(${tm}) 금리가 서버에 없습니다. 서버에 저장된 기준월: ${months.join(', ')} — 금리 화면(업로드한 PC)을 열면 브라우저에만 있던 금리가 서버로 자동 저장됩니다. 그래도 안 되면 금리 화면에서 다시 업로드하고 「서버 저장」 완료 메시지를 확인하세요. (이 화면은 자동으로 다시 확인합니다)`;
+}
+
+/* 서버 기준월을 다시 읽어 새로 생긴 달(예: 이번 달)을 목록에 반영한다.
+   작업 중인 선택 목록을 날리지 않도록, 새 달이 생겼을 때만 목록을 갱신하고
+   이번 달이 새로 생기면서 사용자가 최신월을 보고 있던 경우에만 이번 달로 전환한다. */
+let _rechecking=false;
+async function recheckServerMonths(){
+  if(_rechecking) return; _rechecking=true;
+  try{
+    const ps=await fetch('/api/pension_store').then(r=>r.ok?r.json():null);
+    if(!ps || typeof ps!=='object') return;
+    const before=Object.keys(STORE).sort();
+    const months=Object.keys(ps).filter(m=>/^\d{4}-\d{2}$/.test(m)).sort();
+    const added=months.filter(m=>!STORE[m]);
+    if(!added.length) return;
+    const wasLatest=curMonth===before[before.length-1];
+    added.forEach(m=>{ STORE[m]=ps[m]; });
+    // 금리 화면이 새 달의 제안목록을 자동 등록했을 수 있으니 등록본도 다시 읽는다(덮어쓰기 방지)
+    const pr=await fetch('/api/proposals').then(r=>r.ok?r.json():null).catch(()=>null);
+    if(pr && typeof pr==='object' && !pr.login_required) PROPOSALS=pr;
+    const all=Object.keys(STORE).sort();
+    $('monthSel').innerHTML=all.map(m=>`<option value="${m}">${m}</option>`).join('');
+    const hadWarn=!!monthWarn;
+    setMonthWarn(all);
+    if(wasLatest || hadWarn) curMonth=all[all.length-1];
+    $('monthSel').value=curMonth;
+    buildDbRows(); renderSuspension();
+    await loadProposalsForMonth();
+    render();
+    toast(`서버에 ${added.join(', ')} 금리가 추가되어 반영했습니다`);
+  }catch(e){}
+  finally{ _rechecking=false; }
 }
 
 /* 오른쪽 패널 안내 배너.
