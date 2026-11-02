@@ -883,7 +883,13 @@ const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;   /* 기준월 키 형식(YYYY-MM) 
 
 let DB = load();            // { "YYYY-MM": { rows:[...], fileName, uploadedAt } }
 let curMonth = null;
-let userPickedMonth = false;   /* 사용자가 월 선택을 직접 바꿨는가(서버 동기화 후 최신월 자동선택 여부 판단) */
+let userPickedMonth = false;
+/* 서버(pension_store)에 실제로 저장된 기준월. null = 아직 서버 확인 전.
+   화면의 DB는 localStorage와 서버를 합친 것이라, 서버 저장에 실패한 달도 이 PC에서는
+   그대로 보인다 → 상품제안관리(서버만 읽음)에는 안 뜨는 원인. 그래서 따로 추적한다. */
+let SERVER_MONTHS = null;
+/* 로그인 역할 조회(연금컨설팅팀만 서버 저장 가능). init에서 채운다. */
+let ROLE_P = Promise.resolve(null);   /* 사용자가 월 선택을 직접 바꿨는가(서버 동기화 후 최신월 자동선택 여부 판단) */
 let curRows = [];
 let filterSec = 'ALL';
 let prodFilter = 'ALL';    // 상품구분 필터(이율보증형보험/정기예금/ELB·DLB)
@@ -927,6 +933,10 @@ function save(months){
     .then(r=>r.json().catch(()=>({})).then(d=>({ok:r.ok && d && d.ok!==false, d:d||{}})))
     .then(({ok,d})=>{
       if(!ok){ toast('서버 저장 실패 — 이 브라우저에만 저장됐습니다'+(d.message?' ('+d.message+')':''), true); return false; }
+      // 서버가 알려준 실제 보관 기준월로 갱신 → 기준월 목록의 '서버 미저장' 표시 해제
+      if(Array.isArray(d.months)) SERVER_MONTHS=new Set(d.months);
+      else if(SERVER_MONTHS) Object.keys(payload).forEach(m=>SERVER_MONTHS.add(m));
+      refreshMonthSel();
       return true;
     })
     .catch(()=>{ toast('서버 저장 실패(네트워크) — 이 브라우저에만 저장됐습니다', true); return false; });
@@ -938,14 +948,34 @@ function syncFromServer(){
     // 기준월(YYYY-MM) 키만 반영 — 로그인 만료 시 오는 {success,message,login_required}가
     // DB에 섞여 들어가 화면이 '데이터 없음'으로 보이던 문제 방지
     const keys=Object.keys(srv).filter(m=>MONTH_KEY.test(m) && srv[m] && typeof srv[m]==='object');
-    if(!keys.length) return;
-    keys.forEach(m=>{ DB[m]=srv[m]; });          // 서버 데이터 반영
-    try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
-    // 사용자가 월을 직접 고르기 전이라면, 서버에 새로 올라온 달(예: 9월)을 자동으로 연다
-    if(!userPickedMonth || !curMonth || !DB[curMonth]) curMonth = dbMonths()[0] || curMonth;
+    SERVER_MONTHS=new Set(keys);
+    if(keys.length){
+      keys.forEach(m=>{ DB[m]=srv[m]; });          // 서버 데이터 반영
+      try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }catch(e){}
+      // 사용자가 월을 직접 고르기 전이라면, 서버에 새로 올라온 달(예: 9월)을 자동으로 연다
+      if(!userPickedMonth || !curMonth || !DB[curMonth]) curMonth = dbMonths()[0] || curMonth;
+    }
     refreshMonthSel();
     loadMonth(curMonth);
+    restoreLocalOnlyMonths();
   }).catch(()=>{});
+}
+/* 이 브라우저에만 있고 서버에는 없는 기준월(업로드 때 서버 저장이 실패한 달)을 서버로 복구한다.
+   서버는 보내온 달만 추가·갱신하므로 다른 달은 건드리지 않는다. 복구되면 상품제안관리에도 뜬다.
+   RM(조회 전용)은 서버 저장 권한이 없으므로 시도하지 않는다. */
+function restoreLocalOnlyMonths(){
+  if(!SERVER_MONTHS) return;
+  const missing=dbMonths().filter(m=>!SERVER_MONTHS.has(m));
+  if(!missing.length) return;
+  ROLE_P.then(role=>{
+    if(role!=='consulting') return;   // 서버 저장은 연금컨설팅팀만 가능
+    save(missing).then(ok=>{
+      if(!ok) return;                     // 실패 사유는 save()가 토스트로 알린다
+      const lbl=missing.slice().sort().map(m=>m.replace('-','년 ')+'월').join(', ');
+      toast(`서버에 없던 ${lbl} 금리를 서버에 저장했습니다 · 상품제안관리에서 선택 가능`);
+      missing.forEach(m=>autoRegisterProposals(m));   // 이달의 제안상품 자동 승계·등록
+    });
+  });
 }
 function thisMonth(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
@@ -1007,7 +1037,8 @@ function refreshMonthSel(){
   const cur=thisMonth();
   const all=[...new Set([cur,...months])].sort().reverse();
   sel.innerHTML=all.map(m=>{
-    const has=DB[m]?' ●':'';
+    // ● 서버 저장됨 / ○ 이 브라우저에만 있음(서버 미저장 → 상품제안관리에 안 뜸)
+    const has=!DB[m]?'' : (SERVER_MONTHS && !SERVER_MONTHS.has(m)) ? ' ○ 서버 미저장' : ' ●';
     return `<option value="${m}">${m.replace('-','년 ')}월${has}</option>`;
   }).join('');
   if(!curMonth) curMonth = months[0]||cur;
@@ -2419,7 +2450,7 @@ $('viewTabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{
 (function init(){
   if(window.self!==window.top) document.body.classList.add('embedded');  // iframe 임베드 감지
   // 소속(role) 조회 — RM(조회 전용)이면 업로드 버튼 숨김
-  fetch('/api/me').then(r=>r.json()).then(d=>{ if(d && d.role==='rm') document.body.classList.add('role-rm'); }).catch(()=>{});
+  ROLE_P = fetch('/api/me').then(r=>r.json()).then(d=>{ if(d && d.role==='rm') document.body.classList.add('role-rm'); return d&&d.role; }).catch(()=>null);
   refreshMonthSel();
   loadMonth(curMonth);
   fitTable();
