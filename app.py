@@ -3165,6 +3165,235 @@ def api_my_proposals_delete(rid):
     return jsonify({'success': True})
 
 
+# ── 제안서 만들기 (모바일 상품제안 → 「(법인명) 원리금보장상품 제안서」 엑셀/PDF) ──
+#   2단계: ① POST /api/proposal_doc/<xlsx|pdf> (JSON) → 파일을 만들어 잠시 보관하고 받을 주소를 돌려준다
+#          ② GET /api/proposal_doc/file/<id> → 첨부 파일로 내려받는다.
+#   폼을 새 창(_blank)으로 POST 하면 일부 인앱/내장 브라우저가 본문을 버리고 GET 으로 열어
+#   405 가 나므로, 실제 다운로드는 항상 GET 주소로 받는다(과거 금리 추이 다운로드와 같은 방식).
+#   payload = {corp, month, cols:[컬럼명], wide:[bool], rows:[[셀 문자열]], pages:[dataURL(JPEG)]}
+#   표 내용은 화면에서 확정된 문자열 그대로 쓴다(수수료·실질수익률·중도해지이율·비고는 RM 입력값).
+_PROPOSAL_DOC_MAX_ROWS = 300
+_PROPOSAL_DOC_MAX_COLS = 12
+
+
+_PROPOSAL_DOC_FILES = {}          # id -> {user, at, data, fname, ascii, mime}
+_PROPOSAL_DOC_LOCK = threading.Lock()
+_PROPOSAL_DOC_TTL = 600            # 만든 파일은 10분간 다시 받을 수 있다(서버 메모리, 단일 프로세스)
+
+
+def _proposal_doc_store(data, fname, ascii_name, mime):
+    fid = secrets.token_urlsafe(16)
+    now = time.time()
+    with _PROPOSAL_DOC_LOCK:
+        for k in [k for k, v in _PROPOSAL_DOC_FILES.items() if now - v['at'] > _PROPOSAL_DOC_TTL]:
+            _PROPOSAL_DOC_FILES.pop(k, None)
+        _PROPOSAL_DOC_FILES[fid] = {'user': session.get('user', ''), 'at': now, 'data': data,
+                                    'fname': fname, 'ascii': ascii_name, 'mime': mime}
+    return jsonify({'success': True, 'url': url_for('api_proposal_doc_file', fid=fid)})
+
+
+@app.route('/api/proposal_doc/file/<fid>')
+def api_proposal_doc_file(fid):
+    with _PROPOSAL_DOC_LOCK:
+        rec = _PROPOSAL_DOC_FILES.get(fid)
+    if (not rec or time.time() - rec['at'] > _PROPOSAL_DOC_TTL
+            or rec['user'] != session.get('user', '')):
+        return make_response('파일이 만료되었습니다. 제안서 화면에서 다시 만들어 주세요.', 404,
+                             {'Content-Type': 'text/plain; charset=utf-8'})
+    return _attachment(io.BytesIO(rec['data']), rec['fname'], rec['ascii'], rec['mime'])
+
+
+def _proposal_doc_payload():
+    try:
+        if request.form.get('payload'):
+            p = json.loads(request.form['payload'])
+        else:
+            p = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        return None
+    if not isinstance(p, dict):
+        return None
+    corp = str(p.get('corp') or '').strip()[:40]
+    month = str(p.get('month') or '')[:7]
+    cols = [str(c)[:20] for c in (p.get('cols') or [])][:_PROPOSAL_DOC_MAX_COLS]
+    wide = [bool(w) for w in (p.get('wide') or [])][:len(cols)]
+    wide += [False] * (len(cols) - len(wide))
+    rows = []
+    for r in (p.get('rows') or [])[:_PROPOSAL_DOC_MAX_ROWS]:
+        if isinstance(r, list):
+            rows.append([str(v if v is not None else '')[:100] for v in r[:len(cols)]])
+    if not corp or not cols:
+        return None
+    return {'corp': corp, 'month': month, 'cols': cols, 'wide': wide, 'rows': rows,
+            'pages': p.get('pages') or []}
+
+
+def _proposal_doc_fname(p, ext):
+    safe = re.sub(r'[\\/:*?"<>|\r\n\t]', '', p['corp']).strip() or '제안서'
+    fname = f"{safe}_원리금보장상품 제안서{('_' + p['month']) if p['month'] else ''}.{ext}"
+    ascii_name = f"proposal{('_' + p['month']) if p['month'] else ''}.{ext}"
+    return fname, ascii_name
+
+
+def _attachment(bio, fname, ascii_name, mimetype):
+    resp = send_file(bio, as_attachment=True, download_name=fname, mimetype=mimetype)
+    resp.headers['Content-Disposition'] = (
+        "attachment; filename=\"%s\"; filename*=UTF-8''%s" % (ascii_name, _urlquote(fname))
+    )
+    return _set_download_cookie(resp)
+
+
+@app.route('/api/proposal_doc/xlsx', methods=['POST'])
+def api_proposal_doc_xlsx():
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+    p = _proposal_doc_payload()
+    if not p:
+        return jsonify({'error': '요청 형식이 올바르지 않습니다'}), 400
+    ncol = len(p['cols'])
+    wb = Workbook()
+    ws = wb.active
+    ws.title = '제안서'
+    ws.sheet_view.showGridLines = False
+    navy, line = '043B72', 'C9D1DC'
+    thin = Side(style='thin', color=line)
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    last = get_column_letter(ncol)
+    # 제목(1행) · 기준월(2행) · 헤더(4행) · 본문(5행~) · 안내
+    ws.merge_cells(f'A1:{last}1')
+    ws['A1'] = f"{p['corp']} 원리금보장상품 제안서"
+    ws['A1'].font = Font(name='맑은 고딕', size=16, bold=True, color=navy)
+    ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 34
+    if p['month']:
+        ws.merge_cells(f'A2:{last}2')
+        ws['A2'] = f"기준월 {p['month'][:4]}년 {p['month'][5:7]}월"
+        ws['A2'].font = Font(name='맑은 고딕', size=10, color='6B7280')
+        ws['A2'].alignment = Alignment(horizontal='right')
+    hdr = 4
+    for i, t in enumerate(p['cols'], start=1):
+        c = ws.cell(row=hdr, column=i, value=t)
+        c.font = Font(name='맑은 고딕', size=11, bold=True, color='FFFFFF')
+        c.fill = PatternFill('solid', fgColor=navy)
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        c.border = border
+    ws.row_dimensions[hdr].height = 24
+    for ri, row in enumerate(p['rows'], start=hdr + 1):
+        for ci, v in enumerate(row, start=1):
+            c = ws.cell(row=ri, column=ci, value=v)
+            c.font = Font(name='맑은 고딕', size=10.5)
+            left = ci == 1 or p['wide'][ci - 1]
+            c.alignment = Alignment(horizontal='left' if left else 'center', vertical='center',
+                                    wrap_text=p['wide'][ci - 1])
+            c.border = border
+            if (ri - hdr) % 2 == 0:
+                c.fill = PatternFill('solid', fgColor='F6F8FB')
+        ws.row_dimensions[ri].height = 22
+    note_r = hdr + len(p['rows']) + 2
+    ws.cell(row=note_r, column=1, value='※ 금리는 기준월 기준이며 실제 가입 시점의 금리와 다를 수 있습니다.').font = \
+        Font(name='맑은 고딕', size=9, color='6B7280')
+    for i, t in enumerate(p['cols']):
+        vals = [t] + [r[i] for r in p['rows'] if i < len(r)]
+        w = max(sum(2 if ord(ch) > 127 else 1 for ch in str(v)) for v in vals) + 4
+        ws.column_dimensions[get_column_letter(i + 1)].width = min(40 if p['wide'][i] else 28, max(10, w))
+    ws.print_options.horizontalCentered = True
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    fname, ascii_name = _proposal_doc_fname(p, 'xlsx')
+    logger.info('제안서 엑셀 생성: user=%s, corp=%s, %d행', session.get('user', ''), p['corp'], len(p['rows']))
+    return _proposal_doc_store(bio.getvalue(), fname, ascii_name, _XLSX_MIME)
+
+
+def _jpeg_size(data):
+    """JPEG 바이트에서 (너비, 높이)를 읽는다(SOFn 마커)."""
+    i = 2
+    while i + 9 < len(data):
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        marker = data[i + 1]
+        seglen = int.from_bytes(data[i + 2:i + 4], 'big')
+        if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+            h = int.from_bytes(data[i + 5:i + 7], 'big')
+            w = int.from_bytes(data[i + 7:i + 9], 'big')
+            return w, h
+        i += 2 + seglen
+    return None
+
+
+def _jpegs_to_pdf(jpegs):
+    """JPEG 페이지들을 A4 한 장씩 꽉 채운 PDF로 묶는다(외부 라이브러리 없음).
+    이미지가 세로로 길면 세로 A4(595×842pt), 아니면 가로 A4(842×595pt)."""
+    objs = []   # 1-based 객체 번호 = 인덱스+1
+
+    def add(body):
+        objs.append(body)
+        return len(objs)
+
+    add(b'')   # 1: Catalog (나중에 채움)
+    add(b'')   # 2: Pages
+    kids = []
+    for n, (data, (w, h)) in enumerate(jpegs):
+        PW, PH = (595, 842) if h > w else (842, 595)
+        img = add(b'<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB '
+                  b'/BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n' % (w, h, len(data))
+                  + data + b'\nendstream')
+        content = b'q %d 0 0 %d 0 0 cm /Im%d Do Q' % (PW, PH, n)
+        cs = add(b'<< /Length %d >>\nstream\n' % len(content) + content + b'\nendstream')
+        page = add(b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] '
+                   b'/Resources << /XObject << /Im%d %d 0 R >> >> /Contents %d 0 R >>' % (PW, PH, n, img, cs))
+        kids.append(page)
+    objs[0] = b'<< /Type /Catalog /Pages 2 0 R >>'
+    objs[1] = b'<< /Type /Pages /Kids [%s] /Count %d >>' % (b' '.join(b'%d 0 R' % k for k in kids), len(kids))
+    out = io.BytesIO()
+    out.write(b'%PDF-1.4\n%\xe2\xe3\xcf\xd3\n')
+    offsets = []
+    for i, body in enumerate(objs, start=1):
+        offsets.append(out.tell())
+        out.write(b'%d 0 obj\n' % i + body + b'\nendobj\n')
+    xref = out.tell()
+    out.write(b'xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1))
+    for off in offsets:
+        out.write(b'%010d 00000 n \n' % off)
+    out.write(b'trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, xref))
+    out.seek(0)
+    return out
+
+
+@app.route('/api/proposal_doc/pdf', methods=['POST'])
+def api_proposal_doc_pdf():
+    import base64
+    p = _proposal_doc_payload()
+    if not p:
+        return jsonify({'error': '요청 형식이 올바르지 않습니다'}), 400
+    jpegs = []
+    for url in (p['pages'] or [])[:30]:
+        s = str(url)
+        if not s.startswith('data:image/jpeg;base64,'):
+            return jsonify({'error': '페이지 이미지 형식이 올바르지 않습니다'}), 400
+        try:
+            data = base64.b64decode(s.split(',', 1)[1], validate=True)
+        except Exception:
+            return jsonify({'error': '페이지 이미지를 읽지 못했습니다'}), 400
+        size = _jpeg_size(data) if data[:2] == b'\xff\xd8' else None
+        if not size:
+            return jsonify({'error': '페이지 이미지를 읽지 못했습니다'}), 400
+        jpegs.append((data, size))
+    if not jpegs:
+        return jsonify({'error': '페이지가 없습니다'}), 400
+    bio = _jpegs_to_pdf(jpegs)
+    fname, ascii_name = _proposal_doc_fname(p, 'pdf')
+    logger.info('제안서 PDF 생성: user=%s, corp=%s, %d쪽', session.get('user', ''), p['corp'], len(jpegs))
+    return _proposal_doc_store(bio.getvalue(), fname, ascii_name, 'application/pdf')
+
+
 @app.route('/simple2')
 def simple2_preview():
     # 모바일 ver2 미리보기(개발용) — 로그인 세션 공유로 /api/* 정상 동작

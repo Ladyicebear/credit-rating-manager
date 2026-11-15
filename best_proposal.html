@@ -4,6 +4,9 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 <title>상품제안하기(DB제도)</title>
+<!-- 제안서(미리보기·PDF) 글꼴: 스포카 한 산스 Neo · 상단 손글씨 문구: 나눔손글씨 펜 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@3.3.0/css/SpoqaHanSansNeo.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap">
 <style>
   /* 최적상품 찾기(상품제안 탭) — 이달의 제안상품에서 조건별 최고금리 상품 추천.
      1 신용등급 → 2 상품분류(다중) → 3 기간(다중) → 4 분류별 제안 개수 → 결과 */
@@ -80,6 +83,60 @@
          border-radius:22px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;white-space:nowrap}
   #toast.on{opacity:1}
   @media (prefers-reduced-motion:reduce){#toast{transition:none}}
+
+  /* ── 제안서 만들기(모바일 전용) — 결과 선택 → 제안서 미리보기·편집 → 엑셀/PDF ──
+     PC(iframe 폭 769px 이상)에서는 .m-only 요소가 보이지 않아 기존 화면 그대로 유지된다. */
+  .m-only{display:none!important}
+  @media (max-width:768px){
+    .m-only{display:revert!important}
+    .selbar.m-only,.docbar.m-only{display:flex!important}
+    #resList.pickable .row{grid-template-columns:22px 26px minmax(0,1fr) auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    #resList.pickable .row.picked{border-color:var(--orange);background:#FFFBF6}
+  }
+  .ckb{width:22px;height:22px;border-radius:6px;border:1.5px solid #C9CED6;background:#fff;display:grid;place-items:center}
+  .ckb svg{width:14px;height:14px;opacity:0}
+  .row.picked .ckb{background:var(--orange);border-color:var(--orange)}
+  .row.picked .ckb svg{opacity:1}
+  .selbar{align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:10px}
+  .selbar b{color:var(--orange)}
+  .lnk{background:none;border:0;font-family:inherit;font-size:12.5px;font-weight:800;color:var(--navy);cursor:pointer;padding:4px 0}
+  .docbar{position:sticky;bottom:0;margin:12px -16px -24px;padding:10px 16px 14px;background:var(--panel);border-top:1px solid var(--line)}
+  .docbar .btn{width:100%}
+  /* 제안서 화면 */
+  .dv-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .dv-h b{font-size:16px;font-weight:800;color:var(--ink)}
+  .dv-back{border:1.5px solid var(--line);background:#fff;border-radius:10px;width:36px;height:36px;display:grid;place-items:center;cursor:pointer;color:var(--navy)}
+  .dv-sec{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+  .dv-lb{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline}
+  .dv-lb small{font-size:11.5px;color:var(--muted);font-weight:600}
+  .dv-in{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;color:var(--ink)}
+  .dv-in:focus{outline:none;border-color:var(--orange)}
+  .dv-in.err{border-color:#D9480F}
+  .dv-err{font-size:12px;color:#D9480F;margin-top:6px}
+  .colchips{display:flex;flex-wrap:wrap;gap:6px}
+  .cc{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700;color:var(--ink);font-family:inherit;cursor:pointer}
+  .cc.on{border-color:var(--navy);background:var(--navy);color:#fff}
+  .cc.lock{background:var(--chip);border-color:var(--chip);color:var(--muted);cursor:default}
+  .paper{font-family:'Spoqa Han Sans Neo','Malgun Gothic',sans-serif;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 12px;margin-bottom:10px}
+  .paper h2{font-size:16px;font-weight:800;color:var(--navy);text-align:center;line-height:1.4;word-break:keep-all}
+  .paper h2 .corp{border-bottom:2px dashed var(--orange);cursor:text}
+  .paper h2 .corp.ph{color:#B8BEC8}
+  .paper .asof{font-size:11.5px;color:var(--muted);text-align:right;margin:8px 0 6px}
+  .tblw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+  .dt{border-collapse:collapse;font-size:12.5px;min-width:100%;white-space:nowrap}
+  .dt th{background:var(--navy);color:#fff;font-weight:700;padding:8px 6px;border:1px solid var(--navy)}
+  .dt td{border:1px solid var(--line);padding:6px;text-align:center;font-variant-numeric:tabular-nums}
+  .dt td.l{text-align:left}
+  .dt th:first-child,.dt td:first-child{position:sticky;left:0;z-index:1}
+  .dt td:first-child{background:#fff;box-shadow:1px 0 0 var(--line)}
+  .dt td.x{border:0;padding:0 0 0 4px}
+  .dt th.x{background:none;border:0}
+  .dt input{width:68px;border:1px solid #D7DBE2;border-radius:6px;padding:5px 6px;font-size:12.5px;font-family:inherit;text-align:center;background:#FFFCF7}
+  .dt input.note{width:130px;text-align:left}
+  .dt input:focus{outline:none;border-color:var(--orange)}
+  .rm{border:0;background:none;color:#9AA1AC;font-size:18px;line-height:1;cursor:pointer;padding:4px}
+  .dv-hint{font-size:11.5px;color:var(--muted);margin-top:8px}
+  .dv-empty{text-align:center;color:var(--muted);font-size:13px;padding:22px 0}
 </style>
 </head>
 <body>
@@ -99,12 +156,43 @@
   </div>
 
   <div id="result" hidden>
+    <div class="selbar m-only" id="selBar"></div>
     <div id="resList"></div>
     <div class="acts">
       <button class="btn ghost" onclick="editCond()">조건 수정</button>
       <button class="btn" id="bSave" onclick="saveResult()">제안상품 저장</button>
     </div>
     <p class="saved" id="savedMsg" hidden>마이페이지에 저장한 상품 정보를 확인할 수 있습니다</p>
+    <div class="docbar m-only"><button class="btn" id="bDoc" onclick="openDoc()">제안서 만들기</button></div>
+  </div>
+
+  <!-- 제안서 만들기(모바일 전용): 미리보기 문서를 보면서 법인명·컬럼·입력값 편집 → 엑셀/PDF -->
+  <div id="docView" hidden>
+    <div class="dv-h">
+      <button class="dv-back" onclick="closeDoc()" aria-label="상품 선택으로 돌아가기">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <b>제안서 만들기</b>
+    </div>
+    <div class="dv-sec">
+      <div class="dv-lb">법인명</div>
+      <input class="dv-in" id="dvCorp" maxlength="40" placeholder="(주)미래상사" autocomplete="off" oninput="onCorp()">
+      <div class="dv-err" id="dvCorpErr" hidden>법인명을 입력하세요</div>
+    </div>
+    <div class="dv-sec">
+      <div class="dv-lb">표 컬럼 <small>회색은 필수 항목</small></div>
+      <div class="colchips" id="dvCols"></div>
+    </div>
+    <div class="paper">
+      <h2><span class="corp" id="dvTitleCorp" onclick="$('dvCorp').focus()"></span> 원리금보장상품 제안서</h2>
+      <div class="asof" id="dvAsof"></div>
+      <div class="tblw"><table class="dt" id="dvTable"></table></div>
+      <div class="dv-hint" id="dvHint"></div>
+    </div>
+    <div class="acts">
+      <button class="btn ghost" style="flex:1" onclick="makeDoc('xlsx')">엑셀 다운로드</button>
+      <button class="btn" onclick="makeDoc('pdf')">PDF 다운로드</button>
+    </div>
   </div>
 </div>
 <div id="toast"></div>
@@ -278,8 +366,340 @@ function showResult(){
   }).join('') || `<div class="none">조건에 맞는 상품이 없습니다.</div>`;
   $('savedMsg').hidden=true;
   $('wizard').hidden=true; $('result').hidden=false; window.scrollTo(0,0);
+  if(isMobile()) decorateResult();
 }
 function editCond(){ $('savedMsg').hidden=true; $('result').hidden=true; $('wizard').hidden=false; step=1; render(); window.scrollTo(0,0); }
+
+/* ══ 제안서 만들기(모바일 전용) ══════════════════════════════════════════
+   결과에서 상품을 고르면 PICKS에 담긴다. 조건을 바꿔 다시 검색해도 PICKS는 유지되어
+   여러 조건의 상품을 한 제안서에 모을 수 있다. 수수료·실질수익률·중도해지이율·비고는
+   RM이 직접 입력하는 칸(계산 로직은 추후)이며, 상품을 뺐다가 다시 담아도 입력값은 VALS에 남는다. */
+const isMobile=()=>window.matchMedia('(max-width:768px)').matches;
+const pickKey=r=>[r.cat,r.org,r.fam,r.months].join('|');
+const PICKS=new Map();   // key -> 상품
+const VALS={};           // key -> {fee, real, early, note}
+const DOC_COLS=[
+  {k:'org',   t:'상품제공기관', lock:true},
+  {k:'cat',   t:'상품종류',     lock:true},
+  {k:'period',t:'기간',         lock:true},
+  {k:'rate',  t:'금리',         lock:true},
+  {k:'fee',   t:'수수료',       input:true, ph:'0.00'},
+  {k:'real',  t:'실질수익률',   input:true, ph:'0.00'},
+  {k:'early', t:'중도해지이율', input:true, ph:'0.00'},
+  {k:'note',  t:'비고',         input:true, ph:'메모', wide:true},
+];
+function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+const DOC={corp:lsGet('propDoc.corp',''), cols:Object.assign({fee:false,real:false,early:false,note:false}, lsGet('propDoc.cols',{}))};
+
+const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function resultRows(){ const out=[]; RESULT.forEach(g=>g.rows.forEach(r=>out.push(r))); return out; }
+/* 결과 행에 체크박스를 달고 탭으로 담기/빼기 */
+function decorateResult(){
+  const list=$('resList'), rows=resultRows();
+  list.classList.toggle('pickable', rows.length>0);
+  list.querySelectorAll('.row').forEach((el,i)=>{
+    const r=rows[i]; if(!r) return;
+    const k=pickKey(r);
+    el.dataset.k=k;
+    el.setAttribute('role','checkbox'); el.tabIndex=0;
+    el.insertAdjacentHTML('afterbegin', `<span class="ckb">${CHECK_SVG}</span>`);
+    el.onclick=()=>togglePick(r);
+    el.onkeydown=e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); togglePick(r); } };
+  });
+  syncPicks();
+}
+function togglePick(r){ const k=pickKey(r); if(PICKS.has(k)) PICKS.delete(k); else PICKS.set(k, r); syncPicks(); }
+function pickAll(on){ resultRows().forEach(r=>{ const k=pickKey(r); if(on) PICKS.set(k,r); else PICKS.delete(k); }); syncPicks(); }
+function syncPicks(){
+  const rows=resultRows(), here=rows.filter(r=>PICKS.has(pickKey(r))).length, other=PICKS.size-here;
+  $('resList').querySelectorAll('.row[data-k]').forEach(el=>{ const on=PICKS.has(el.dataset.k); el.classList.toggle('picked', on); el.setAttribute('aria-checked', on); });
+  const all=rows.length && here===rows.length;
+  $('selBar').innerHTML=rows.length
+    ? `<span>제안서에 넣을 상품을 선택하세요${other?` · 다른 조건 <b>${other}</b>개 담김`:''}</span>`+
+      `<button class="lnk" onclick="pickAll(${!all})">${all?'전체 해제':'전체 선택'}</button>`
+    : '';
+  $('bDoc').textContent=PICKS.size?`제안서 만들기 (${PICKS.size})`:'제안서 만들기';
+}
+
+/* ── 제안서 화면 ── */
+function docItems(){
+  return [...PICKS.values()].sort((a,b)=>(CATS.indexOf(a.cat)-CATS.indexOf(b.cat)) || (a.months-b.months) || (b.rate-a.rate) || String(a.org).localeCompare(b.org,'ko'));
+}
+function openDoc(){
+  if(!PICKS.size){ toast('제안서에 넣을 상품을 먼저 선택하세요'); return; }
+  $('dvCorp').value=DOC.corp; $('dvCorp').classList.remove('err'); $('dvCorpErr').hidden=true;
+  $('dvAsof').textContent=MONTH?('기준월 '+MONTH.slice(0,4)+'년 '+MONTH.slice(5,7)+'월'):'';
+  renderDoc();
+  $('result').hidden=true; $('docView').hidden=false; window.scrollTo(0,0);
+}
+function closeDoc(){ $('docView').hidden=true; $('result').hidden=false; syncPicks(); window.scrollTo(0,0); }
+function onCorp(){
+  DOC.corp=$('dvCorp').value; lsSet('propDoc.corp', DOC.corp.trim());
+  if(DOC.corp.trim()){ $('dvCorp').classList.remove('err'); $('dvCorpErr').hidden=true; }
+  renderTitle();
+}
+function renderTitle(){ const c=DOC.corp.trim(), el=$('dvTitleCorp'); el.textContent=c||'(법인명)'; el.classList.toggle('ph', !c); }
+const activeCols=()=>DOC_COLS.filter(c=>c.lock||DOC.cols[c.k]);
+function toggleCol(k){ DOC.cols[k]=!DOC.cols[k]; lsSet('propDoc.cols', DOC.cols); renderDoc(); }
+function rateText(r){ return typeof r.rate==='number'?r.rate.toFixed(2)+'%':'-'; }
+function renderDoc(){
+  renderTitle();
+  $('dvCols').innerHTML=DOC_COLS.map(c=>c.lock
+    ? `<button class="cc lock" tabindex="-1" aria-disabled="true">${esc(c.t)}</button>`
+    : `<button class="cc${DOC.cols[c.k]?' on':''}" aria-pressed="${!!DOC.cols[c.k]}" onclick="toggleCol('${c.k}')">${esc(c.t)}</button>`).join('');
+  const cols=activeCols(), items=docItems();
+  if(!items.length){ $('dvTable').innerHTML=''; $('dvHint').innerHTML='<div class="dv-empty">담은 상품이 없습니다. 이전 화면에서 상품을 선택하세요.</div>'; return; }
+  $('dvTable').innerHTML=`<thead><tr>${cols.map(c=>`<th>${esc(c.t)}</th>`).join('')}<th class="x"></th></tr></thead><tbody>`+
+    items.map(r=>{ const k=pickKey(r), v=VALS[k]||{};
+      return `<tr>`+cols.map(c=>{
+        if(c.input) return `<td><input class="${c.wide?'note':''}" data-k="${esc(k)}" data-f="${c.k}" value="${esc(v[c.k]||'')}" placeholder="${esc(c.ph)}" maxlength="${c.wide?60:20}"${c.wide?'':' inputmode="decimal"'} oninput="onVal(this)" aria-label="${esc(r.org+' '+c.t)}"></td>`;
+        if(c.k==='org') return `<td class="l">${esc(r.org)}</td>`;
+        if(c.k==='cat') return `<td>${esc(r.cat)}</td>`;
+        if(c.k==='period') return `<td>${esc(MONTH_LABEL[r.months]||r.period)}</td>`;
+        return `<td>${rateText(r)}</td>`;
+      }).join('')+`<td class="x"><button class="rm" onclick="dropPick('${esc(k)}')" aria-label="${esc(r.org)} 빼기">×</button></td></tr>`;
+    }).join('')+`</tbody>`;
+  $('dvHint').textContent=cols.some(c=>c.input)?'수수료·실질수익률·중도해지이율·비고는 직접 입력합니다. 숫자만 입력하면 %가 붙습니다.':'';
+}
+function onVal(el){ const k=el.dataset.k; (VALS[k]=VALS[k]||{})[el.dataset.f]=el.value; }
+function dropPick(k){ PICKS.delete(k); renderDoc(); if(!PICKS.size) toast('담은 상품이 없습니다'); }
+/* 숫자만 입력하면 % 를 붙인다(수수료·실질수익률·중도해지이율). 문장은 그대로 */
+function fmtInput(c,v){ v=String(v||'').trim(); if(!v) return ''; return (!c.wide && /^-?\d+(\.\d+)?$/.test(v))?v+'%':v; }
+function docPayload(){
+  const cols=activeCols();
+  return {
+    corp:DOC.corp.trim(), month:MONTH,
+    cols:cols.map(c=>c.t),
+    wide:cols.map(c=>!!c.wide),
+    rows:docItems().map(r=>{ const v=VALS[pickKey(r)]||{};
+      return cols.map(c=> c.input?fmtInput(c,v[c.k])
+        : c.k==='org'?r.org : c.k==='cat'?r.cat : c.k==='period'?(MONTH_LABEL[r.months]||r.period) : rateText(r)); }),
+  };
+}
+
+/* ── 파일 만들기: 엑셀은 서버(openpyxl)가 양식을 만들고, PDF는 화면에서 A4 이미지를 그려
+   서버가 PDF로 묶는다. ① fetch로 서버에 파일을 만들고 ② 돌려받은 GET 주소로 내려받는다.
+   - blob + <a download>: 모바일 크롬이 iframe 안에서 '완료'로 표시하고도 파일을 남기지 않음
+   - 폼을 새 창(_blank)으로 POST: 일부 인앱/내장 브라우저가 본문을 버리고 GET으로 열어 405
+   그래서 다운로드 자체는 항상 GET 주소를 최상위 창에서 연다(첨부 응답이라 화면은 그대로). */
+function _dlToken(){ return 'dl'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function _watchDownload(token, doneMsg){
+  const started=Date.now();
+  const tick=setInterval(()=>{
+    if(document.cookie.indexOf('fileDownloadToken='+token)!==-1){
+      clearInterval(tick); document.cookie='fileDownloadToken=; path=/; max-age=0'; toast(doneMsg);
+    }else if(Date.now()-started>120000) clearInterval(tick);
+  }, 350);
+}
+async function buildAndDownload(kind, payload, doneMsg){
+  const res=await fetch('/api/proposal_doc/'+kind, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  const d=await res.json().catch(()=>({}));
+  if(!res.ok || !d.success || !d.url) throw new Error(d.error||d.message||('서버 '+res.status));
+  const token=_dlToken(), u=d.url+'?dl_token='+encodeURIComponent(token);
+  try{ (window.top||window).location.href=u; }catch(e){ window.location.href=u; }
+  _watchDownload(token, doneMsg);
+}
+let _docBusy=false;
+async function makeDoc(kind){
+  if(!DOC.corp.trim()){
+    $('dvCorp').classList.add('err'); $('dvCorpErr').hidden=false; $('dvCorp').focus();
+    window.scrollTo({top:0, behavior:'smooth'}); return;
+  }
+  if(!PICKS.size){ toast('제안서에 넣을 상품이 없습니다'); return; }
+  if(_docBusy) return;
+  _docBusy=true;
+  const p=docPayload(), name=kind==='xlsx'?'엑셀':'PDF';
+  toast(name+' 파일을 만드는 중…');
+  try{
+    if(kind==='pdf') p.pages=await drawPdfPages(p);
+    await buildAndDownload(kind, p, name+' 다운로드가 완료되었습니다');
+  }catch(e){ toast(name+' 파일을 만들지 못했습니다: '+e.message); }
+  finally{ _docBusy=false; }
+}
+
+/* PDF 양식 — 세로 A4(210×297mm)를 150dpi 캔버스(1240×1754)에 그린다.
+   1쪽: 상단 사진 배너(손글씨 문구 · 퇴직연금 상품제안서 · 안내 문구) → 흰 카드(제목·기준월·상품표)
+        → 주요 제안 내용(안정성·수익성·편의성) → 하단 물결 띠.
+   행이 많으면 다음 쪽부터 표만 이어 그리고, 주요 제안 내용은 마지막 쪽에 둔다.
+   글꼴: 스포카 한 산스 Neo(본문) · 나눔손글씨 펜(상단 문구) — <head>의 웹폰트를 불러온 뒤 그린다.
+   사진: /static/images/proposal_hero.jpg */
+const PDF_FONT='"Spoqa Han Sans Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
+const PDF_HAND='"Nanum Pen Script","Spoqa Han Sans Neo",sans-serif';
+let _heroImg=null, _fontsReady=null;
+function loadHero(){
+  if(_heroImg) return Promise.resolve(_heroImg);
+  return new Promise(res=>{ const im=new Image(); im.onload=()=>{ _heroImg=im; res(im); }; im.onerror=()=>res(null); im.src='/static/images/proposal_hero.jpg'; });
+}
+function loadPdfFonts(){
+  if(!_fontsReady){
+    const want=['400 30px "Spoqa Han Sans Neo"','500 30px "Spoqa Han Sans Neo"','700 30px "Spoqa Han Sans Neo"','400 30px "Nanum Pen Script"'];
+    const all=document.fonts?Promise.all(want.map(f=>document.fonts.load(f,'퇴직연금 상품제안서 0123'))).catch(()=>{}):Promise.resolve();
+    _fontsReady=Promise.race([all, new Promise(r=>setTimeout(r,4000))]);   // 못 불러오면 4초 뒤 기기 글꼴로
+  }
+  return _fontsReady;
+}
+async function drawPdfPages(p){
+  const [hero]=await Promise.all([loadHero(), loadPdfFonts()]);
+  const W=1240, H=1754;
+  const NAVY='#043B72', ORANGE='#F58220', LINE='#D5DCE6', INK='#1F2937', MUTED='#6B7280', BG='#FBF5F0';
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d'); g.textBaseline='middle';
+  const font=(px,w)=>{ g.font=`${w||400} ${px}px ${PDF_FONT}`; };
+  const rr=(x,y,w,h,r)=>{ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); };
+  // 띄어쓰기 단위로 줄바꿈하고, 한 단어가 칸보다 길 때만 글자 단위로 자른다
+  const wrap=(text,maxW)=>{
+    const out=[]; let cur='';
+    const push=w=>{ for(const ch of w){ if(g.measureText(cur+ch).width>maxW && cur){ out.push(cur); cur=ch; } else cur+=ch; } };
+    String(text||'').split(' ').forEach((w,i)=>{ const cand=i&&cur?cur+' '+w:cur+w;
+      if(g.measureText(cand).width<=maxW){ cur=cand; return; } if(cur){ out.push(cur); cur=''; } push(w); });
+    out.push(cur); return out;
+  };
+  const CX=56, CW=W-CX*2, PAD=44, TX=CX+PAD, TW=CW-PAD*2;   // 카드·표 영역
+  // ── 표 치수 ── 짧은 값(종류·기간·금리 등)과 헤더는 한 줄에 들어가게 폭을 먼저 확보하고,
+  //   넘치면 ① 비고 칸을 최소 160까지 → ② 기관명을 최소 150까지 → ③ 그래도 넘치면 전체 비례로 줄인다.
+  const fs=21, lh=29, padX=10;
+  const flex=p.cols.map((t,i)=>i===0||p.wide[i]);
+  let ws=p.cols.map((t,i)=>{ font(fs,700); let w=g.measureText(t).width; font(fs);
+    p.rows.forEach(r=>{ w=Math.max(w, Math.min(flex[i]?(p.wide[i]?300:230):9999, g.measureText(r[i]||'').width)); }); return w+padX*2; });
+  const tot=()=>ws.reduce((a,b)=>a+b,0);
+  if(tot()>TW){
+    let over=tot()-TW;
+    p.wide.forEach((w,i)=>{ if(w && over>0){ const cut=Math.min(over, Math.max(0, ws[i]-160)); ws[i]-=cut; over-=cut; } });
+    if(over>0){ const cut=Math.min(over, Math.max(0, ws[0]-150)); ws[0]-=cut; over-=cut; }
+  }
+  { const t=tot(); ws=ws.map(w=>w*TW/t); }
+  font(fs,700);
+  const hLines=p.cols.map((t,i)=>wrap(t, ws[i]-padX*2));
+  const headH=Math.max(58, Math.max(...hLines.map(l=>l.length))*lh+22);
+  font(fs);
+  const rowsL=p.rows.map(r=>r.map((v,i)=>wrap(v, ws[i]-padX*2)));
+  const rowH=rowsL.map(ls=>Math.max(54, Math.max(...ls.map(l=>l.length))*lh+20));
+  const BOX_H=300, WAVE_TOP=H-150;
+
+  function drawHero(){
+    const HH=720;
+    if(hero){
+      const sw=hero.width*HH/hero.height, sx=W-sw;
+      g.drawImage(hero, 0,0,2,hero.height, 0,0,sx+4,HH);   // 사진 왼쪽 끝 색을 늘려 하늘을 잇는다
+      g.drawImage(hero, sx,0,sw,HH);
+      const gr=g.createLinearGradient(0,0,W*0.68,0);       // 글자 쪽을 밝게 + 이음매를 덮는다
+      gr.addColorStop(0,'rgba(255,248,240,.82)'); gr.addColorStop(.72,'rgba(255,248,240,.40)'); gr.addColorStop(1,'rgba(255,248,240,0)');
+      g.fillStyle=gr; g.fillRect(0,0,W,HH);
+      const top=g.createLinearGradient(0,0,0,180);         // 상단 손글씨 문구 뒤를 살짝 밝게
+      top.addColorStop(0,'rgba(255,250,245,.55)'); top.addColorStop(1,'rgba(255,250,245,0)');
+      g.fillStyle=top; g.fillRect(0,0,W,180);
+    }else{
+      const gr=g.createLinearGradient(0,0,0,HH); gr.addColorStop(0,'#F3E3D6'); gr.addColorStop(1,'#EFC9A4'); g.fillStyle=gr; g.fillRect(0,0,W,HH);
+    }
+    // 상단 오른쪽 손글씨 문구 + 웃는 얼굴
+    g.font=`400 50px ${PDF_HAND}`; g.fillStyle=NAVY; g.textAlign='right';
+    const tag='당신의 더 빛나는 내일을 위해', tx=W-138;
+    g.fillText(tag, tx, 104);
+    g.save(); g.translate(W-100,100); g.strokeStyle=ORANGE; g.fillStyle=ORANGE; g.lineWidth=5; g.lineCap='round';
+    g.beginPath(); g.arc(0,2,15,0.15*Math.PI,0.85*Math.PI); g.stroke();
+    g.beginPath(); g.arc(-8,-10,3.4,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(8,-10,3.4,0,Math.PI*2); g.fill();
+    g.restore();
+    // 제목 + 안내 문구
+    const tc=p.titleColors||[ORANGE, NAVY];   // [퇴직연금, 상품제안서] 글자색 — A안(주황·네이비) 확정
+    g.textAlign='left'; font(104,700);
+    g.fillStyle=tc[0]; g.fillText('퇴직연금', 84, 300);
+    g.fillStyle=tc[1]; g.fillText('상품제안서', 84, 428);
+    g.fillStyle='#24324A'; font(36,400);
+    g.fillText('고객님의 안정적인 노후를 위한', 88, 548); g.fillText('맞춤형 제안입니다.', 88, 600);
+  }
+  function drawCardBg(top){ g.fillStyle='#fff'; rr(0, top, W, H-top+60, 44); g.fill(); }
+  function drawSectionTitle(y, cont){
+    g.fillStyle=ORANGE; g.fillRect(TX, y-24, 9, 48);
+    g.fillStyle=NAVY; font(38,700); g.textAlign='left';
+    const t=`${p.corp} 원리금보장상품 제안서${cont?' (계속)':''}`;
+    const maxW=TW-40; let s=t; while(g.measureText(s+'…').width>maxW && s.length>4) s=s.slice(0,-1);
+    g.fillText(s===t?t:s+'…', TX+26, y);
+    if(p.month){ g.fillStyle=MUTED; font(22); g.textAlign='right'; g.fillText(`기준월 ${p.month.slice(0,4)}년 ${p.month.slice(5,7)}월`, TX+TW, y+50); }
+    return y+82;
+  }
+  function drawHead(y){
+    g.fillStyle=NAVY; rr(TX,y,TW,headH,14); g.fill(); g.fillRect(TX,y+headH-14,TW,14);
+    let x=TX; font(fs,700); g.textAlign='center';
+    hLines.forEach((ls,i)=>{
+      if(i){ g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(x,y+10,1.5,headH-20); }
+      g.fillStyle='#fff';
+      const ty=y+headH/2-(ls.length-1)*lh/2; ls.forEach((s,j)=>g.fillText(s, x+ws[i]/2, ty+j*lh)); x+=ws[i];
+    });
+    return y+headH;
+  }
+  function drawRow(ri, y){
+    const h=rowH[ri];
+    if(ri%2===1){ g.fillStyle='#F7F9FC'; g.fillRect(TX,y,TW,h); }
+    let x=TX; font(fs);
+    rowsL[ri].forEach((ls,i)=>{
+      g.strokeStyle=LINE; g.lineWidth=1.5; g.strokeRect(x,y,ws[i],h);
+      g.fillStyle=INK; g.textAlign='center';
+      const ty=y+h/2-(ls.length-1)*lh/2; ls.forEach((s,j)=>g.fillText(s, x+ws[i]/2, ty+j*lh)); x+=ws[i];
+    });
+    return y+h;
+  }
+  function drawIcon(i, cx, cy){
+    g.save(); g.translate(cx,cy); g.lineCap='round'; g.lineJoin='round';
+    if(i===0){            // 방패 + 체크
+      g.fillStyle=NAVY; g.beginPath(); g.moveTo(0,-38); g.lineTo(32,-26); g.lineTo(30,6); g.quadraticCurveTo(24,30,0,40); g.quadraticCurveTo(-24,30,-30,6); g.lineTo(-32,-26); g.closePath(); g.fill();
+      g.strokeStyle='#fff'; g.lineWidth=7; g.beginPath(); g.moveTo(-13,0); g.lineTo(-3,11); g.lineTo(15,-11); g.stroke();
+    }else if(i===1){      // 막대 + 상승 화살표
+      g.fillStyle=NAVY; [[-30,12,15,26],[-9,0,15,38],[12,-14,15,52]].forEach(b=>{ rr(b[0],b[1],b[2],b[3],3); g.fill(); });
+      g.strokeStyle=ORANGE; g.lineWidth=6; g.beginPath(); g.moveTo(-34,-6); g.lineTo(-12,-22); g.lineTo(4,-12); g.lineTo(26,-32); g.stroke();
+      g.fillStyle=ORANGE; g.beginPath(); g.moveTo(36,-42); g.lineTo(16,-38); g.lineTo(32,-22); g.closePath(); g.fill();
+    }else{                // 하트
+      const heart=s=>{ g.beginPath(); g.moveTo(0,s*0.95); g.bezierCurveTo(-s*1.3,s*0.1,-s*0.9,-s*0.95,0,-s*0.35); g.bezierCurveTo(s*0.9,-s*0.95,s*1.3,s*0.1,0,s*0.95); g.closePath(); };
+      g.fillStyle=ORANGE; heart(42); g.fill();
+      g.strokeStyle='#fff'; g.lineWidth=5; heart(17); g.stroke();
+    }
+    g.restore();
+  }
+  function drawBox(y){
+    const bx=CX+24, bw=CW-48;
+    g.fillStyle='#FDF3EB'; rr(bx,y,bw,BOX_H,28); g.fill();
+    g.fillStyle=ORANGE; g.fillRect(bx+40, y+34, 9, 44);
+    g.fillStyle=NAVY; font(36,700); g.textAlign='left'; g.fillText('주요 제안 내용', bx+66, y+56);
+    const items=[['안정성','원금과 이자를','보장하는 상품 중심'],['수익성','경쟁력 있는 금리로','더 높은 수익 추구'],['편의성','언제 어디서나,','간편한 연금 관리']];
+    const cw=bw/3;
+    items.forEach((it,i)=>{
+      const cx=bx+cw*i+cw/2, iy=y+136;
+      if(i){ g.fillStyle='#EBDACB'; g.fillRect(bx+cw*i, y+100, 2, BOX_H-126); }
+      drawIcon(i, cx, iy);
+      g.fillStyle=INK; font(28,700); g.textAlign='center'; g.fillText(it[0], cx, iy+72);
+      g.fillStyle='#4B5563'; font(23); g.fillText(it[1], cx, iy+108); g.fillText(it[2], cx, iy+138);
+    });
+  }
+  // 하단: 안내 문구 + 오른쪽으로 올라가는 남색 물결 띠(주황 곡선) + 쪽번호
+  function drawFoot(n){
+    g.fillStyle=MUTED; font(19); g.textAlign='left';
+    g.fillText('※ 금리는 기준월 기준이며 실제 가입 시점의 금리와 다를 수 있습니다.', TX, WAVE_TOP-22);
+    g.fillStyle='#EAF0F7'; g.beginPath(); g.moveTo(0,H); g.lineTo(0,H-26); g.quadraticCurveTo(W*0.45,H-70, W,H-118); g.lineTo(W,H); g.closePath(); g.fill();
+    g.fillStyle=NAVY; g.beginPath(); g.moveTo(W*0.22,H); g.quadraticCurveTo(W*0.62,H-52, W,H-104); g.lineTo(W,H); g.closePath(); g.fill();
+    g.strokeStyle=ORANGE; g.lineWidth=7; g.lineCap='round'; g.beginPath(); g.moveTo(W*0.12,H+4); g.quadraticCurveTo(W*0.58,H-74, W+4,H-132); g.stroke();
+    g.fillStyle='#fff'; font(20,500); g.textAlign='right'; g.fillText(String(n), W-60, H-38);
+  }
+
+  const pages=[]; let ri=0, n=0, boxDone=false;
+  const limit=WAVE_TOP-48;
+  while((ri<p.rows.length || !boxDone) && n<30){
+    n++;
+    g.fillStyle=BG; g.fillRect(0,0,W,H);
+    let y;
+    if(n===1){ drawHero(); drawCardBg(668); y=drawSectionTitle(748, false); }
+    else{ drawCardBg(-60); y=drawSectionTitle(100, true); }
+    if(ri<p.rows.length){
+      y=drawHead(y);
+      let drawn=0;
+      while(ri<p.rows.length && (y+rowH[ri]<=limit || !drawn)){ y=drawRow(ri, y); ri++; drawn++; }
+      y+=36;
+    }
+    if(ri>=p.rows.length && y+BOX_H<=limit){ drawBox(y); boxDone=true; }
+    drawFoot(n);
+    pages.push(cv.toDataURL('image/jpeg', 0.9));
+  }
+  return pages;
+}
 
 /* 결과 저장 → 마이페이지(본인 전용, 제안상품 기준월별) */
 async function saveResult(){
