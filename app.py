@@ -3225,7 +3225,7 @@ def _proposal_doc_payload():
     if not corp or not cols:
         return None
     return {'corp': corp, 'month': month, 'cols': cols, 'wide': wide, 'rows': rows,
-            'pages': p.get('pages') or []}
+            'pages': p.get('pages') or [], 'file': p.get('file') or ''}
 
 
 def _proposal_doc_fname(p, ext):
@@ -3365,6 +3365,28 @@ def _jpegs_to_pdf(jpegs):
     out.write(b'trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, xref))
     out.seek(0)
     return out
+
+
+_PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+
+
+@app.route('/api/proposal_doc/pptx', methods=['POST'])
+def api_proposal_doc_pptx():
+    """PPT는 화면(PptxGenJS)에서 편집 가능한 개체로 만들고, 서버는 받아서 첨부로 돌려주기만 한다
+    (운영 서버 자동배포는 파이썬 패키지를 새로 설치하지 않으므로 서버측 PPT 라이브러리를 쓰지 않음)."""
+    import base64
+    p = _proposal_doc_payload()
+    if not p:
+        return jsonify({'error': '요청 형식이 올바르지 않습니다'}), 400
+    try:
+        data = base64.b64decode(str(p['file']), validate=True)
+    except Exception:
+        return jsonify({'error': 'PPT 파일을 읽지 못했습니다'}), 400
+    if data[:2] != b'PK' or len(data) > 40 * 1024 * 1024:   # pptx = zip
+        return jsonify({'error': 'PPT 파일 형식이 올바르지 않습니다'}), 400
+    fname, ascii_name = _proposal_doc_fname(p, 'pptx')
+    logger.info('제안서 PPT 생성: user=%s, corp=%s, %d행', session.get('user', ''), p['corp'], len(p['rows']))
+    return _proposal_doc_store(data, fname, ascii_name, _PPTX_MIME)
 
 
 @app.route('/api/proposal_doc/pdf', methods=['POST'])

@@ -101,7 +101,7 @@
   .selbar b{color:var(--orange)}
   .lnk{background:none;border:0;font-family:inherit;font-size:12.5px;font-weight:800;color:var(--navy);cursor:pointer;padding:4px 0}
   .docbar{position:sticky;bottom:0;margin:12px -16px -24px;padding:10px 16px 14px;background:var(--panel);border-top:1px solid var(--line)}
-  .docbar .btn{width:100%}
+  .docbar .btn{width:100%;background:var(--navy)}
   /* 제안서 화면 */
   .dv-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .dv-h b{font-size:16px;font-weight:800;color:var(--ink)}
@@ -190,8 +190,9 @@
       <div class="dv-hint" id="dvHint"></div>
     </div>
     <div class="acts">
-      <button class="btn ghost" style="flex:1" onclick="makeDoc('xlsx')">엑셀 다운로드</button>
-      <button class="btn" onclick="makeDoc('pdf')">PDF 다운로드</button>
+      <button class="btn ghost" style="flex:1;padding:14px 0" onclick="makeDoc('xlsx')">엑셀</button>
+      <button class="btn" style="padding:14px 0" onclick="makeDoc('pdf')">PDF</button>
+      <button class="btn ghost" style="flex:1;padding:14px 0" onclick="makeDoc('pptx')">PPT</button>
     </div>
   </div>
 </div>
@@ -380,6 +381,7 @@ const PICKS=new Map();   // key -> 상품
 const VALS={};           // key -> {fee, real, early, note}
 const DOC_COLS=[
   {k:'org',   t:'상품제공기관', lock:true},
+  {k:'grade', t:'신용등급'},   // 기관 최종등급(데이터에서 자동) — 기본 표시, 끌 수 있음
   {k:'cat',   t:'상품종류',     lock:true},
   {k:'period',t:'기간',         lock:true},
   {k:'rate',  t:'금리',         lock:true},
@@ -390,7 +392,7 @@ const DOC_COLS=[
 ];
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }
 function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-const DOC={corp:lsGet('propDoc.corp',''), cols:Object.assign({fee:false,real:false,early:false,note:false}, lsGet('propDoc.cols',{}))};
+const DOC={corp:lsGet('propDoc.corp',''), cols:Object.assign({grade:true,fee:false,real:false,early:false,note:false}, lsGet('propDoc.cols',{}))};
 
 const CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function resultRows(){ const out=[]; RESULT.forEach(g=>g.rows.forEach(r=>out.push(r))); return out; }
@@ -442,6 +444,7 @@ function onCorp(){
 function renderTitle(){ const c=DOC.corp.trim(), el=$('dvTitleCorp'); el.textContent=c||'(법인명)'; el.classList.toggle('ph', !c); }
 const activeCols=()=>DOC_COLS.filter(c=>c.lock||DOC.cols[c.k]);
 function toggleCol(k){ DOC.cols[k]=!DOC.cols[k]; lsSet('propDoc.cols', DOC.cols); renderDoc(); }
+function gradeText(r){ return gradeLabel(r.grade)||'-'; }   // AA→AA0, A→A0 (결과 카드와 같은 표기)
 function rateText(r){ return typeof r.rate==='number'?r.rate.toFixed(2)+'%':'-'; }
 function renderDoc(){
   renderTitle();
@@ -455,6 +458,7 @@ function renderDoc(){
       return `<tr>`+cols.map(c=>{
         if(c.input) return `<td><input class="${c.wide?'note':''}" data-k="${esc(k)}" data-f="${c.k}" value="${esc(v[c.k]||'')}" placeholder="${esc(c.ph)}" maxlength="${c.wide?60:20}"${c.wide?'':' inputmode="decimal"'} oninput="onVal(this)" aria-label="${esc(r.org+' '+c.t)}"></td>`;
         if(c.k==='org') return `<td class="l">${esc(r.org)}</td>`;
+        if(c.k==='grade') return `<td>${esc(gradeText(r))}</td>`;
         if(c.k==='cat') return `<td>${esc(r.cat)}</td>`;
         if(c.k==='period') return `<td>${esc(MONTH_LABEL[r.months]||r.period)}</td>`;
         return `<td>${rateText(r)}</td>`;
@@ -474,7 +478,7 @@ function docPayload(){
     wide:cols.map(c=>!!c.wide),
     rows:docItems().map(r=>{ const v=VALS[pickKey(r)]||{};
       return cols.map(c=> c.input?fmtInput(c,v[c.k])
-        : c.k==='org'?r.org : c.k==='cat'?r.cat : c.k==='period'?(MONTH_LABEL[r.months]||r.period) : rateText(r)); }),
+        : c.k==='org'?r.org : c.k==='grade'?gradeText(r) : c.k==='cat'?r.cat : c.k==='period'?(MONTH_LABEL[r.months]||r.period) : rateText(r)); }),
   };
 }
 
@@ -501,6 +505,7 @@ async function buildAndDownload(kind, payload, doneMsg){
   _watchDownload(token, doneMsg);
 }
 let _docBusy=false;
+const DOC_KIND_NAME={xlsx:'엑셀', pdf:'PDF', pptx:'PPT'};
 async function makeDoc(kind){
   if(!DOC.corp.trim()){
     $('dvCorp').classList.add('err'); $('dvCorpErr').hidden=false; $('dvCorp').focus();
@@ -509,23 +514,36 @@ async function makeDoc(kind){
   if(!PICKS.size){ toast('제안서에 넣을 상품이 없습니다'); return; }
   if(_docBusy) return;
   _docBusy=true;
-  const p=docPayload(), name=kind==='xlsx'?'엑셀':'PDF';
+  const p=docPayload(), name=DOC_KIND_NAME[kind];
   toast(name+' 파일을 만드는 중…');
   try{
     if(kind==='pdf') p.pages=await drawPdfPages(p);
+    if(kind==='pptx') p.file=await buildPptx(p);
     await buildAndDownload(kind, p, name+' 다운로드가 완료되었습니다');
   }catch(e){ toast(name+' 파일을 만들지 못했습니다: '+e.message); }
   finally{ _docBusy=false; }
 }
 
-/* PDF 양식 — 세로 A4(210×297mm)를 150dpi 캔버스(1240×1754)에 그린다.
+/* ══ 제안서 양식(PDF · PPT 공용) ══════════════════════════════════════════
+   세로 A4(210×297mm)를 1240×1754 좌표(150dpi)로 배치한다.
    1쪽: 상단 사진 배너(손글씨 문구 · 퇴직연금 상품제안서 · 안내 문구) → 흰 카드(제목·기준월·상품표)
-        → 주요 제안 내용(안정성·수익성·편의성) → 하단 물결 띠.
-   행이 많으면 다음 쪽부터 표만 이어 그리고, 주요 제안 내용은 마지막 쪽에 둔다.
-   글꼴: 스포카 한 산스 Neo(본문) · 나눔손글씨 펜(상단 문구) — <head>의 웹폰트를 불러온 뒤 그린다.
-   사진: /static/images/proposal_hero.jpg */
+        → 주요 제안 내용(안정성·수익성·편의성) → 유의 문구 → 하단 물결 띠.
+   행이 많으면 다음 쪽부터 표만 이어 그리고, 주요 제안 내용·유의 문구는 마지막 쪽에 둔다.
+   proposalLayout()이 위치를 한 번 계산하고, drawPdfPages()(캔버스→JPEG→서버가 PDF로 묶음)와
+   buildPptx()(PptxGenJS, 글·표·도형을 모두 편집 가능한 개체로)가 같은 배치를 그대로 쓴다.
+   글꼴: 스포카 한 산스 Neo · 상단 문구 나눔손글씨 펜(<head> 웹폰트). 사진: /static/images/proposal_hero.jpg */
 const PDF_FONT='"Spoqa Han Sans Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
 const PDF_HAND='"Nanum Pen Script","Spoqa Han Sans Neo",sans-serif';
+const PZ={W:1240, H:1754, NAVY:'#043B72', ORANGE:'#F58220', LINE:'#D5DCE6', INK:'#1F2937', MUTED:'#6B7280', SUB:'#24324A',
+  BG:'#FBF5F0', BOX:'#FDF3EB', ZEBRA:'#F7F9FC', HERO_H:720, CARD_TOP:668, WAVE_TOP:1604, BOX_H:300,
+  CX:56, PAD:44, fs:21, lh:29, padX:10,
+  TAG:'당신의 더 빛나는 내일을 위해', SUBTXT:['고객님의 안정적인 노후를 위한','맞춤형 제안입니다.'],
+  DISC:'※ 금리는 기준월 기준이며 실제 가입 시점의 금리와 다를 수 있습니다.',
+  ITEMS:[['안정성','원금과 이자를','보장하는 상품 중심'],['수익성','경쟁력 있는 금리로','더 높은 수익 추구'],['편의성','언제 어디서나,','간편한 연금 관리']]};
+PZ.CW=PZ.W-PZ.CX*2; PZ.TX=PZ.CX+PZ.PAD; PZ.TW=PZ.CW-PZ.PAD*2;
+const TITLE_COLORS=[PZ.ORANGE, PZ.NAVY];   // [퇴직연금, 상품제안서] — A안(주황·네이비) 확정
+const TITLE_Y=[260, 388], SUB_Y=[500, 552];   // 제목·안내 문구 세로 위치(글자 가운데)
+
 let _heroImg=null, _fontsReady=null;
 function loadHero(){
   if(_heroImg) return Promise.resolve(_heroImg);
@@ -539,166 +557,257 @@ function loadPdfFonts(){
   }
   return _fontsReady;
 }
-async function drawPdfPages(p){
+const pzFont=(g,px,w)=>{ g.font=`${w||400} ${px}px ${PDF_FONT}`; };
+function pzRR(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+// 띄어쓰기 단위로 줄바꿈하고, 한 단어가 칸보다 길 때만 글자 단위로 자른다
+function pzWrap(g,text,maxW){
+  const out=[]; let cur='';
+  const push=w=>{ for(const ch of w){ if(g.measureText(cur+ch).width>maxW && cur){ out.push(cur); cur=ch; } else cur+=ch; } };
+  String(text||'').split(' ').forEach((w,i)=>{ const cand=i&&cur?cur+' '+w:cur+w;
+    if(g.measureText(cand).width<=maxW){ cur=cand; return; } if(cur){ out.push(cur); cur=''; } push(w); });
+  out.push(cur); return out;
+}
+function pzTitle(p, cont){ return `${p.corp} 원리금보장상품 제안서${cont?' (계속)':''}`; }
+function pzMonth(p){ return p.month?`기준월 ${p.month.slice(0,4)}년 ${p.month.slice(5,7)}월`:''; }
+
+async function proposalLayout(p){
   const [hero]=await Promise.all([loadHero(), loadPdfFonts()]);
-  const W=1240, H=1754;
-  const NAVY='#043B72', ORANGE='#F58220', LINE='#D5DCE6', INK='#1F2937', MUTED='#6B7280', BG='#FBF5F0';
-  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
-  const g=cv.getContext('2d'); g.textBaseline='middle';
-  const font=(px,w)=>{ g.font=`${w||400} ${px}px ${PDF_FONT}`; };
-  const rr=(x,y,w,h,r)=>{ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); };
-  // 띄어쓰기 단위로 줄바꿈하고, 한 단어가 칸보다 길 때만 글자 단위로 자른다
-  const wrap=(text,maxW)=>{
-    const out=[]; let cur='';
-    const push=w=>{ for(const ch of w){ if(g.measureText(cur+ch).width>maxW && cur){ out.push(cur); cur=ch; } else cur+=ch; } };
-    String(text||'').split(' ').forEach((w,i)=>{ const cand=i&&cur?cur+' '+w:cur+w;
-      if(g.measureText(cand).width<=maxW){ cur=cand; return; } if(cur){ out.push(cur); cur=''; } push(w); });
-    out.push(cur); return out;
-  };
-  const CX=56, CW=W-CX*2, PAD=44, TX=CX+PAD, TW=CW-PAD*2;   // 카드·표 영역
-  // ── 표 치수 ── 짧은 값(종류·기간·금리 등)과 헤더는 한 줄에 들어가게 폭을 먼저 확보하고,
-  //   넘치면 ① 비고 칸을 최소 160까지 → ② 기관명을 최소 150까지 → ③ 그래도 넘치면 전체 비례로 줄인다.
-  const fs=21, lh=29, padX=10;
+  const g=document.createElement('canvas').getContext('2d');
+  const {fs,lh,padX,TW}=PZ;
+  // 표 폭: 짧은 값(종류·기간·금리 등)과 헤더는 한 줄에 들어가게 먼저 확보하고,
+  //   넘치면 ① 비고 칸을 최소 120까지 → ② 기관명을 최소 150까지 → ③ 그래도 넘치면 전체 비례로 줄인다.
   const flex=p.cols.map((t,i)=>i===0||p.wide[i]);
-  let ws=p.cols.map((t,i)=>{ font(fs,700); let w=g.measureText(t).width; font(fs);
+  let ws=p.cols.map((t,i)=>{ pzFont(g,fs,700); let w=g.measureText(t).width; pzFont(g,fs);
     p.rows.forEach(r=>{ w=Math.max(w, Math.min(flex[i]?(p.wide[i]?300:230):9999, g.measureText(r[i]||'').width)); }); return w+padX*2; });
   const tot=()=>ws.reduce((a,b)=>a+b,0);
   if(tot()>TW){
     let over=tot()-TW;
-    p.wide.forEach((w,i)=>{ if(w && over>0){ const cut=Math.min(over, Math.max(0, ws[i]-160)); ws[i]-=cut; over-=cut; } });
+    p.wide.forEach((w,i)=>{ if(w && over>0){ const cut=Math.min(over, Math.max(0, ws[i]-120)); ws[i]-=cut; over-=cut; } });
     if(over>0){ const cut=Math.min(over, Math.max(0, ws[0]-150)); ws[0]-=cut; over-=cut; }
   }
   { const t=tot(); ws=ws.map(w=>w*TW/t); }
-  font(fs,700);
-  const hLines=p.cols.map((t,i)=>wrap(t, ws[i]-padX*2));
+  pzFont(g,fs,700);
+  const hLines=p.cols.map((t,i)=>pzWrap(g,t, ws[i]-padX*2));
   const headH=Math.max(58, Math.max(...hLines.map(l=>l.length))*lh+22);
-  font(fs);
-  const rowsL=p.rows.map(r=>r.map((v,i)=>wrap(v, ws[i]-padX*2)));
+  pzFont(g,fs);
+  const rowsL=p.rows.map(r=>r.map((v,i)=>pzWrap(g,v, ws[i]-padX*2)));
   const rowH=rowsL.map(ls=>Math.max(54, Math.max(...ls.map(l=>l.length))*lh+20));
-  const BOX_H=300, WAVE_TOP=H-150;
-
-  function drawHero(){
-    const HH=720;
-    if(hero){
-      const sw=hero.width*HH/hero.height, sx=W-sw;
-      g.drawImage(hero, 0,0,2,hero.height, 0,0,sx+4,HH);   // 사진 왼쪽 끝 색을 늘려 하늘을 잇는다
-      g.drawImage(hero, sx,0,sw,HH);
-      const gr=g.createLinearGradient(0,0,W*0.68,0);       // 글자 쪽을 밝게 + 이음매를 덮는다
-      gr.addColorStop(0,'rgba(255,248,240,.82)'); gr.addColorStop(.72,'rgba(255,248,240,.40)'); gr.addColorStop(1,'rgba(255,248,240,0)');
-      g.fillStyle=gr; g.fillRect(0,0,W,HH);
-      const top=g.createLinearGradient(0,0,0,180);         // 상단 손글씨 문구 뒤를 살짝 밝게
-      top.addColorStop(0,'rgba(255,250,245,.55)'); top.addColorStop(1,'rgba(255,250,245,0)');
-      g.fillStyle=top; g.fillRect(0,0,W,180);
-    }else{
-      const gr=g.createLinearGradient(0,0,0,HH); gr.addColorStop(0,'#F3E3D6'); gr.addColorStop(1,'#EFC9A4'); g.fillStyle=gr; g.fillRect(0,0,W,HH);
-    }
-    // 상단 오른쪽 손글씨 문구 + 웃는 얼굴
-    g.font=`400 50px ${PDF_HAND}`; g.fillStyle=NAVY; g.textAlign='right';
-    const tag='당신의 더 빛나는 내일을 위해', tx=W-138;
-    g.fillText(tag, tx, 104);
-    g.save(); g.translate(W-100,100); g.strokeStyle=ORANGE; g.fillStyle=ORANGE; g.lineWidth=5; g.lineCap='round';
-    g.beginPath(); g.arc(0,2,15,0.15*Math.PI,0.85*Math.PI); g.stroke();
-    g.beginPath(); g.arc(-8,-10,3.4,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(8,-10,3.4,0,Math.PI*2); g.fill();
-    g.restore();
-    // 제목 + 안내 문구
-    const tc=p.titleColors||[ORANGE, NAVY];   // [퇴직연금, 상품제안서] 글자색 — A안(주황·네이비) 확정
-    g.textAlign='left'; font(104,700);
-    g.fillStyle=tc[0]; g.fillText('퇴직연금', 84, 300);
-    g.fillStyle=tc[1]; g.fillText('상품제안서', 84, 428);
-    g.fillStyle='#24324A'; font(36,400);
-    g.fillText('고객님의 안정적인 노후를 위한', 88, 548); g.fillText('맞춤형 제안입니다.', 88, 600);
-  }
-  function drawCardBg(top){ g.fillStyle='#fff'; rr(0, top, W, H-top+60, 44); g.fill(); }
-  function drawSectionTitle(y, cont){
-    g.fillStyle=ORANGE; g.fillRect(TX, y-24, 9, 48);
-    g.fillStyle=NAVY; font(38,700); g.textAlign='left';
-    const t=`${p.corp} 원리금보장상품 제안서${cont?' (계속)':''}`;
-    const maxW=TW-40; let s=t; while(g.measureText(s+'…').width>maxW && s.length>4) s=s.slice(0,-1);
-    g.fillText(s===t?t:s+'…', TX+26, y);
-    if(p.month){ g.fillStyle=MUTED; font(22); g.textAlign='right'; g.fillText(`기준월 ${p.month.slice(0,4)}년 ${p.month.slice(5,7)}월`, TX+TW, y+50); }
-    return y+82;
-  }
-  function drawHead(y){
-    g.fillStyle=NAVY; rr(TX,y,TW,headH,14); g.fill(); g.fillRect(TX,y+headH-14,TW,14);
-    let x=TX; font(fs,700); g.textAlign='center';
-    hLines.forEach((ls,i)=>{
-      if(i){ g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(x,y+10,1.5,headH-20); }
-      g.fillStyle='#fff';
-      const ty=y+headH/2-(ls.length-1)*lh/2; ls.forEach((s,j)=>g.fillText(s, x+ws[i]/2, ty+j*lh)); x+=ws[i];
-    });
-    return y+headH;
-  }
-  function drawRow(ri, y){
-    const h=rowH[ri];
-    if(ri%2===1){ g.fillStyle='#F7F9FC'; g.fillRect(TX,y,TW,h); }
-    let x=TX; font(fs);
-    rowsL[ri].forEach((ls,i)=>{
-      g.strokeStyle=LINE; g.lineWidth=1.5; g.strokeRect(x,y,ws[i],h);
-      g.fillStyle=INK; g.textAlign='center';
-      const ty=y+h/2-(ls.length-1)*lh/2; ls.forEach((s,j)=>g.fillText(s, x+ws[i]/2, ty+j*lh)); x+=ws[i];
-    });
-    return y+h;
-  }
-  function drawIcon(i, cx, cy){
-    g.save(); g.translate(cx,cy); g.lineCap='round'; g.lineJoin='round';
-    if(i===0){            // 방패 + 체크
-      g.fillStyle=NAVY; g.beginPath(); g.moveTo(0,-38); g.lineTo(32,-26); g.lineTo(30,6); g.quadraticCurveTo(24,30,0,40); g.quadraticCurveTo(-24,30,-30,6); g.lineTo(-32,-26); g.closePath(); g.fill();
-      g.strokeStyle='#fff'; g.lineWidth=7; g.beginPath(); g.moveTo(-13,0); g.lineTo(-3,11); g.lineTo(15,-11); g.stroke();
-    }else if(i===1){      // 막대 + 상승 화살표
-      g.fillStyle=NAVY; [[-30,12,15,26],[-9,0,15,38],[12,-14,15,52]].forEach(b=>{ rr(b[0],b[1],b[2],b[3],3); g.fill(); });
-      g.strokeStyle=ORANGE; g.lineWidth=6; g.beginPath(); g.moveTo(-34,-6); g.lineTo(-12,-22); g.lineTo(4,-12); g.lineTo(26,-32); g.stroke();
-      g.fillStyle=ORANGE; g.beginPath(); g.moveTo(36,-42); g.lineTo(16,-38); g.lineTo(32,-22); g.closePath(); g.fill();
-    }else{                // 하트
-      const heart=s=>{ g.beginPath(); g.moveTo(0,s*0.95); g.bezierCurveTo(-s*1.3,s*0.1,-s*0.9,-s*0.95,0,-s*0.35); g.bezierCurveTo(s*0.9,-s*0.95,s*1.3,s*0.1,0,s*0.95); g.closePath(); };
-      g.fillStyle=ORANGE; heart(42); g.fill();
-      g.strokeStyle='#fff'; g.lineWidth=5; heart(17); g.stroke();
-    }
-    g.restore();
-  }
-  function drawBox(y){
-    const bx=CX+24, bw=CW-48;
-    g.fillStyle='#FDF3EB'; rr(bx,y,bw,BOX_H,28); g.fill();
-    g.fillStyle=ORANGE; g.fillRect(bx+40, y+34, 9, 44);
-    g.fillStyle=NAVY; font(36,700); g.textAlign='left'; g.fillText('주요 제안 내용', bx+66, y+56);
-    const items=[['안정성','원금과 이자를','보장하는 상품 중심'],['수익성','경쟁력 있는 금리로','더 높은 수익 추구'],['편의성','언제 어디서나,','간편한 연금 관리']];
-    const cw=bw/3;
-    items.forEach((it,i)=>{
-      const cx=bx+cw*i+cw/2, iy=y+136;
-      if(i){ g.fillStyle='#EBDACB'; g.fillRect(bx+cw*i, y+100, 2, BOX_H-126); }
-      drawIcon(i, cx, iy);
-      g.fillStyle=INK; font(28,700); g.textAlign='center'; g.fillText(it[0], cx, iy+72);
-      g.fillStyle='#4B5563'; font(23); g.fillText(it[1], cx, iy+108); g.fillText(it[2], cx, iy+138);
-    });
-  }
-  // 하단: 안내 문구 + 오른쪽으로 올라가는 남색 물결 띠(주황 곡선) + 쪽번호
-  function drawFoot(n){
-    g.fillStyle=MUTED; font(19); g.textAlign='left';
-    g.fillText('※ 금리는 기준월 기준이며 실제 가입 시점의 금리와 다를 수 있습니다.', TX, WAVE_TOP-22);
-    g.fillStyle='#EAF0F7'; g.beginPath(); g.moveTo(0,H); g.lineTo(0,H-26); g.quadraticCurveTo(W*0.45,H-70, W,H-118); g.lineTo(W,H); g.closePath(); g.fill();
-    g.fillStyle=NAVY; g.beginPath(); g.moveTo(W*0.22,H); g.quadraticCurveTo(W*0.62,H-52, W,H-104); g.lineTo(W,H); g.closePath(); g.fill();
-    g.strokeStyle=ORANGE; g.lineWidth=7; g.lineCap='round'; g.beginPath(); g.moveTo(W*0.12,H+4); g.quadraticCurveTo(W*0.58,H-74, W+4,H-132); g.stroke();
-    g.fillStyle='#fff'; font(20,500); g.textAlign='right'; g.fillText(String(n), W-60, H-38);
-  }
-
-  const pages=[]; let ri=0, n=0, boxDone=false;
-  const limit=WAVE_TOP-48;
+  // 쪽 나누기
+  const pages=[], limit=PZ.WAVE_TOP-20, DISC_H=56;
+  let ri=0, n=0, boxDone=false;
   while((ri<p.rows.length || !boxDone) && n<30){
     n++;
-    g.fillStyle=BG; g.fillRect(0,0,W,H);
-    let y;
-    if(n===1){ drawHero(); drawCardBg(668); y=drawSectionTitle(748, false); }
-    else{ drawCardBg(-60); y=drawSectionTitle(100, true); }
+    const pg={n, first:n===1, titleY:n===1?748:100, headY:null, rows:[], boxY:null};
+    let y=pg.titleY+82;
     if(ri<p.rows.length){
-      y=drawHead(y);
-      let drawn=0;
-      while(ri<p.rows.length && (y+rowH[ri]<=limit || !drawn)){ y=drawRow(ri, y); ri++; drawn++; }
+      pg.headY=y; y+=headH;
+      while(ri<p.rows.length && (y+rowH[ri]<=limit || !pg.rows.length)){ pg.rows.push({ri, y}); y+=rowH[ri]; ri++; }
       y+=36;
     }
-    if(ri>=p.rows.length && y+BOX_H<=limit){ drawBox(y); boxDone=true; }
-    drawFoot(n);
+    if(ri>=p.rows.length && y+PZ.BOX_H+DISC_H<=limit){ pg.boxY=y; boxDone=true; }
+    pages.push(pg);
+  }
+  return {hero, ws, hLines, headH, rowsL, rowH, pages};
+}
+
+/* ── 캔버스 그리기 조각(PDF와 PPT 이미지 조각이 함께 쓴다) ── */
+function drawHeroBg(g, hero){   // 사진 + 밝게 덮기 + 웃는 얼굴(글자 제외)
+  const {W, HERO_H:HH}=PZ;
+  if(hero){
+    const sw=hero.width*HH/hero.height, sx=W-sw;
+    g.drawImage(hero, 0,0,2,hero.height, 0,0,sx+4,HH);   // 사진 왼쪽 끝 색을 늘려 하늘을 잇는다
+    g.drawImage(hero, sx,0,sw,HH);
+    const gr=g.createLinearGradient(0,0,W*0.68,0);
+    gr.addColorStop(0,'rgba(255,248,240,.82)'); gr.addColorStop(.72,'rgba(255,248,240,.40)'); gr.addColorStop(1,'rgba(255,248,240,0)');
+    g.fillStyle=gr; g.fillRect(0,0,W,HH);
+    const top=g.createLinearGradient(0,0,0,180);
+    top.addColorStop(0,'rgba(255,250,245,.55)'); top.addColorStop(1,'rgba(255,250,245,0)');
+    g.fillStyle=top; g.fillRect(0,0,W,180);
+  }else{
+    const gr=g.createLinearGradient(0,0,0,HH); gr.addColorStop(0,'#F3E3D6'); gr.addColorStop(1,'#EFC9A4'); g.fillStyle=gr; g.fillRect(0,0,W,HH);
+  }
+  g.save(); g.translate(W-100,100); g.strokeStyle=PZ.ORANGE; g.fillStyle=PZ.ORANGE; g.lineWidth=5; g.lineCap='round';
+  g.beginPath(); g.arc(0,2,15,0.15*Math.PI,0.85*Math.PI); g.stroke();
+  g.beginPath(); g.arc(-8,-10,3.4,0,Math.PI*2); g.fill(); g.beginPath(); g.arc(8,-10,3.4,0,Math.PI*2); g.fill();
+  g.restore();
+}
+function drawIcon(g, i, cx, cy){
+  const {NAVY, ORANGE}=PZ;
+  g.save(); g.translate(cx,cy); g.lineCap='round'; g.lineJoin='round';
+  if(i===0){            // 방패 + 체크
+    g.fillStyle=NAVY; g.beginPath(); g.moveTo(0,-38); g.lineTo(32,-26); g.lineTo(30,6); g.quadraticCurveTo(24,30,0,40); g.quadraticCurveTo(-24,30,-30,6); g.lineTo(-32,-26); g.closePath(); g.fill();
+    g.strokeStyle='#fff'; g.lineWidth=7; g.beginPath(); g.moveTo(-13,0); g.lineTo(-3,11); g.lineTo(15,-11); g.stroke();
+  }else if(i===1){      // 막대 + 상승 화살표
+    g.fillStyle=NAVY; [[-30,12,15,26],[-9,0,15,38],[12,-14,15,52]].forEach(b=>{ pzRR(g,b[0],b[1],b[2],b[3],3); g.fill(); });
+    g.strokeStyle=ORANGE; g.lineWidth=6; g.beginPath(); g.moveTo(-34,-6); g.lineTo(-12,-22); g.lineTo(4,-12); g.lineTo(26,-32); g.stroke();
+    g.fillStyle=ORANGE; g.beginPath(); g.moveTo(36,-42); g.lineTo(16,-38); g.lineTo(32,-22); g.closePath(); g.fill();
+  }else{                // 하트
+    const heart=s=>{ g.beginPath(); g.moveTo(0,s*0.95); g.bezierCurveTo(-s*1.3,s*0.1,-s*0.9,-s*0.95,0,-s*0.35); g.bezierCurveTo(s*0.9,-s*0.95,s*1.3,s*0.1,0,s*0.95); g.closePath(); };
+    g.fillStyle=ORANGE; heart(42); g.fill();
+    g.strokeStyle='#fff'; g.lineWidth=5; heart(17); g.stroke();
+  }
+  g.restore();
+}
+function drawWave(g, oy){   // 하단 물결 띠(oy = 띠 기준 y 이동)
+  const {W, H, NAVY, ORANGE}=PZ;
+  g.save(); g.translate(0, oy||0);
+  g.fillStyle='#EAF0F7'; g.beginPath(); g.moveTo(0,H); g.lineTo(0,H-26); g.quadraticCurveTo(W*0.45,H-70, W,H-118); g.lineTo(W,H); g.closePath(); g.fill();
+  g.fillStyle=NAVY; g.beginPath(); g.moveTo(W*0.22,H); g.quadraticCurveTo(W*0.62,H-52, W,H-104); g.lineTo(W,H); g.closePath(); g.fill();
+  g.strokeStyle=ORANGE; g.lineWidth=7; g.lineCap='round'; g.beginPath(); g.moveTo(W*0.12,H+4); g.quadraticCurveTo(W*0.58,H-74, W+4,H-132); g.stroke();
+  g.restore();
+}
+
+/* ── PDF: 쪽마다 캔버스에 그려 JPEG로 ── */
+async function drawPdfPages(p){
+  const L=await proposalLayout(p);
+  const {W,H,NAVY,ORANGE,LINE,INK,MUTED,BG,TX,TW,CX,CW,BOX_H,fs,lh,padX}=PZ;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d'); g.textBaseline='middle';
+  const font=(px,w)=>pzFont(g,px,w);
+  const tc=p.titleColors||TITLE_COLORS;
+  const pages=[];
+  for(const pg of L.pages){
+    g.fillStyle=BG; g.fillRect(0,0,W,H);
+    if(pg.first){
+      drawHeroBg(g, L.hero);
+      g.font=`400 50px ${PDF_HAND}`; g.fillStyle=NAVY; g.textAlign='right'; g.fillText(PZ.TAG, W-138, 104);
+      g.textAlign='left'; font(104,700);
+      g.fillStyle=tc[0]; g.fillText('퇴직연금', 84, TITLE_Y[0]);
+      g.fillStyle=tc[1]; g.fillText('상품제안서', 84, TITLE_Y[1]);
+      g.fillStyle=PZ.SUB; font(36);
+      g.fillText(PZ.SUBTXT[0], 88, SUB_Y[0]); g.fillText(PZ.SUBTXT[1], 88, SUB_Y[1]);
+    }
+    g.fillStyle='#fff'; pzRR(g, 0, pg.first?PZ.CARD_TOP:-60, W, H+120, 44); g.fill();
+    // 제목·기준월
+    const y0=pg.titleY;
+    g.fillStyle=ORANGE; g.fillRect(TX, y0-24, 9, 48);
+    g.fillStyle=NAVY; font(38,700); g.textAlign='left';
+    const t=pzTitle(p, !pg.first); let s=t; while(g.measureText(s+'…').width>TW-40 && s.length>4) s=s.slice(0,-1);
+    g.fillText(s===t?t:s+'…', TX+26, y0);
+    if(p.month){ g.fillStyle=MUTED; font(22); g.textAlign='right'; g.fillText(pzMonth(p), TX+TW, y0+50); }
+    // 표
+    if(pg.headY!=null){
+      const y=pg.headY, hh=L.headH;
+      g.fillStyle=NAVY; pzRR(g,TX,y,TW,hh,14); g.fill(); g.fillRect(TX,y+hh-14,TW,14);
+      let x=TX; font(fs,700); g.textAlign='center';
+      L.hLines.forEach((ls,i)=>{
+        if(i){ g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(x,y+10,1.5,hh-20); }
+        g.fillStyle='#fff'; const ty=y+hh/2-(ls.length-1)*lh/2; ls.forEach((s2,j)=>g.fillText(s2, x+L.ws[i]/2, ty+j*lh)); x+=L.ws[i];
+      });
+      pg.rows.forEach(({ri,y})=>{
+        const h=L.rowH[ri];
+        if(ri%2===1){ g.fillStyle=PZ.ZEBRA; g.fillRect(TX,y,TW,h); }
+        let x2=TX; font(fs);
+        L.rowsL[ri].forEach((ls,i)=>{
+          g.strokeStyle=LINE; g.lineWidth=1.5; g.strokeRect(x2,y,L.ws[i],h);
+          g.fillStyle=INK; g.textAlign='center';
+          const ty=y+h/2-(ls.length-1)*lh/2; ls.forEach((s2,j)=>g.fillText(s2, x2+L.ws[i]/2, ty+j*lh)); x2+=L.ws[i];
+        });
+      });
+    }
+    // 주요 제안 내용 + 바로 아래 유의 문구
+    if(pg.boxY!=null){
+      const y=pg.boxY, bx=CX+24, bw=CW-48, cw=bw/3;
+      g.fillStyle=PZ.BOX; pzRR(g,bx,y,bw,BOX_H,28); g.fill();
+      g.fillStyle=ORANGE; g.fillRect(bx+40, y+34, 9, 44);
+      g.fillStyle=NAVY; font(36,700); g.textAlign='left'; g.fillText('주요 제안 내용', bx+66, y+56);
+      PZ.ITEMS.forEach((it,i)=>{
+        const cx=bx+cw*i+cw/2, iy=y+136;
+        if(i){ g.fillStyle='#EBDACB'; g.fillRect(bx+cw*i, y+100, 2, BOX_H-126); }
+        drawIcon(g, i, cx, iy);
+        g.fillStyle=INK; font(28,700); g.textAlign='center'; g.fillText(it[0], cx, iy+72);
+        g.fillStyle='#4B5563'; font(23); g.fillText(it[1], cx, iy+108); g.fillText(it[2], cx, iy+138);
+      });
+      g.fillStyle=MUTED; font(19); g.textAlign='left'; g.fillText(PZ.DISC, bx+8, y+BOX_H+34);
+    }
+    drawWave(g);
+    g.fillStyle='#fff'; font(20,500); g.textAlign='right'; g.fillText(String(pg.n), W-60, H-38);
     pages.push(cv.toDataURL('image/jpeg', 0.9));
   }
   return pages;
+}
+
+/* ── PPT: 같은 배치를 PptxGenJS 개체로. 글·표·네모 상자는 모두 편집 가능,
+   사진 배너·아이콘·물결 띠만 이미지(그림)로 넣는다. 결과는 base64 → 서버가 첨부로 돌려준다. ── */
+let _pptxLib=null;
+function loadPptxLib(){
+  if(window.PptxGenJS) return Promise.resolve(window.PptxGenJS);
+  if(!_pptxLib) _pptxLib=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+    s.onload=()=>window.PptxGenJS?res(window.PptxGenJS):rej(new Error('PPT 모듈을 불러오지 못했습니다'));
+    s.onerror=()=>{ _pptxLib=null; rej(new Error('PPT 모듈을 불러오지 못했습니다')); };
+    document.head.appendChild(s);
+  });
+  return _pptxLib;
+}
+function pzCanvasPng(w,h,draw){ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d')); return c.toDataURL('image/png'); }
+async function buildPptx(p){
+  const [Pptx, L]=await Promise.all([loadPptxLib(), proposalLayout(p)]);
+  const {W,H,TX,TW,CX,CW,BOX_H,fs}=PZ;
+  const SW=8.27, SH=11.69, k=SW/W;            // 좌표(px) → 인치
+  const u=v=>+(v*k).toFixed(4), pt=v=>Math.round(v*k*72*10)/10;   // px → pt
+  const hex=c=>c.replace('#','').toUpperCase();
+  const FONT='Spoqa Han Sans Neo', HAND='Nanum Pen Script';
+  const tc=(p.titleColors||TITLE_COLORS).map(hex);
+  const pptx=new Pptx();
+  pptx.defineLayout({name:'A4P', width:SW, height:SH}); pptx.layout='A4P';
+  pptx.title=pzTitle(p, false); pptx.company=''; pptx.author='';
+  // 이미지 조각
+  const heroPng=pzCanvasPng(W, PZ.HERO_H, g=>drawHeroBg(g, L.hero));
+  const iconPng=[0,1,2].map(i=>pzCanvasPng(100,100,g=>drawIcon(g,i,50,50)));
+  const WAVE_H=150;
+  const wavePng=pzCanvasPng(W, WAVE_H, g=>drawWave(g, -(H-WAVE_H)));
+  // 글상자: (x, 글자 가운데 y, 폭, 높이px, 크기px) — 캔버스 textBaseline:middle 과 같은 기준
+  const text=(s, t, x, cy, w, hpx, px, o)=>s.addText(t, Object.assign({x:u(x), y:u(cy-hpx/2), w:u(w), h:u(hpx), fontFace:FONT, fontSize:pt(px),
+    color:hex(PZ.INK), margin:0, valign:'middle', align:'left', fit:'none', wrap:true}, o||{}));
+  const rect=(s,x,y,w,h,color,r)=>s.addShape(r?pptx.ShapeType.roundRect:pptx.ShapeType.rect,
+    Object.assign({x:u(x), y:u(y), w:u(w), h:u(h), fill:{color:hex(color)}, line:{type:'none'}}, r?{rectRadius:u(r)}:{}));
+  for(const pg of L.pages){
+    const s=pptx.addSlide(); s.background={color:hex(PZ.BG)};
+    if(pg.first){
+      s.addImage({data:heroPng, x:0, y:0, w:SW, h:u(PZ.HERO_H)});
+      text(s, PZ.TAG, W-138-760, 104, 760, 70, 50, {fontFace:HAND, color:hex(PZ.NAVY), align:'right'});
+      text(s, '퇴직연금', 80, TITLE_Y[0], 900, 130, 104, {bold:true, color:tc[0]});
+      text(s, '상품제안서', 80, TITLE_Y[1], 900, 130, 104, {bold:true, color:tc[1]});
+      text(s, PZ.SUBTXT.join('\n'), 86, (SUB_Y[0]+SUB_Y[1])/2, 800, 120, 36, {color:hex(PZ.SUB), lineSpacing:pt(52)});
+    }
+    const cardTop=pg.first?PZ.CARD_TOP:0;
+    rect(s, 0, cardTop, W, H-cardTop, '#FFFFFF', pg.first?44:0);
+    if(pg.first) rect(s, 0, cardTop+60, W, H-cardTop-60, '#FFFFFF');   // 카드 아래쪽 모서리는 각지게
+    // 제목·기준월
+    rect(s, TX, pg.titleY-24, 9, 48, PZ.ORANGE);
+    text(s, pzTitle(p, !pg.first), TX+26, pg.titleY, TW-40, 60, 38, {bold:true, color:hex(PZ.NAVY)});
+    if(p.month) text(s, pzMonth(p), TX+TW-400, pg.titleY+50, 400, 34, 22, {color:hex(PZ.MUTED), align:'right'});
+    // 표(편집 가능한 표 개체)
+    if(pg.headY!=null){
+      const cell=(t,o)=>({text:t, options:o||{}});
+      const head=p.cols.map(t=>cell(t,{bold:true, color:'FFFFFF', fill:{color:hex(PZ.NAVY)}}));
+      const body=pg.rows.map(({ri})=>p.rows[ri].map(v=>cell(v||'', ri%2===1?{fill:{color:hex(PZ.ZEBRA)}}:{fill:{color:'FFFFFF'}})));
+      s.addTable([head, ...body], {x:u(TX), y:u(pg.headY), w:u(TW), colW:L.ws.map(u),
+        rowH:[u(L.headH), ...pg.rows.map(({ri})=>u(L.rowH[ri]))],
+        fontFace:FONT, fontSize:pt(fs)-0.5, color:hex(PZ.INK), align:'center', valign:'middle',   // 글꼴이 없는 PC에서 대체 글꼴로 열려도 줄이 덜 넘치게 약간 작게
+        border:{type:'solid', pt:0.75, color:hex(PZ.LINE)}, margin:0.02, autoPage:false});
+    }
+    // 주요 제안 내용 + 유의 문구
+    if(pg.boxY!=null){
+      const y=pg.boxY, bx=CX+24, bw=CW-48, cw=bw/3;
+      rect(s, bx, y, bw, BOX_H, PZ.BOX, 28);
+      rect(s, bx+40, y+34, 9, 44, PZ.ORANGE);
+      text(s, '주요 제안 내용', bx+66, y+56, 500, 56, 36, {bold:true, color:hex(PZ.NAVY)});
+      PZ.ITEMS.forEach((it,i)=>{
+        const cx=bx+cw*i+cw/2, iy=y+136;
+        if(i) rect(s, bx+cw*i, y+100, 2, BOX_H-126, '#EBDACB');
+        s.addImage({data:iconPng[i], x:u(cx-50), y:u(iy-50), w:u(100), h:u(100)});
+        text(s, it[0], cx-cw/2+10, iy+72, cw-20, 40, 28, {bold:true, align:'center'});
+        text(s, it[1]+'\n'+it[2], cx-cw/2+10, iy+123, cw-20, 70, 23, {color:'4B5563', align:'center', lineSpacing:pt(30)});
+      });
+      text(s, PZ.DISC, bx+8, y+BOX_H+34, bw-16, 30, 19, {color:hex(PZ.MUTED)});
+    }
+    s.addImage({data:wavePng, x:0, y:u(H-WAVE_H), w:SW, h:u(WAVE_H)});
+    text(s, String(pg.n), W-160, H-38, 100, 30, 20, {color:'FFFFFF', align:'right', bold:true});
+  }
+  return await pptx.write({outputType:'base64'});
 }
 
 /* 결과 저장 → 마이페이지(본인 전용, 제안상품 기준월별) */
