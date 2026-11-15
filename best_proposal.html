@@ -88,9 +88,17 @@
   .m-only{display:none!important}
   @media (max-width:768px){
     .m-only{display:revert!important}
-    .selbar.m-only,.docbar.m-only{display:flex!important}
+    .selbar.m-only{display:flex!important}
+    /* 결과 하단 버튼 3개(조건 수정·제안상품 저장·제안서 만들기)를 한 줄에 */
+    #resActs .btn{padding:14px 6px;font-size:14px;letter-spacing:-.4px;flex:1 1 0;min-width:0;white-space:nowrap}
+    #resActs .btn.ghost{flex:0 0 auto;padding:14px 12px}
     #resList.pickable .row{grid-template-columns:22px 26px minmax(0,1fr) auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
     #resList.pickable .row.picked{border-color:var(--orange);background:#FFFBF6}
+  }
+  @media (max-width:380px){   /* 폭 360px급 폰: 버튼 3개가 한 줄에 들어가게 */
+    #resActs{gap:6px}
+    #resActs .btn{font-size:13px;padding:14px 4px}
+    #resActs .btn.ghost{padding:14px 10px}
   }
   .ckb{width:22px;height:22px;border-radius:6px;border:1.5px solid #C9CED6;background:#fff;display:grid;place-items:center}
   .ckb svg{width:14px;height:14px;opacity:0}
@@ -99,8 +107,8 @@
   .selbar{align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:10px}
   .selbar b{color:var(--orange)}
   .lnk{background:none;border:0;font-family:inherit;font-size:12.5px;font-weight:800;color:var(--navy);cursor:pointer;padding:4px 0}
-  .docbar{position:sticky;bottom:0;margin:12px -16px -24px;padding:10px 16px 14px;background:var(--panel);border-top:1px solid var(--line)}
-  .docbar .btn{width:100%;background:var(--navy)}
+  .btn.navy{background:var(--navy);position:relative;overflow:visible}
+  .btn .badge{position:absolute;top:-7px;right:-5px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--orange);color:#fff;font-size:12px;font-weight:800;line-height:22px;text-align:center;border:2px solid var(--panel)}
   /* 제안서 화면 */
   .dv-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   .dv-h b{font-size:16px;font-weight:800;color:var(--ink)}
@@ -130,7 +138,7 @@
   .dt td:first-child{background:#fff;box-shadow:1px 0 0 var(--line)}
   .dt td.x{border:0;padding:0 0 0 4px}
   .dt th.x{background:none;border:0}
-  .dt input{width:68px;border:1px solid #D7DBE2;border-radius:6px;padding:5px 6px;font-size:12.5px;font-family:inherit;text-align:center;background:#FFFCF7}
+  .dt input{width:96px;border:1px solid #D7DBE2;border-radius:6px;padding:5px 6px;font-size:12.5px;font-family:inherit;text-align:center;background:#FFFCF7}
   .dt input.note{width:130px;text-align:left}
   .dt input:focus{outline:none;border-color:var(--orange)}
   .rm{border:0;background:none;color:#9AA1AC;font-size:18px;line-height:1;cursor:pointer;padding:4px}
@@ -157,12 +165,12 @@
   <div id="result" hidden>
     <div class="selbar m-only" id="selBar"></div>
     <div id="resList"></div>
-    <div class="acts">
+    <div class="acts" id="resActs">
       <button class="btn ghost" onclick="editCond()">조건 수정</button>
       <button class="btn" id="bSave" onclick="saveResult()">제안상품 저장</button>
+      <button class="btn navy m-only" id="bDoc" onclick="openDoc()">제안서 만들기</button>
     </div>
     <p class="saved" id="savedMsg" hidden>마이페이지에 저장한 상품 정보를 확인할 수 있습니다</p>
-    <div class="docbar m-only"><button class="btn" id="bDoc" onclick="openDoc()">제안서 만들기</button></div>
   </div>
 
   <!-- 제안서 만들기(모바일 전용): 미리보기 문서를 보면서 법인명·컬럼·입력값 편집 → 엑셀/PDF -->
@@ -384,9 +392,9 @@ const DOC_COLS=[
   {k:'cat',   t:'상품종류',     lock:true},
   {k:'period',t:'기간',         lock:true},
   {k:'rate',  t:'금리',         lock:true},
-  {k:'fee',   t:'수수료',       input:true, ph:'0.00'},
-  {k:'real',  t:'실질수익률',   input:true, ph:'0.00'},
-  {k:'early', t:'중도해지이율', input:true, ph:'0.00'},
+  {k:'fee',   t:'수수료',       input:true, ph:'직접 입력'},   // 숫자·글자·특수문자 모두 자유 입력
+  {k:'real',  t:'실질수익률',   input:true, ph:'직접 입력'},
+  {k:'early', t:'중도해지이율', input:true, ph:'직접 입력'},
   {k:'note',  t:'비고',         input:true, ph:'메모', wide:true},
 ];
 function lsGet(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }
@@ -420,7 +428,7 @@ function syncPicks(){
     ? `<span>제안서에 넣을 상품을 선택하세요${other?` · 다른 조건 <b>${other}</b>개 담김`:''}</span>`+
       `<button class="lnk" onclick="pickAll(${!all})">${all?'전체 해제':'전체 선택'}</button>`
     : '';
-  $('bDoc').textContent=PICKS.size?`제안서 만들기 (${PICKS.size})`:'제안서 만들기';
+  $('bDoc').innerHTML='제안서 만들기'+(PICKS.size?`<span class="badge" aria-label="${PICKS.size}개 선택">${PICKS.size}</span>`:'');
 }
 
 /* ── 제안서 화면 ── */
@@ -455,7 +463,7 @@ function renderDoc(){
   $('dvTable').innerHTML=`<thead><tr>${cols.map(c=>`<th>${esc(c.t)}</th>`).join('')}<th class="x"></th></tr></thead><tbody>`+
     items.map(r=>{ const k=pickKey(r), v=VALS[k]||{};
       return `<tr>`+cols.map(c=>{
-        if(c.input) return `<td><input class="${c.wide?'note':''}" data-k="${esc(k)}" data-f="${c.k}" value="${esc(v[c.k]||'')}" placeholder="${esc(c.ph)}" maxlength="${c.wide?60:20}"${c.wide?'':' inputmode="decimal"'} oninput="onVal(this)" aria-label="${esc(r.org+' '+c.t)}"></td>`;
+        if(c.input) return `<td><input class="${c.wide?'note':''}" data-k="${esc(k)}" data-f="${c.k}" value="${esc(v[c.k]||'')}" placeholder="${esc(c.ph)}" maxlength="60" inputmode="text" autocomplete="off" oninput="onVal(this)" aria-label="${esc(r.org+' '+c.t)}"></td>`;
         if(c.k==='org') return `<td class="l">${esc(r.org)}</td>`;
         if(c.k==='grade') return `<td>${esc(gradeText(r))}</td>`;
         if(c.k==='cat') return `<td>${esc(r.cat)}</td>`;
@@ -463,12 +471,12 @@ function renderDoc(){
         return `<td>${rateText(r)}</td>`;
       }).join('')+`<td class="x"><button class="rm" onclick="dropPick('${esc(k)}')" aria-label="${esc(r.org)} 빼기">×</button></td></tr>`;
     }).join('')+`</tbody>`;
-  $('dvHint').textContent=cols.some(c=>c.input)?'수수료·실질수익률·중도해지이율·비고는 직접 입력합니다. 숫자만 입력하면 %가 붙습니다.':'';
+  $('dvHint').textContent=cols.some(c=>c.input)?'수수료·실질수익률·중도해지이율·비고는 숫자·글자·기호 모두 입력한 그대로 들어갑니다.':'';
 }
 function onVal(el){ const k=el.dataset.k; (VALS[k]=VALS[k]||{})[el.dataset.f]=el.value; }
 function dropPick(k){ PICKS.delete(k); renderDoc(); if(!PICKS.size) toast('담은 상품이 없습니다'); }
-/* 숫자만 입력하면 % 를 붙인다(수수료·실질수익률·중도해지이율). 문장은 그대로 · 비워 두면 '-'(비고는 빈칸) */
-function fmtInput(c,v){ v=String(v||'').trim(); if(!v) return c.wide?'':'-'; return (!c.wide && /^-?\d+(\.\d+)?$/.test(v))?v+'%':v; }
+/* 입력한 글자 그대로(숫자·글자·기호 모두) · 비워 두면 '-'(비고는 빈칸) */
+function fmtInput(c,v){ v=String(v||'').trim(); if(!v) return c.wide?'':'-'; return v; }
 function docPayload(){
   const cols=activeCols();
   return {
@@ -476,6 +484,7 @@ function docPayload(){
     cats:[...new Set(docItems().map(r=>r.cat))],
     cols:cols.map(c=>c.t),
     wide:cols.map(c=>!!c.wide),
+    inp:cols.map(c=>!!c.input && !c.wide),   // 직접 입력 칸(수수료·실질수익률·중도해지이율) — 표 폭 계산용
     rows:docItems().map(r=>{ const v=VALS[pickKey(r)]||{};
       return cols.map(c=> c.input?fmtInput(c,v[c.k])
         : c.k==='org'?r.org : c.k==='grade'?gradeText(r) : c.k==='cat'?r.cat : c.k==='period'?(MONTH_LABEL[r.months]||r.period) : rateText(r)); }),
@@ -527,19 +536,23 @@ async function makeDoc(kind){
 /* ══ 제안서 양식(PDF · PPT 공용) ══════════════════════════════════════════
    세로 A4(210×297mm)를 1240×1754 좌표(150dpi)로 배치한다. 흰 바탕 보고서형.
    1쪽: 상단(법인명 · 퇴직연금 상품제안서 · 안내 문구 + 오른쪽 건물 그림) → 제안 개요(제안상품·제안목적·기준월)
-        → 상품 제안 내역(표) → 제안 POINT → 유의 문구 · 오른쪽 아래 주황 곡선.
-   행이 많으면 다음 쪽부터 표만 이어 그리고, 제안 POINT·유의 문구는 마지막 쪽에 둔다.
+        → 상품 제안 내역(표) → 상품 선택 포인트(카드 4개) → 유의 문구 · 오른쪽 아래 주황 곡선.
+   행이 많으면 다음 쪽부터 표만 이어 그리고, 상품 선택 포인트·유의 문구는 마지막 쪽에 둔다.
    proposalLayout()이 위치를 한 번 계산하고, drawPdfPages()(캔버스→JPEG→서버가 PDF로 묶음)와
    buildPptx()(PptxGenJS, 글·표·도형을 모두 편집 가능한 개체로)가 같은 배치를 그대로 쓴다.
    글꼴: 스포카 한 산스 Neo(<head> 웹폰트). 그림: /static/images/proposal_building.jpg */
 const PDF_FONT='"Spoqa Han Sans Neo","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
 const PZ={W:1240, H:1754, NAVY:'#043B72', ORANGE:'#F58220', LINE:'#D5DCE6', INK:'#1F2937', MUTED:'#6B7280', SUB:'#4B5563',
-  FRAME:'#E3E7EE', PEACH:'#FDF1E7', ZEBRA:'#F7F9FC',
-  CX:100, fs:21, lh:29, padX:10, OV_Y:550, OV_H:240, BOX_H:300, DISC_GAP:40,
+  FRAME:'#E3E7EE', ZEBRA:'#F7F9FC',
+  CX:100, fs:21, lh:29, padX:10, OV_Y:550, OV_H:240, BOX_H:318, DISC_GAP:40,
   SUBTXT:['안정적인 운용과 수익성 제고를 위한','퇴직연금 원리금보장상품을 제안드립니다.'],
   DISC:'※ 본 제안은 기준월 기준 시장금리 및 판매조건을 반영한 것으로, 실제 계약 시 변동될 수 있습니다.',
   PURPOSE:['퇴직연금 적립금의','안정적 운용 및 수익률 제고'],
-  POINTS:[['원리금 보장으로','안정성 확보'],['경쟁력 있는','금리'],['퇴직연금 운용','수익률 제고']]};
+  SEL_TITLE:'상품 선택 포인트',
+  SELPTS:[['우량 금융기관의 안정성',['신뢰도 높은 금융기관의','우수한 상품으로 안정적인','운용이 가능합니다.']],
+          ['경쟁력 있는 금리',['시장 금리 대비','우수한 금리 조건을','제공합니다.']],
+          ['다양한 상품 구성',['정기예금, ELB, GIC 등','다양한 상품으로','선택의 폭을 넓혔습니다.']],
+          ['맞춤형 컨설팅',['고객의 투자성향과 제도를','고려한 맞춤형 상품을','제안드립니다.']]]};
 PZ.TX=PZ.CX; PZ.TW=PZ.W-PZ.CX*2;
 const TITLE_COLORS=[PZ.NAVY, PZ.ORANGE];   // [법인명, 퇴직연금 상품제안서]
 const TITLE_Y=[196, 296], SUB_Y=[388, 434];
@@ -575,17 +588,22 @@ async function proposalLayout(p){
   const [hero]=await Promise.all([loadHero(), loadPdfFonts()]);
   const g=document.createElement('canvas').getContext('2d');
   const {fs,lh,padX,TW,H}=PZ;
-  // 표 폭: 짧은 값(종류·기간·금리 등)과 헤더는 한 줄에 들어가게 먼저 확보하고,
-  //   넘치면 ① 비고 칸을 최소 120까지 → ② 기관명을 최소 150까지 → ③ 그래도 넘치면 전체 비례로 줄인다.
-  const flex=p.cols.map((t,i)=>i===0||p.wide[i]);
-  let ws=p.cols.map((t,i)=>{ pzFont(g,fs,700); let w=g.measureText(t).width; pzFont(g,fs);
-    p.rows.forEach(r=>{ w=Math.max(w, Math.min(flex[i]?(p.wide[i]?300:230):9999, g.measureText(r[i]||'').width)); }); return w+padX*2; });
+  // 표 폭: 짧은 값(신용등급·종류·기간·금리)과 헤더는 한 줄에 들어가게 먼저 확보하고, 넘치면
+  //   ① 비고를 최소 120까지 → ② 직접 입력 칸(자유 글)을 헤더 폭까지 → ③ 기관명을 최소 150까지 → ④ 그래도 넘치면 전체 비례.
+  const inp=p.inp||p.cols.map(()=>false);
+  const cap=i=>p.wide[i]?300:(inp[i]?200:(i===0?230:9999));
+  const headW=p.cols.map(t=>{ pzFont(g,fs,700); return g.measureText(t).width+padX*2; });
+  let ws=p.cols.map((t,i)=>{ let w=headW[i]-padX*2; pzFont(g,fs);
+    p.rows.forEach(r=>{ w=Math.max(w, Math.min(cap(i), g.measureText(r[i]||'').width)); }); return w+padX*2; });
   const tot=()=>ws.reduce((a,b)=>a+b,0);
-  if(tot()>TW){
-    let over=tot()-TW;
-    p.wide.forEach((w,i)=>{ if(w && over>0){ const cut=Math.min(over, Math.max(0, ws[i]-120)); ws[i]-=cut; over-=cut; } });
-    if(over>0){ const cut=Math.min(over, Math.max(0, ws[0]-150)); ws[0]-=cut; over-=cut; }
+  let over=tot()-TW;
+  const shrink=(test,min)=>{ ws.forEach((w,i)=>{ if(over>0 && test(i)){ const cut=Math.min(over, Math.max(0, w-min(i))); ws[i]-=cut; over-=cut; } }); };
+  if(over>0) shrink(i=>p.wide[i], ()=>120);
+  if(over>0){   // 직접 입력 칸들은 고르게 줄인다
+    const ids=ws.map((w,i)=>i).filter(i=>inp[i]);
+    for(let k=0;k<40 && over>0 && ids.length;k++) ids.forEach(i=>{ if(over>0){ const cut=Math.min(over, Math.max(0, ws[i]-headW[i]), 4); ws[i]-=cut; over-=cut; } });
   }
+  if(over>0) shrink(i=>i===0, ()=>150);
   { const t=tot(); ws=ws.map(w=>w*TW/t); }
   pzFont(g,fs,700);
   const hLines=p.cols.map((t,i)=>pzWrap(g,t, ws[i]-padX*2));
@@ -612,17 +630,18 @@ async function proposalLayout(p){
 }
 
 /* ── 캔버스 그리기 조각(PDF와 PPT 그림 조각이 함께 쓴다) ── */
-function drawHeroArt(g, hero){   // 오른쪽 위 건물 그림(왼쪽·아래 가장자리를 흰색으로 흐리게)
-  const {W}=PZ, HH=500;
+function drawHeroArt(g, hero){   // 오른쪽 위 건물 그림 — 그림 자체가 흰 배경이라 흐림 처리 없이 선명하게, 가장자리만 살짝
+  const {W}=PZ, HH=520;
   if(!hero) return;
   const sw=hero.width*HH/hero.height, sx=W-sw;
+  g.imageSmoothingQuality='high';
   g.drawImage(hero, sx, 0, sw, HH);
-  let gr=g.createLinearGradient(sx,0,sx+170,0);
+  let gr=g.createLinearGradient(sx,0,sx+40,0);   // 왼쪽 끝 이음매만 가린다(건물에는 닿지 않음)
   gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(1,'rgba(255,255,255,0)');
-  g.fillStyle=gr; g.fillRect(sx-2,0,172,HH);
-  gr=g.createLinearGradient(0,HH-80,0,HH);
+  g.fillStyle=gr; g.fillRect(sx-2,0,42,HH);
+  gr=g.createLinearGradient(0,HH-16,0,HH);         // 아래 끝 이음매
   gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(1,'rgba(255,255,255,1)');
-  g.fillStyle=gr; g.fillRect(sx-2,HH-80,sw+2,80);
+  g.fillStyle=gr; g.fillRect(sx-2,HH-16,sw+2,16);
 }
 function drawCorner(g, oy){   // 오른쪽 아래 주황 곡선 장식
   const {W,H}=PZ;
@@ -633,7 +652,7 @@ function drawCorner(g, oy){   // 오른쪽 아래 주황 곡선 장식
   g.fillStyle='rgba(245,130,32,.25)'; g.beginPath(); g.moveTo(W-620,H); g.quadraticCurveTo(W-240,H-70, W,H-200); g.lineTo(W,H-170); g.quadraticCurveTo(W-230,H-48, W-540,H); g.closePath(); g.fill();
   g.restore();
 }
-function drawLineIcon(g, kind, cx, cy, color){   // 선 아이콘(제안 개요: layers·target·calendar / POINT: shield·coins·bars / check)
+function drawLineIcon(g, kind, cx, cy, color){   // 선 아이콘(제안 개요: layers·target·calendar)
   g.save(); g.translate(cx,cy); g.strokeStyle=color; g.fillStyle=color; g.lineWidth=4.5; g.lineCap='round'; g.lineJoin='round';
   const P=(pts,close)=>{ g.beginPath(); pts.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1])); if(close) g.closePath(); g.stroke(); };
   if(kind==='layers'){
@@ -658,7 +677,39 @@ function drawLineIcon(g, kind, cx, cy, color){   // 선 아이콘(제안 개요:
   }
   g.restore();
 }
-const OV_ICONS=['layers','target','calendar'], PT_ICONS=['shield','coins','bars'];
+const OV_ICONS=['layers','target','calendar'];
+/* 상품 선택 포인트: 카드 4개 배치(제목·설명 글자는 칸에 맞게 줄인 크기) — PDF·PPT 공용 */
+function selCards(y0){
+  const g=document.createElement('canvas').getContext('2d');
+  const bx=PZ.TX-20, bw=PZ.TW+40, gap=16, cw=(bw-gap*3)/4, cy=y0+68, ch=250, pad=20, inner=cw-pad*2;
+  const fit=(texts,start,min,w)=>{ let px=start; for(;px>min;px--){ pzFont(g,px,w); if(texts.every(t=>g.measureText(t).width<=inner)) break; } return px; };
+  const tpx=fit(PZ.SELPTS.map(x=>x[0]),22,16,700), dpx=fit(PZ.SELPTS.flatMap(x=>x[1]),19,14,400);
+  return {bx, bw, cw, cy, ch, pad, tpx, dpx, cards:PZ.SELPTS.map((x,i)=>({x:bx+i*(cw+gap), title:x[0], lines:x[1]}))};
+}
+function drawSelIcon(g, i, cx, cy){   // 연한 주황 원 + 주황 아이콘(방패·%·문서·사람)
+  const O=PZ.ORANGE;
+  g.save(); g.fillStyle='#FDEBDD'; g.beginPath(); g.arc(cx,cy,34,0,Math.PI*2); g.fill();
+  g.translate(cx,cy); g.strokeStyle=O; g.fillStyle=O; g.lineWidth=4; g.lineCap='round'; g.lineJoin='round';
+  if(i===0){
+    g.beginPath(); g.moveTo(0,-17); g.lineTo(14,-11); g.quadraticCurveTo(14,8,0,18); g.quadraticCurveTo(-14,8,-14,-11); g.closePath(); g.stroke();
+  }else if(i===1){
+    g.font=`700 34px ${PDF_FONT}`; g.textAlign='center'; g.textBaseline='middle'; g.fillText('%',0,2);
+  }else if(i===2){
+    g.beginPath(); g.moveTo(-12,-17); g.lineTo(5,-17); g.lineTo(13,-9); g.lineTo(13,17); g.lineTo(-12,17); g.closePath(); g.fill();
+    g.strokeStyle='#fff'; g.lineWidth=2.6; [-5,1,7].forEach(y=>{ g.beginPath(); g.moveTo(-6,y); g.lineTo(7,y); g.stroke(); });
+  }else{
+    const person=(x,y,sz)=>{ g.beginPath(); g.arc(x,y-sz*0.55,sz*0.42,0,Math.PI*2); g.fill(); g.beginPath(); g.moveTo(x-sz*0.8,y+sz*0.95); g.quadraticCurveTo(x-sz*0.8,y,x,y); g.quadraticCurveTo(x+sz*0.8,y,x+sz*0.8,y+sz*0.95); g.closePath(); g.fill(); };
+    g.globalAlpha=.75; person(8,0,15); g.globalAlpha=1; person(-6,2,17);
+  }
+  g.restore();
+}
+function drawMedal(g, cx, cy){   // 제목 앞 주황 원 + 흰 리본
+  g.save(); g.fillStyle=PZ.ORANGE; g.beginPath(); g.arc(cx,cy,19,0,Math.PI*2); g.fill();
+  g.strokeStyle='#fff'; g.lineWidth=2.6; g.lineJoin='round';
+  g.beginPath(); g.arc(cx,cy-3,7,0,Math.PI*2); g.stroke();
+  g.beginPath(); g.moveTo(cx-5,cy+2); g.lineTo(cx-8,cy+12); g.lineTo(cx-3,cy+9); g.lineTo(cx,cy+13); g.lineTo(cx+3,cy+9); g.lineTo(cx+8,cy+12); g.lineTo(cx+5,cy+2); g.stroke();
+  g.restore();
+}
 function ovItems(p){ return [['제안상품','원리금보장상품', pzCats(p)], ['제안목적', PZ.PURPOSE[0], PZ.PURPOSE[1]], ['기준월', pzMonthText(p), '']]; }
 
 /* ── PDF: 쪽마다 캔버스에 그려 JPEG로 ── */
@@ -713,19 +764,17 @@ async function drawPdfPages(p){
         });
       });
     }
-    // 제안 POINT + 유의 문구
+    // 상품 선택 포인트(카드 4개) + 유의 문구
     if(pg.boxY!=null){
-      const y=pg.boxY, bx=TX-20, bw=TW+40;
-      g.fillStyle=PZ.PEACH; pzRR(g,bx,y,bw,BOX_H,24); g.fill();
-      drawLineIcon(g,'check', TX+18, y+52, ORANGE);
-      g.fillStyle=NAVY; font(32,700); g.textAlign='left'; g.fillText('제안 POINT', TX+54, y+52);
-      const iy=y+96, ih=BOX_H-120, ix=TX, iw=TW, cw=iw/3;
-      g.fillStyle='#fff'; pzRR(g,ix,iy,iw,ih,16); g.fill();
-      PZ.POINTS.forEach((pt,i)=>{
-        const cx=ix+cw*i+cw/2;
-        if(i){ g.fillStyle='#F1E4D8'; g.fillRect(ix+cw*i, iy+26, 2, ih-52); }
-        drawLineIcon(g, PT_ICONS[i], cx, iy+52, ORANGE);
-        g.fillStyle=INK; font(25,700); g.textAlign='center'; g.fillText(pt[0], cx, iy+116); g.fillText(pt[1], cx, iy+148);
+      const y=pg.boxY, C=selCards(y);
+      drawMedal(g, TX+2, y+24);
+      g.fillStyle=NAVY; font(32,700); g.textAlign='left'; g.fillText(PZ.SEL_TITLE, TX+36, y+24);
+      C.cards.forEach((c,i)=>{
+        g.fillStyle='#F6F8FB'; pzRR(g,c.x,C.cy,C.cw,C.ch,16); g.fill();
+        g.strokeStyle='#E6EAF0'; g.lineWidth=1.5; pzRR(g,c.x,C.cy,C.cw,C.ch,16); g.stroke();
+        drawSelIcon(g, i, c.x+C.pad+34, C.cy+C.pad+34);
+        g.fillStyle=NAVY; font(C.tpx,700); g.textAlign='left'; g.fillText(c.title, c.x+C.pad, C.cy+128);
+        g.fillStyle=PZ.SUB; font(C.dpx); c.lines.forEach((t,j)=>g.fillText(t, c.x+C.pad, C.cy+170+j*30));
       });
       g.fillStyle=MUTED; font(19); g.textAlign='left'; g.fillText(PZ.DISC, TX, y+BOX_H+PZ.DISC_GAP);
     }
@@ -763,10 +812,11 @@ async function buildPptx(p){
   pptx.defineLayout({name:'A4P', width:SW, height:SH}); pptx.layout='A4P';
   pptx.title=`${p.corp} 퇴직연금 상품제안서`; pptx.company=''; pptx.author='';
   // 그림 조각
-  const HERO_X=600, HERO_H=500;
+  const HERO_X=560, HERO_H=520;
   const heroPng=L.hero?pzCanvasPng(W-HERO_X, HERO_H, g=>{ g.translate(-HERO_X,0); drawHeroArt(g, L.hero); }):null;
   const icon=(kind,color)=>pzCanvasPng(100,100,g=>drawLineIcon(g,kind,50,50,color));
-  const ovPng=OV_ICONS.map(kd=>icon(kd,PZ.NAVY)), ptPng=PT_ICONS.map(kd=>icon(kd,PZ.ORANGE)), chkPng=icon('check',PZ.ORANGE);
+  const ovPng=OV_ICONS.map(kd=>icon(kd,PZ.NAVY));
+  const selPng=[0,1,2,3].map(i=>pzCanvasPng(80,80,g=>drawSelIcon(g,i,40,40))), medalPng=pzCanvasPng(44,44,g=>drawMedal(g,22,22));
   const CORNER_W=640, CORNER_H=220;
   const cornerPng=pzCanvasPng(CORNER_W, CORNER_H, g=>{ g.translate(-(W-CORNER_W), -(H-CORNER_H)); drawCorner(g); });
   // 글상자: (x, 글자 가운데 y, 폭, 높이px, 크기px) — 캔버스 textBaseline:middle 과 같은 기준
@@ -805,17 +855,15 @@ async function buildPptx(p){
         border:{type:'solid', pt:0.75, color:hex(PZ.LINE)}, margin:0.02, autoPage:false});
     }
     if(pg.boxY!=null){
-      const y=pg.boxY, bx=TX-20, bw=TW+40;
-      rect(s, bx, y, bw, BOX_H, PZ.PEACH, 24);
-      img(s, chkPng, TX+18-50, y+52-50, 100, 100);
-      text(s, '제안 POINT', TX+54, y+52, 500, 50, 32, {bold:true, color:hex(PZ.NAVY)});
-      const iy=y+96, ih=BOX_H-120, cw=TW/3;
-      rect(s, TX, iy, TW, ih, 'FFFFFF', 16);
-      PZ.POINTS.forEach((ptx,i)=>{
-        const cx=TX+cw*i+cw/2;
-        if(i) rect(s, TX+cw*i, iy+26, 2, ih-52, '#F1E4D8');
-        img(s, ptPng[i], cx-50, iy+2, 100, 100);
-        text(s, ptx[0]+'\n'+ptx[1], cx-cw/2+10, iy+132, cw-20, 76, 25, {bold:true, align:'center', lineSpacing:pt(32)});
+      const y=pg.boxY;
+      img(s, medalPng, TX+2-22, y+24-22, 44, 44);
+      text(s, PZ.SEL_TITLE, TX+36, y+24, 600, 50, 32, {bold:true, color:hex(PZ.NAVY)});
+      const C=selCards(y);
+      C.cards.forEach((c,i)=>{
+        rect(s, c.x, C.cy, C.cw, C.ch, '#F6F8FB', 16, {color:'E6EAF0', width:1});
+        img(s, selPng[i], c.x+C.pad-6, C.cy+C.pad-6, 80, 80);
+        text(s, c.title, c.x+C.pad, C.cy+128, C.cw-C.pad*2+14, 36, C.tpx-2, {bold:true, color:hex(PZ.NAVY)});   // 대체 글꼴로 열려도 한 줄에 들어가게 약간 작게
+        text(s, c.lines.join('\n'), c.x+C.pad, C.cy+200, C.cw-C.pad*2+14, 96, C.dpx-1, {color:hex(PZ.SUB), lineSpacing:pt(30)});
       });
       text(s, PZ.DISC, TX, y+BOX_H+PZ.DISC_GAP, TW, 30, 19, {color:hex(PZ.MUTED)});
     }
